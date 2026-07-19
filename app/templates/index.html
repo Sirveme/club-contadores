@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0b1512">
+  <title>Club de Contadores — Perú Sistemas</title>
+  <meta name="description" content="El directorio de contadores del Perú + los nuevos negocios de tu distrito cada mes.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/css/styles.css?v=1">
+</head>
+<body>
+  <div class="app" id="app">
+
+    <!-- Barra de progreso del embudo -->
+    <div class="progress" id="progress" aria-hidden="true">
+      <span class="dot on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+
+    <!-- ETAPA 0 — Portada (gancho) -->
+    <section class="stage active" data-stage="0">
+      <div class="brand">
+        <div class="brand-mark">₡</div>
+        <div class="brand-name">Club de Contadores</div>
+      </div>
+      <h1 class="hook">Los <b>nuevos negocios</b> de tu distrito, cada mes.</h1>
+      <p class="value">El directorio de contadores del Perú + las nuevas empresas y RUC que se dan de alta cerca de ti.</p>
+
+      <div class="social">
+        <span class="social-dot"></span>
+        Ya somos más de <b>{{ estudios_total }}</b> estudios contables en el Perú
+      </div>
+
+      <div class="video">
+        {% if video_url %}
+        <iframe src="{{ video_url }}" title="Video" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+        {% else %}
+        <div class="video-placeholder">
+          <div class="play">▶</div>
+          <span>Video explicativo (próximamente)</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <button class="cta" data-next="1">Quiero mis nuevos negocios</button>
+      <p class="fineprint">Gratis. Sin compromiso. Toma 30 segundos.</p>
+    </section>
+
+    <!-- ETAPA 1 — RUC + Distrito -->
+    <section class="stage" data-stage="1">
+      <h2 class="step-title">Tu estudio</h2>
+      <p class="step-sub">Ingresa tu RUC y elige tu distrito.</p>
+
+      <label class="field">
+        <span>RUC del estudio</span>
+        <input id="ruc" inputmode="numeric" maxlength="11" placeholder="20601234567" autocomplete="off">
+      </label>
+      <div id="razon" class="razon" hidden></div>
+
+      <label class="field">
+        <span>Distrito</span>
+        <div class="combo">
+          <input id="distrito" placeholder="Busca tu distrito…" autocomplete="off">
+          <div id="combo-list" class="combo-list" hidden></div>
+        </div>
+      </label>
+
+      <div id="err1" class="err" hidden></div>
+
+      <button class="cta" id="btn-validar">Continuar</button>
+      <button class="ghost" data-back="0">← Volver</button>
+    </section>
+
+    <!-- ETAPA 2 — Adelanto + captura de contacto -->
+    <section class="stage" data-stage="2">
+      <h2 class="step-title">En <span class="dist-name">tu distrito</span></h2>
+      <p class="step-sub">Esto es lo que se movió los últimos meses:</p>
+
+      <div id="conteo" class="conteo"><div class="loading-mini">Consultando…</div></div>
+
+      <p class="step-sub small">Déjanos dónde enviártelos cada mes:</p>
+      <label class="field">
+        <span>WhatsApp</span>
+        <input id="whatsapp" inputmode="tel" maxlength="9" placeholder="999 888 777" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>Email</span>
+        <input id="email" inputmode="email" type="email" placeholder="tu@correo.com" autocomplete="off">
+      </label>
+
+      <div id="err2" class="err" hidden></div>
+
+      <button class="cta" id="btn-ver">Ver los nuevos negocios de <span class="dist-name">tu distrito</span></button>
+      <button class="ghost" data-back="1">← Volver</button>
+    </section>
+
+    <!-- ETAPA 3 — Entrega del valor + suscripción WhatsApp -->
+    <section class="stage" data-stage="3">
+      <div class="stage3-head">
+        <h2 class="step-title">Nuevos negocios en <span class="dist-name">tu distrito</span></h2>
+        <span id="neg-count" class="neg-count"></span>
+      </div>
+
+      <div id="lista" class="lista">
+        <div class="spinner" id="spinner"><div class="ring"></div><span>Buscando…</span></div>
+      </div>
+
+      <div class="stage3-actions">
+        <button class="cta wa" id="btn-wa">Recíbelos cada mes por WhatsApp</button>
+        <button class="ghost" id="btn-install" hidden>Instalar app / activar avisos</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    window.__CFG__ = {
+      whatsappNumber: "{{ '' }}",           // definir en app.js (WA_NUMBER)
+      vapidPublicKey: "{{ vapid_public_key }}",
+      demo: {{ 'true' if demo else 'false' }}
+    };
+  </script>
+  <script src="/static/js/app.js?v=1"></script>
+</body>
+</html>

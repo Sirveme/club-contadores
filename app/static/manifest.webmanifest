@@ -1,0 +1,18 @@
+{
+  "name": "Club de Contadores — Perú Sistemas",
+  "short_name": "Contadores",
+  "description": "El directorio de contadores del Perú + los nuevos negocios de tu distrito cada mes.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1512",
+  "theme_color": "#0b1512",
+  "categories": ["business", "finance", "productivity"],
+  "lang": "es-PE",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
