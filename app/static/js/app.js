@@ -12,6 +12,43 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
+  // ---- Captura temprana progresiva del lead --------------------------------
+  // Un solo registro por usuario (session_id en localStorage) que se va
+  // completando por UPSERT. Se guarda apenas hay dato (RUC+distrito al avanzar;
+  // WhatsApp/email al blur/debounce — sin esperar a ningun boton).
+  const SID = (() => {
+    const KEY = "cc_sid";
+    let v = "";
+    try { v = localStorage.getItem(KEY) || ""; } catch (_) {}
+    if (!v) {
+      v = (self.crypto && crypto.randomUUID) ? crypto.randomUUID()
+          : "s-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+      try { localStorage.setItem(KEY, v); } catch (_) {}
+    }
+    return v;
+  })();
+
+  function saveLead(partial) {
+    const body = JSON.stringify({
+      session_id: SID, origen: state.origen, ...partial,
+    });
+    // sendBeacon sobrevive a que el usuario cierre/navegue; fallback a fetch.
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon("/api/lead", new Blob([body], { type: "application/json" }));
+        return;
+      }
+    } catch (_) {}
+    fetch("/api/lead", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body, keepalive: true,
+    }).catch(() => {});
+  }
+
+  function debounce(fn, ms) {
+    let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  }
+
   // ---- Navegacion de etapas -------------------------------------------------
   const stages = $$(".stage");
   const dots = $$("#progress .dot");
@@ -91,6 +128,12 @@
       const d = await r.json();
       if (!r.ok || !d.ok) throw new Error(d.error || "RUC no válido.");
       state.ruc = d.ruc; state.tipo = d.tipo || ""; state.razon_social = d.razon_social || "";
+      // Guardado TEMPRANO: RUC + distrito apenas se valida (etapa 1->2).
+      saveLead({
+        ruc: state.ruc, razon_social: state.razon_social,
+        nombre: state.razon_social, distrito: state.distrito, ubigeo: state.ubigeo,
+        etapa: 2,
+      });
       if (d.razon_social) {
         razonEl.innerHTML = `✓ <b style="color:#d7ffe9">${escapeHtml(d.razon_social)}</b>`;
         razonEl.hidden = false;
@@ -123,32 +166,48 @@
   }
 
   const err2 = $("#err2");
+  const waEl = $("#whatsapp"), emailEl = $("#email");
+
+  // CAPTURA TEMPRANA de WhatsApp/email: al blur (inmediato) y al tipear
+  // (debounce), SIN esperar a que toque ningun boton. Si escribe el WhatsApp y
+  // abandona ahi, igual queda guardado.
+  const guardarWa = () => {
+    const wa = waEl.value.replace(/\D/g, "");
+    if (wa.length >= 6) { state.whatsapp = wa; saveLead({ whatsapp: wa, etapa: 2 }); }
+  };
+  const guardarEmail = () => {
+    const em = emailEl.value.trim();
+    if (em.includes("@")) { state.email = em; saveLead({ email: em, etapa: 2 }); }
+  };
+  waEl.addEventListener("input", debounce(guardarWa, 800));
+  waEl.addEventListener("blur", guardarWa);
+  emailEl.addEventListener("input", debounce(guardarEmail, 900));
+  emailEl.addEventListener("blur", guardarEmail);
+
   $("#btn-ver").addEventListener("click", async () => {
     err2.hidden = true;
-    const wa = $("#whatsapp").value.replace(/\D/g, "");
-    const email = $("#email").value.trim();
+    const wa = waEl.value.replace(/\D/g, "");
+    const email = emailEl.value.trim();
     if (wa.length !== 9) return showErr(err2, "Ingresa un WhatsApp de 9 dígitos.");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showErr(err2, "Ingresa un email válido.");
     state.whatsapp = wa; state.email = email;
+    // Guardado al avanzar a etapa 3 (lead completo: WhatsApp + email).
+    saveLead({ whatsapp: wa, email, etapa: 3 });
     const btn = $("#btn-ver"); btn.disabled = true;
-    goto(3); // entra a etapa 3 (muestra spinner) mientras guardamos + traemos lista
+    goto(3); // entra a etapa 3 (muestra spinner) mientras traemos la lista
   });
 
-  // ---- Etapa 3: guardar lead + lista real ----------------------------------
+  // ---- Etapa 3: lista real (el lead ya se guardo progresivamente) ----------
   let listaCargada = false;
   async function cargarLista() {
     if (listaCargada) return;
     listaCargada = true;
+    saveLead({ etapa: 3 });  // marca que llego a la etapa 3 (vio la lista)
     const cont = $("#lista"), count = $("#neg-count");
     try {
-      const r = await fetch("/api/inscripcion", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: state.razon_social, ruc: state.ruc, razon_social: state.razon_social,
-          distrito: state.distrito, ubigeo: state.ubigeo,
-          whatsapp: state.whatsapp, email: state.email, origen: state.origen,
-        }),
-      });
+      const r = await fetch(
+        `/api/negocios?distrito=${encodeURIComponent(state.distrito)}&ubigeo=${state.ubigeo}`
+      );
       const d = await r.json();
       const negocios = (d && d.negocios) || [];
       count.textContent = negocios.length ? `${negocios.length} negocios` : "";
@@ -162,7 +221,8 @@
 
   // Abreviaturas de régimen para que el badge quepa en móvil.
   const REGIMEN_CORTO = {
-    "Régimen General / MYPE": "Gral/MYPE",
+    "Régimen General": "General",
+    "Régimen MYPE Tributario (RMT)": "RMT",
     "Régimen Especial (RER)": "RER",
     "RUS": "RUS",
     "Amazonía": "Amazonía",
