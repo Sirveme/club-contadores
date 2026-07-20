@@ -27,10 +27,10 @@ _DEMO_NEGOCIOS = [
     # distrito, ruc, razon_social, tipo, giro, fecha_inscripcion, direccion, ciiu, regimen
     ("MIRAFLORES", "20601234501", "INVERSIONES AURORA SAC", "juridica",
      "Venta al por menor en bodegas", dt.date(2026, 7, 3),
-     "AV. LARCO 345, MIRAFLORES", "4711", "Régimen General / MYPE"),
+     "AV. LARCO 345, MIRAFLORES", "4711", "Régimen General"),
     ("MIRAFLORES", "20601234502", "ESTUDIO CONTABLE DELTA EIRL", "juridica",
      "Actividades de contabilidad y auditoria", dt.date(2026, 7, 8),
-     "CALLE SCHELL 210, MIRAFLORES", "6920", "Régimen Especial (RER)"),
+     "CALLE SCHELL 210, MIRAFLORES", "6920", "Régimen MYPE Tributario (RMT)"),
     ("MIRAFLORES", "10456789012", "QUISPE ROJAS MARIA ELENA", "natural",
      "Servicios de peluqueria", dt.date(2026, 7, 12), None, "9602", "RUS"),
     ("MIRAFLORES", "20601234503", "PANIFICADORA EL SOL SAC", "juridica",
@@ -38,7 +38,7 @@ _DEMO_NEGOCIOS = [
      "AV. BENAVIDES 1200, MIRAFLORES", "1071", None),
     ("SANTIAGO DE SURCO", "20601234510", "TECH ANDINA SAC", "juridica",
      "Programacion informatica", dt.date(2026, 7, 5),
-     "AV. EL POLO 500, SURCO", "6201", "Régimen General / MYPE"),
+     "AV. EL POLO 500, SURCO", "6201", "Régimen MYPE Tributario (RMT)"),
     ("SANTIAGO DE SURCO", "10556677889", "TORRES LEON JUAN CARLOS", "natural",
      "Servicios de transporte de carga", dt.date(2026, 7, 9), None, "4923", "Régimen Especial (RER)"),
 ]
@@ -130,24 +130,45 @@ async def lista_negocios(ubigeo: str, distrito: str, limit: int = 60) -> list[di
     return [dict(r) for r in rows]
 
 
-async def guardar_inscripcion(data: dict) -> None:
+async def upsert_lead(data: dict) -> dict:
+    """
+    CAPTURA TEMPRANA PROGRESIVA. Un solo registro por session_id que se va
+    completando. Cada llamada trae un SUBCONJUNTO de campos (ej. solo whatsapp
+    al blur); COALESCE evita pisar con NULL lo ya guardado, y etapa_max sube con
+    GREATEST. estado ('completo'/'parcial') es columna generada.
+    Devuelve {estado, etapa_max} para que el frontend sepa el estado del lead.
+    """
+    estado = "completo" if (data.get("whatsapp") and data.get("email")) else "parcial"
     if demo_mode():
-        return
+        return {"estado": estado, "etapa_max": int(data.get("etapa") or 0)}
+
     assert _pool is not None
-    await _pool.execute(
+    row = await _pool.fetchrow(
         """
         INSERT INTO inscripciones
-            (nombre, ruc, razon_social, distrito, ubigeo, whatsapp, email, origen, user_agent)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-        ON CONFLICT (ruc, distrito) WHERE ruc IS NOT NULL
-        DO UPDATE SET whatsapp = EXCLUDED.whatsapp,
-                      email    = EXCLUDED.email,
-                      creado_en = now()
+            (session_id, nombre, ruc, razon_social, distrito, ubigeo,
+             whatsapp, email, origen, etapa_max, user_agent)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        ON CONFLICT (session_id) DO UPDATE SET
+            nombre        = COALESCE(EXCLUDED.nombre,       inscripciones.nombre),
+            ruc           = COALESCE(EXCLUDED.ruc,          inscripciones.ruc),
+            razon_social  = COALESCE(EXCLUDED.razon_social, inscripciones.razon_social),
+            distrito      = COALESCE(EXCLUDED.distrito,     inscripciones.distrito),
+            ubigeo        = COALESCE(EXCLUDED.ubigeo,       inscripciones.ubigeo),
+            whatsapp      = COALESCE(EXCLUDED.whatsapp,     inscripciones.whatsapp),
+            email         = COALESCE(EXCLUDED.email,        inscripciones.email),
+            origen        = COALESCE(EXCLUDED.origen,       inscripciones.origen),
+            etapa_max     = GREATEST(inscripciones.etapa_max, EXCLUDED.etapa_max),
+            user_agent    = COALESCE(inscripciones.user_agent, EXCLUDED.user_agent),
+            actualizado_en = now()
+        RETURNING estado, etapa_max
         """,
-        data.get("nombre"), data.get("ruc"), data.get("razon_social"),
-        data.get("distrito"), data.get("ubigeo"), data.get("whatsapp"),
-        data.get("email"), data.get("origen"), data.get("user_agent"),
+        data.get("session_id"), data.get("nombre"), data.get("ruc"),
+        data.get("razon_social"), data.get("distrito"), data.get("ubigeo"),
+        data.get("whatsapp"), data.get("email"), data.get("origen"),
+        int(data.get("etapa") or 0), data.get("user_agent"),
     )
+    return {"estado": row["estado"], "etapa_max": row["etapa_max"]}
 
 
 async def guardar_push(sub: dict, ruc: str | None, distrito: str | None) -> None:

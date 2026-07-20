@@ -71,9 +71,19 @@ async def api_conteo(distrito: str = "", ubigeo: str = ""):
     return {"distrito": distrito, "meses": meses, "total": total}
 
 
-@app.post("/api/inscripcion")
-async def api_inscripcion(payload: dict, request: Request):
+@app.post("/api/lead")
+async def api_lead(payload: dict, request: Request):
+    """
+    CAPTURA TEMPRANA PROGRESIVA. Recibe un SUBCONJUNTO de campos y hace UPSERT por
+    session_id (un solo registro por usuario que se completa). Se llama al pasar
+    de etapa 1->2 (RUC+distrito), al escribir WhatsApp/email (blur/debounce, sin
+    tocar boton) y al entrar a la etapa 3. Nunca bloquea la UI.
+    """
+    session_id = (payload.get("session_id") or "").strip()
+    if not session_id:
+        return JSONResponse({"ok": False, "error": "session_id requerido"}, status_code=422)
     data = {
+        "session_id": session_id[:40],
         "nombre": (payload.get("nombre") or "").strip() or None,
         "ruc": (payload.get("ruc") or "").strip() or None,
         "razon_social": (payload.get("razon_social") or "").strip() or None,
@@ -81,16 +91,15 @@ async def api_inscripcion(payload: dict, request: Request):
         "ubigeo": (payload.get("ubigeo") or "").strip() or None,
         "whatsapp": (payload.get("whatsapp") or "").strip() or None,
         "email": (payload.get("email") or "").strip() or None,
-        "origen": (payload.get("origen") or "directo").strip(),
+        "origen": (payload.get("origen") or "").strip() or None,
+        "etapa": payload.get("etapa") or 0,
         "user_agent": request.headers.get("user-agent", "")[:400],
     }
     try:
-        await db.guardar_inscripcion(data)
+        res = await db.upsert_lead(data)
     except Exception:
-        # No bloquear la entrega de valor si falla el guardado.
-        pass
-    negocios = await db.lista_negocios(data["ubigeo"] or "", data["distrito"] or "")
-    return {"ok": True, "negocios": negocios}
+        return JSONResponse({"ok": False}, status_code=200)  # nunca bloquear la UI
+    return {"ok": True, **res}
 
 
 @app.get("/api/negocios")
