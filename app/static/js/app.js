@@ -160,8 +160,23 @@
     }
   }
 
+  // Abreviaturas de régimen para que el badge quepa en móvil.
+  const REGIMEN_CORTO = {
+    "Régimen General / MYPE": "Gral/MYPE",
+    "Régimen Especial (RER)": "RER",
+    "RUS": "RUS",
+    "Amazonía": "Amazonía",
+    "Agrario": "Agrario",
+    "Frontera": "Frontera",
+  };
+  function regimenCorto(r) {
+    if (!r) return "";
+    return REGIMEN_CORTO[r] || r;
+  }
+
   function renderNegocio(n) {
     const tag = n.tipo === "juridica" ? "Jurídica" : (n.tipo === "natural" ? "Natural" : "");
+    const reg = regimenCorto(n.regimen);
     return `<div class="neg">
       <div class="top"><div class="rs">${escapeHtml(n.razon_social || "—")}</div>
         <div class="fecha">${escapeHtml(n.fecha_inscripcion || "")}</div></div>
@@ -169,6 +184,7 @@
         <span class="ruc">RUC ${escapeHtml(n.ruc || "")}</span>
         ${n.giro ? `<span>· ${escapeHtml(n.giro)}</span>` : ""}
         ${tag ? `<span class="tag">${tag}</span>` : ""}
+        ${reg ? `<span class="regimen" title="${escapeHtml(n.regimen)}">${escapeHtml(reg)}</span>` : ""}
       </div>
       ${n.direccion ? `<div class="dir">📍 ${escapeHtml(n.direccion)}</div>` : ""}
     </div>`;
