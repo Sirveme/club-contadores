@@ -24,23 +24,23 @@ def demo_mode() -> bool:
 
 # --- Datos DEMO (solo cuando no hay DATABASE_URL) ---------------------------
 _DEMO_NEGOCIOS = [
-    # distrito, ruc, razon_social, tipo, giro, fecha_inscripcion, direccion
+    # distrito, ruc, razon_social, tipo, giro, fecha_inscripcion, direccion, ciiu, regimen
     ("MIRAFLORES", "20601234501", "INVERSIONES AURORA SAC", "juridica",
      "Venta al por menor en bodegas", dt.date(2026, 7, 3),
-     "AV. LARCO 345, MIRAFLORES", "4711"),
+     "AV. LARCO 345, MIRAFLORES", "4711", "Régimen General / MYPE"),
     ("MIRAFLORES", "20601234502", "ESTUDIO CONTABLE DELTA EIRL", "juridica",
      "Actividades de contabilidad y auditoria", dt.date(2026, 7, 8),
-     "CALLE SCHELL 210, MIRAFLORES", "6920"),
+     "CALLE SCHELL 210, MIRAFLORES", "6920", "Régimen Especial (RER)"),
     ("MIRAFLORES", "10456789012", "QUISPE ROJAS MARIA ELENA", "natural",
-     "Servicios de peluqueria", dt.date(2026, 7, 12), None, "9602"),
+     "Servicios de peluqueria", dt.date(2026, 7, 12), None, "9602", "RUS"),
     ("MIRAFLORES", "20601234503", "PANIFICADORA EL SOL SAC", "juridica",
      "Elaboracion de productos de panaderia", dt.date(2026, 6, 21),
-     "AV. BENAVIDES 1200, MIRAFLORES", "1071"),
+     "AV. BENAVIDES 1200, MIRAFLORES", "1071", None),
     ("SANTIAGO DE SURCO", "20601234510", "TECH ANDINA SAC", "juridica",
      "Programacion informatica", dt.date(2026, 7, 5),
-     "AV. EL POLO 500, SURCO", "6201"),
+     "AV. EL POLO 500, SURCO", "6201", "Régimen General / MYPE"),
     ("SANTIAGO DE SURCO", "10556677889", "TORRES LEON JUAN CARLOS", "natural",
-     "Servicios de transporte de carga", dt.date(2026, 7, 9), None, "4923"),
+     "Servicios de transporte de carga", dt.date(2026, 7, 9), None, "4923", "Régimen Especial (RER)"),
 ]
 
 
@@ -76,18 +76,20 @@ async def conteo_por_mes(ubigeo: str, distrito: str) -> list[dict]:
 
     assert _pool is not None
     where, arg = _distrito_filter(ubigeo, distrito)
+    # mes_inscripcion es el campo COMUN ('YYYY-MM'); comparacion de texto ordena
+    # cronologicamente. Ultimos 3 meses = actual + 2 previos.
     rows = await _pool.fetch(
         f"""
-        SELECT to_char(date_trunc('month', fecha_inscripcion), 'YYYY-MM') AS mes,
-               COUNT(*) AS n
+        SELECT mes_inscripcion AS mes, COUNT(*) AS n
         FROM nuevos_negocios
         WHERE {where}
-          AND fecha_inscripcion >= (CURRENT_DATE - INTERVAL '3 months')
-        GROUP BY 1 ORDER BY 1
+          AND mes_inscripcion >= to_char((CURRENT_DATE - INTERVAL '2 months'), 'YYYY-MM')
+        GROUP BY mes_inscripcion
+        ORDER BY mes_inscripcion
         """,
         arg,
     )
-    return _formatear_meses({r["mes"]: r["n"] for r in rows})
+    return _formatear_meses({r["mes"]: r["n"] for r in rows if r["mes"]})
 
 
 async def lista_negocios(ubigeo: str, distrito: str, limit: int = 60) -> list[dict]:
@@ -97,19 +99,30 @@ async def lista_negocios(ubigeo: str, distrito: str, limit: int = 60) -> list[di
             out.append({
                 "ruc": n[1], "razon_social": n[2], "tipo": n[3], "giro": n[4],
                 "fecha_inscripcion": n[5].strftime("%d/%m/%Y"),
-                "direccion": n[6], "ciiu": n[7],
+                "direccion": n[6], "ciiu": n[7], "regimen": n[8],
             })
         return out
 
     assert _pool is not None
-    where, arg = _distrito_filter(ubigeo, distrito)
+    where, arg = _distrito_filter(ubigeo, distrito, alias="nn")
+    # descripcion -> giro (lo que espera el frontend). Direccion armada por JOIN
+    # a los catalogos SUNAT (tipo_via/tipo_zona -> denominacion). Naturales: los
+    # campos de direccion son NULL, concat_ws los ignora y direccion queda "".
     rows = await _pool.fetch(
         f"""
-        SELECT ruc, razon_social, tipo, ciiu, giro, direccion,
-               to_char(fecha_inscripcion, 'DD/MM/YYYY') AS fecha_inscripcion
-        FROM nuevos_negocios
+        SELECT nn.ruc, nn.razon_social, nn.tipo, nn.ciiu,
+               nn.descripcion AS giro, nn.nombre_comercial, nn.regimen,
+               COALESCE(to_char(nn.fecha_inscripcion, 'DD/MM/YYYY'), nn.mes_inscripcion)
+                   AS fecha_inscripcion,
+               NULLIF(trim(concat_ws(' ',
+                   v.denominacion, nn.nombre_via, nn.numero,
+                   NULLIF(nn.interior, ''), z.denominacion, nn.nombre_zona
+               )), '') AS direccion
+        FROM nuevos_negocios nn
+        LEFT JOIN cat_via  v ON v.codigo = nn.tipo_via
+        LEFT JOIN cat_zona z ON z.codigo = nn.tipo_zona
         WHERE {where}
-        ORDER BY fecha_inscripcion DESC NULLS LAST
+        ORDER BY nn.mes_inscripcion DESC NULLS LAST, nn.creado_en DESC
         LIMIT $2
         """,
         arg, limit,
@@ -153,11 +166,12 @@ async def guardar_push(sub: dict, ruc: str | None, distrito: str | None) -> None
 
 
 # --- Helpers ----------------------------------------------------------------
-def _distrito_filter(ubigeo: str, distrito: str):
-    """Prefiere ubigeo (exacto); cae a nombre de distrito en mayusculas."""
+def _distrito_filter(ubigeo: str, distrito: str, alias: str = ""):
+    """Prefiere ubigeo (exacto); cae a nombre de distrito (case-insensitive)."""
+    p = f"{alias}." if alias else ""
     if ubigeo:
-        return "ubigeo = $1", ubigeo
-    return "upper(distrito) = upper($1)", (distrito or "")
+        return f"{p}ubigeo = $1", ubigeo
+    return f"upper({p}distrito) = upper($1)", (distrito or "")
 
 
 def _formatear_meses(buckets: dict[str, int]) -> list[dict]:
