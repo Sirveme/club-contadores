@@ -8,7 +8,7 @@
   <meta name="description" content="El directorio de contadores del Perú + los nuevos negocios de tu distrito cada mes.">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=6">
+  <link rel="stylesheet" href="/static/css/styles.css?v=7">
 </head>
 <body>
   <div class="app" id="app">
@@ -106,7 +106,11 @@
         <span id="neg-count" class="neg-count"></span>
       </div>
 
-      <div id="meses" class="meses" hidden></div>
+      <!-- Selector de mes: ocupa espacio FIJO haya 2 meses o 12 (no rompe sin-scroll) -->
+      <div id="mes-wrap" class="mes-wrap" hidden>
+        <label class="mes-lbl" for="mes-sel">Mes</label>
+        <select id="mes-sel" class="mes-sel" aria-label="Mes de los nuevos negocios"></select>
+      </div>
 
       <div id="lista" class="lista">
         <div class="spinner" id="spinner"><div class="ring"></div><span>Buscando…</span></div>
@@ -196,6 +200,6 @@
       demo: {{ 'true' if demo else 'false' }}
     };
   </script>
-  <script src="/static/js/app.js?v=6"></script>
+  <script src="/static/js/app.js?v=7"></script>
 </body>
 </html>
