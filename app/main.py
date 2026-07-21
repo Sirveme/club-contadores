@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import db
+from . import ruc as ruc_mod
 from .ruc import validar_ruc
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -34,6 +35,7 @@ VIDEO_URL = os.getenv("VIDEO_URL", "").strip()  # embed opcional (YouTube/otro)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ruc_mod.aviso_config()   # avisa si falta APIS_NET_PE_TOKEN (bloquea registros)
     await db.connect()
     yield
     await db.disconnect()
@@ -126,9 +128,38 @@ async def api_push_subscribe(payload: dict):
     return {"ok": True}
 
 
+@app.get("/api/negocios.csv")
+async def api_negocios_csv(distrito: str = "", ubigeo: str = "", mes: str = ""):
+    """Descarga la lista visible (distrito + mes) como CSV listo para Excel."""
+    negocios = await db.lista_negocios(ubigeo.strip(), distrito.strip(), mes.strip())
+    cols = [("ruc", "RUC"), ("razon_social", "Razon Social"), ("giro", "Giro"),
+            ("ciiu", "CIIU"), ("tipo", "Tipo"), ("regimen", "Regimen"),
+            ("fecha_inscripcion", "Fecha"), ("direccion", "Direccion")]
+
+    def esc(v):
+        s = "" if v is None else str(v)
+        return '"' + s.replace('"', '""') + '"' if (";" in s or '"' in s or "\n" in s) else s
+
+    lineas = [";".join(t for _, t in cols)]
+    for n in negocios:
+        lineas.append(";".join(esc(n.get(k)) for k, _ in cols))
+    # BOM para que Excel (es-PE) respete los acentos; separador ';'.
+    csv = "﻿" + "\r\n".join(lineas) + "\r\n"
+    nombre = f"nuevos-negocios-{(distrito or 'peru').lower().replace(' ', '-')}"
+    if mes:
+        nombre += f"-{mes}"
+    return Response(
+        content=csv.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}.csv"'},
+    )
+
+
 @app.get("/health")
 async def health():
-    return {"ok": True, "demo": db.demo_mode()}
+    return {"ok": True, "demo": db.demo_mode(),
+            "ruc_validacion_activa": ruc_mod.validacion_activa(),
+            "ruc_estricto": ruc_mod.RUC_VALIDACION_ESTRICTA}
 
 
 # --- PWA: service worker y manifest en la raiz ------------------------------

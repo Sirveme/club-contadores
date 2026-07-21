@@ -142,7 +142,7 @@ async def lista_negocios(ubigeo: str, distrito: str, mes: str = "",
     for r in rows:
         out.append({
             "ruc": r["ruc"], "razon_social": r["razon_social"], "tipo": r["tipo"],
-            "giro": r["giro"], "regimen": r["regimen"],
+            "giro": r["giro"], "ciiu": r["ciiu"], "regimen": r["regimen"],
             "fecha_inscripcion": r["fecha_inscripcion"],
             "direccion": _construir_direccion(r),
         })
