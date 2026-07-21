@@ -8,7 +8,7 @@
   <meta name="description" content="El directorio de contadores del Perú + los nuevos negocios de tu distrito cada mes.">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=4">
+  <link rel="stylesheet" href="/static/css/styles.css?v=5">
 </head>
 <body>
   <div class="app" id="app">
@@ -29,12 +29,14 @@
 
       <div class="social">
         <span class="social-dot"></span>
-        Ya somos más de <b>{{ estudios_total }}</b> estudios contables en el Perú
+        <span class="social-txt">Ya somos más de <b>{{ estudios_total }}</b> estudios contables en el Perú</span>
       </div>
 
       <div class="video">
         {% if video_url %}
-        <iframe src="{{ video_url }}" title="Video" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+        <video class="video-el" controls preload="metadata" playsinline poster="/static/icons/icon-512.png">
+          <source src="{{ video_url }}" type="video/mp4">
+        </video>
         {% else %}
         <div class="video-placeholder">
           <div class="play">▶</div>
@@ -82,16 +84,18 @@
       <p class="step-sub small">Déjanos dónde enviártelos cada mes:</p>
       <label class="field">
         <span>WhatsApp</span>
-        <input id="whatsapp" inputmode="tel" maxlength="9" placeholder="967 317 946" autocomplete="off">
+        <input id="whatsapp" inputmode="tel" maxlength="9" placeholder="999 888 777" autocomplete="off">
       </label>
       <label class="field">
         <span>Email</span>
-        <input id="email" inputmode="email" type="email" placeholder="info@perusistemas.pro" autocomplete="off">
+        <input id="email" inputmode="email" type="email" placeholder="tu@correo.com" autocomplete="off">
       </label>
 
       <div id="err2" class="err" hidden></div>
 
       <button class="cta" id="btn-ver">Ver los nuevos negocios de <span class="dist-name">tu distrito</span></button>
+      <p class="consent">Al registrarte aceptas nuestra
+        <a href="#" id="lnk-legal">Política de Privacidad y Términos</a>.</p>
       <button class="ghost" data-back="1">← Volver</button>
     </section>
 
@@ -101,6 +105,8 @@
         <h2 class="step-title">Nuevos negocios en <span class="dist-name">tu distrito</span></h2>
         <span id="neg-count" class="neg-count"></span>
       </div>
+
+      <div id="meses" class="meses" hidden></div>
 
       <div id="lista" class="lista">
         <div class="spinner" id="spinner"><div class="ring"></div><span>Buscando…</span></div>
@@ -112,15 +118,80 @@
       </div>
     </section>
 
+    <!-- ETAPA 4 — Cierre (después de enviar el WhatsApp) -->
+    <section class="stage" data-stage="4">
+      <div class="cierre">
+        <div class="cierre-check">✓</div>
+        <h2 class="step-title">¡Listo!</h2>
+        <p class="step-sub">Ya diste el primer paso. A partir de ahora tienes dos formas de no perderte ningún nuevo negocio de <span class="dist-name">tu distrito</span>:</p>
+
+        <div class="opt-card">
+          <div class="opt-ico">🔔</div>
+          <div>
+            <div class="opt-t">Te avisamos cada mes</div>
+            <div class="opt-d">Cuando estén los nuevos negocios de tu distrito, te llegan por WhatsApp y email.</div>
+          </div>
+        </div>
+        <div class="opt-card">
+          <div class="opt-ico">↻</div>
+          <div>
+            <div class="opt-t">Consúltalos tú mismo</div>
+            <div class="opt-d">También puedes volver aquí cuando quieras a revisarlos por tu cuenta.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage3-actions">
+        <button class="cta" id="btn-volver-lista">Volver a la lista</button>
+        <button class="ghost" id="btn-install-2">Instalar app / activar avisos</button>
+        <p id="install-hint" class="install-hint" hidden>Para instalar: menú del navegador → “Agregar a pantalla de inicio”.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- MODAL: Política de Privacidad y Términos -->
+  <div class="modal" id="modal-legal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <h3 id="modal-title">Política de Privacidad y Términos</h3>
+        <button class="modal-x" data-close-modal aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <p><b>Responsable del tratamiento.</b> Perú Sistemas Pro E.I.R.L., RUC
+          <b>20615446565</b>, empresa registrada ante el MINJUS. Nuestro banco de datos
+          personales está <b>registrado ante la Autoridad Nacional de Protección de Datos
+          Personales (ANPD)</b>, conforme a la <b>Ley N.º 29733</b>, Ley de Protección de
+          Datos Personales, y su reglamento.</p>
+
+        <p><b>Datos que tratamos.</b> Los que nos brindas al registrarte: RUC, razón social,
+          distrito, WhatsApp y correo electrónico. Los usamos para enviarte cada mes los
+          nuevos negocios de tu distrito y comunicaciones del Club de Contadores.</p>
+
+        <p><b>Información de negocios.</b> El listado de nuevos negocios proviene de
+          <b>fuentes oficiales del Estado (SUNAT)</b>, obtenidas al amparo de la Ley de
+          Transparencia y Acceso a la Información Pública. Es información de carácter público.</p>
+
+        <p><b>Tus derechos (ARCO).</b> Puedes ejercer tus derechos de acceso, rectificación,
+          cancelación y oposición, así como revocar tu consentimiento, escribiéndonos a
+          <b>soporte@perusistemas.pro</b>. Atenderemos tu solicitud conforme a la Ley N.º 29733.</p>
+
+        <p><b>Términos.</b> El Club de Contadores es un servicio informativo y gratuito.
+          No garantizamos que un negocio nuevo se convierta en cliente. Al registrarte
+          aceptas recibir nuestras comunicaciones; puedes darte de baja cuando quieras.</p>
+
+        <p class="modal-foot">Perú Sistemas Pro E.I.R.L. — Perú.</p>
+      </div>
+    </div>
   </div>
 
   <script>
     window.__CFG__ = {
-      whatsappNumber: "{{ '' }}",           // definir en app.js (WA_NUMBER)
       vapidPublicKey: "{{ vapid_public_key }}",
       demo: {{ 'true' if demo else 'false' }}
     };
   </script>
-  <script src="/static/js/app.js?v=4"></script>
+  <script src="/static/js/app.js?v=5"></script>
 </body>
 </html>
