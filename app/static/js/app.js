@@ -6,7 +6,7 @@
   const WA_NUMBER = "51999888777";
 
   const CFG = window.__CFG__ || {};
-  const state = { ruc: "", razon_social: "", tipo: "", distrito: "", ubigeo: "",
+  const state = { ruc: "", rucValidado: "", razon_social: "", tipo: "", distrito: "", ubigeo: "",
                   provincia: "", departamento: "",
                   whatsapp: "", email: "", origen: origenFromUrl(),
                   meses: [], mesSel: "" };
@@ -80,8 +80,49 @@
   const rucEl = $("#ruc"), razonEl = $("#razon"), err1 = $("#err1");
   rucEl.addEventListener("input", () => {
     rucEl.value = rucEl.value.replace(/\D/g, "").slice(0, 11);
-    razonEl.hidden = true; err1.hidden = true; state.razon_social = "";
+    if (rucEl.value !== state.rucValidado) {   // cambio el RUC -> deja de estar validado
+      razonEl.hidden = true; err1.hidden = true;
+      state.ruc = ""; state.razon_social = ""; state.rucValidado = "";
+    }
   });
+  // Validacion apenas termina de escribir el RUC (blur), sin esperar al boton.
+  rucEl.addEventListener("blur", () => { if (rucEl.value.trim().length === 11) validarRuc(); });
+
+  async function validarRuc() {
+    const ruc = rucEl.value.trim();
+    if (ruc.length !== 11) { showErr(err1, "Ingresa un RUC de 11 dígitos."); return false; }
+    if (state.rucValidado === ruc) return true;          // ya confirmado
+    err1.hidden = true;
+    razonEl.className = "razon cargando";
+    razonEl.textContent = "Verificando en SUNAT…";
+    razonEl.hidden = false;
+    try {
+      const r = await fetch("/api/validar-ruc", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruc }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) {                              // SUNAT no lo reconoce -> BLOQUEA
+        razonEl.hidden = true;
+        state.ruc = ""; state.razon_social = ""; state.rucValidado = "";
+        showErr(err1, d.error || "No pudimos validar tu RUC.");
+        return false;
+      }
+      state.ruc = d.ruc; state.tipo = d.tipo || "";
+      state.razon_social = d.razon_social || ""; state.rucValidado = d.ruc;
+      razonEl.className = "razon";
+      razonEl.innerHTML =
+        `<span class="razon-ok">✓</span><span class="razon-txt"><b>RUC ${escapeHtml(d.ruc)}</b>` +
+        `<br>${escapeHtml(d.razon_social || "Verificado en SUNAT")}</span>`;
+      razonEl.hidden = false;
+      saveLead({ etapa: 1 });   // CAPTURA TEMPRANA: apenas se confirma que existe
+      return true;
+    } catch {
+      razonEl.hidden = true;
+      showErr(err1, "No pudimos verificar tu RUC ahora. Intenta de nuevo.");
+      return false;
+    }
+  }
 
   let DISTRITOS = [];
   const distEl = $("#distrito"), comboList = $("#combo-list");
@@ -121,33 +162,20 @@
     state.meses = []; state.mesSel = ""; stage3Init = false; // distrito nuevo -> recargar
     distEl.value = x.d; comboList.hidden = true;
     $$(".dist-name").forEach(el => el.textContent = titleCase(x.d));
+    saveLead({ etapa: 1 });   // CAPTURA TEMPRANA: distrito apenas se selecciona
   }
 
-  // Validar RUC + distrito → etapa 2
+  // Continuar → solo avanza con RUC EXISTENTE en SUNAT + distrito elegido.
   $("#btn-validar").addEventListener("click", async () => {
     err1.hidden = true;
-    const ruc = rucEl.value.trim();
-    if (ruc.length !== 11) return showErr(err1, "Ingresa un RUC de 11 dígitos.");
-    if (!state.distrito) return showErr(err1, "Elige tu distrito de la lista.");
     const btn = $("#btn-validar"); btn.disabled = true; btn.textContent = "Validando…";
     try {
-      const r = await fetch("/api/validar-ruc", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ruc }),
-      });
-      const d = await r.json();
-      if (!r.ok || !d.ok) throw new Error(d.error || "RUC no válido.");
-      state.ruc = d.ruc; state.tipo = d.tipo || ""; state.razon_social = d.razon_social || "";
-      // Guardado TEMPRANO: RUC + distrito apenas se valida (etapa 1->2).
+      const ok = await validarRuc();
+      if (!ok) return;                                   // el mensaje ya se mostro
+      if (!state.distrito) { showErr(err1, "Elige tu distrito de la lista."); return; }
       saveLead({ etapa: 2 });
-      if (d.razon_social) {
-        razonEl.innerHTML = `✓ <b style="color:#d7ffe9">${escapeHtml(d.razon_social)}</b>`;
-        razonEl.hidden = false;
-        await sleep(450);
-      }
+      await sleep(250);
       goto(2);
-    } catch (e) {
-      showErr(err1, e.message || "No pudimos validar. Intenta de nuevo.");
     } finally {
       btn.disabled = false; btn.textContent = "Continuar";
     }
@@ -223,9 +251,24 @@
     renderMeses(); cargarLista(true);
   });
 
+  // Los meses pueden no estar todavia si el usuario avanzo antes de que respondiera
+  // /api/conteo (carrera): en ese caso se piden aqui, si no los chips no aparecerian.
+  async function ensureMeses() {
+    if (state.meses.length) return;
+    try {
+      const r = await fetch(
+        `/api/conteo?distrito=${encodeURIComponent(state.distrito)}&ubigeo=${state.ubigeo}`);
+      const d = await r.json();
+      state.meses = (d && d.meses) || [];
+    } catch { /* sin meses -> se lista todo */ }
+  }
+
   async function cargarLista(force = false) {
     if (stage3Init && !force) return;
-    if (!stage3Init) { stage3Init = true; saveLead({ etapa: 3 }); renderMeses(); }
+    if (!stage3Init) {
+      stage3Init = true; saveLead({ etapa: 3 });
+      await ensureMeses(); renderMeses();
+    }
     const cont = $("#lista"), count = $("#neg-count");
     cont.innerHTML = `<div class="spinner"><div class="ring"></div><span>Buscando…</span></div>`;
     try {
@@ -259,20 +302,59 @@
     return REGIMEN_CORTO[r] || r;
   }
 
-  function renderNegocio(n) {
+  // Borde de color rotativo en ciclo de 3: 1,4,7 cyan | 2,5,8 naranja | 3,6,9 morado.
+  function renderNegocio(n, i) {
+    const cls = ["c1", "c2", "c3"][i % 3];
     const tag = n.tipo === "juridica" ? "Jurídica" : (n.tipo === "natural" ? "Natural" : "");
     const reg = regimenCorto(n.regimen);
-    return `<div class="neg">
-      <div class="top"><div class="rs">${escapeHtml(n.razon_social || "—")}</div>
-        <div class="fecha">${escapeHtml(n.fecha_inscripcion || "")}</div></div>
-      <div class="meta">
-        <span class="ruc">RUC ${escapeHtml(n.ruc || "")}</span>
-        ${n.giro ? `<span>· ${escapeHtml(n.giro)}</span>` : ""}
+    return `<div class="neg ${cls}">
+      <div class="neg-main">
+        <div class="rs">${escapeHtml(n.razon_social || "—")}</div>
+        ${n.giro ? `<div class="giro">${escapeHtml(n.giro)}</div>` : ""}
+        <div class="ruc">RUC ${escapeHtml(n.ruc || "")}</div>
+        ${n.direccion ? `<div class="dir"><span class="pin">📍</span>${escapeHtml(n.direccion)}</div>` : ""}
+      </div>
+      <div class="neg-side">
+        ${n.fecha_inscripcion ? `<div class="fecha">${escapeHtml(n.fecha_inscripcion)}</div>` : ""}
         ${tag ? `<span class="tag">${tag}</span>` : ""}
         ${reg ? `<span class="regimen" title="${escapeHtml(n.regimen)}">${escapeHtml(reg)}</span>` : ""}
+        ${n.ciiu ? `<div class="ciiu">CIIU ${escapeHtml(n.ciiu)}</div>` : ""}
       </div>
-      ${n.direccion ? `<div class="dir">📍 ${escapeHtml(n.direccion)}</div>` : ""}
     </div>`;
+  }
+
+  // ---- Descargar (CSV) y Compartir ------------------------------------------
+  $("#btn-descargar").addEventListener("click", () => {
+    const url = `/api/negocios.csv?distrito=${encodeURIComponent(state.distrito)}` +
+                `&ubigeo=${state.ubigeo}` + (state.mesSel ? `&mes=${state.mesSel}` : "");
+    const a = document.createElement("a");
+    a.href = url; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  $("#btn-compartir").addEventListener("click", async () => {
+    const url = location.origin + location.pathname;
+    const texto = `Nuevos negocios de ${titleCase(state.distrito)} — Club de Contadores`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Club de Contadores", text: texto, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast("Link copiado");
+    } catch (_) { /* el usuario cancelo el compartir */ }
+  });
+
+  let toastT = null;
+  function toast(msg) {
+    let el = $("#toast");
+    if (!el) {
+      el = document.createElement("div"); el.id = "toast"; el.className = "toast";
+      document.body.appendChild(el);
+    }
+    el.textContent = msg; el.classList.add("on");
+    clearTimeout(toastT);
+    toastT = setTimeout(() => el.classList.remove("on"), 1900);
   }
 
   // WhatsApp honesto: abre wa.me con mensaje pre-cargado; el usuario envia.
