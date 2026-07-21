@@ -238,16 +238,24 @@ body{
 .consent{ text-align:center; color:var(--muted); font-size:11.5px; margin:8px 0 0; line-height:1.4; }
 .consent a{ color:var(--green); text-decoration:underline; }
 
-/* --- Chips de mes (etapa 3) --- */
-.meses{ display:flex; gap:8px; margin-top:10px; overflow-x:auto; padding-bottom:2px; }
-.mes-chip{
-  flex:0 0 auto; border:1px solid var(--line); background:var(--surface); color:var(--muted);
-  padding:7px 12px; border-radius:99px; font-size:12.5px; cursor:pointer; white-space:nowrap;
-  text-transform:capitalize;
+/* --- Selector de mes (etapa 3) ---
+   Dropdown en vez de chips: ocupa el MISMO espacio haya 2 meses o 12, asi el
+   filtro escala con los meses que se acumulan sin romper el sin-scroll. */
+.mes-wrap{ display:flex; align-items:center; gap:9px; margin-top:10px; }
+.mes-lbl{ flex:0 0 auto; font-size:12.5px; color:var(--muted); font-weight:600; }
+.mes-sel{
+  flex:1 1 auto; min-width:0; width:100%;
+  appearance:none; -webkit-appearance:none;
+  background-color:var(--surface);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%2322c55e' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat:no-repeat; background-position:right 12px center;
+  border:1.5px solid var(--line); border-radius:10px; color:var(--text);
+  padding:10px 34px 10px 12px; font-size:14px; font-weight:600;
+  font-family:inherit; cursor:pointer; text-overflow:ellipsis;
 }
-.mes-chip b{ color:var(--text); }
-.mes-chip.on{ border-color:var(--green); background:var(--green-soft); color:#eafff3; }
-.mes-chip.on b{ color:#fff0; color:var(--green); }
+.mes-sel:focus{ outline:none; border-color:var(--green); }
+/* La lista desplegable la pinta el sistema; se fuerza el tema oscuro donde se puede. */
+.mes-sel option{ background:var(--bg2); color:var(--text); }
 
 /* --- Etapa 4: cierre --- */
 .cierre{ flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
