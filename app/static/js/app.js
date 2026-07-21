@@ -7,7 +7,9 @@
 
   const CFG = window.__CFG__ || {};
   const state = { ruc: "", razon_social: "", tipo: "", distrito: "", ubigeo: "",
-                  whatsapp: "", email: "", origen: originFromUrl() };
+                  provincia: "", departamento: "",
+                  whatsapp: "", email: "", origen: origenFromUrl(),
+                  meses: [], mesSel: "" };
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -29,8 +31,14 @@
   })();
 
   function saveLead(partial) {
+    // La IDENTIDAD del lead es el RUC (validado). Sin RUC no se guarda: asi nunca
+    // se crea ni se pisa un registro sin RUC, y el backend hace UPSERT por RUC.
+    if (!state.ruc) return;
     const body = JSON.stringify({
-      session_id: SID, origen: state.origen, ...partial,
+      session_id: SID, origen: state.origen,
+      ruc: state.ruc, razon_social: state.razon_social, nombre: state.razon_social,
+      distrito: state.distrito, ubigeo: state.ubigeo,
+      ...partial,
     });
     // sendBeacon sobrevive a que el usuario cierre/navegue; fallback a fetch.
     try {
@@ -109,6 +117,8 @@
   function pickDistrito(x) {
     if (!x) return;
     state.distrito = x.d; state.ubigeo = x.u;
+    state.provincia = x.p || ""; state.departamento = x.dep || "";
+    state.meses = []; state.mesSel = ""; stage3Init = false; // distrito nuevo -> recargar
     distEl.value = x.d; comboList.hidden = true;
     $$(".dist-name").forEach(el => el.textContent = titleCase(x.d));
   }
@@ -129,11 +139,7 @@
       if (!r.ok || !d.ok) throw new Error(d.error || "RUC no válido.");
       state.ruc = d.ruc; state.tipo = d.tipo || ""; state.razon_social = d.razon_social || "";
       // Guardado TEMPRANO: RUC + distrito apenas se valida (etapa 1->2).
-      saveLead({
-        ruc: state.ruc, razon_social: state.razon_social,
-        nombre: state.razon_social, distrito: state.distrito, ubigeo: state.ubigeo,
-        etapa: 2,
-      });
+      saveLead({ etapa: 2 });
       if (d.razon_social) {
         razonEl.innerHTML = `✓ <b style="color:#d7ffe9">${escapeHtml(d.razon_social)}</b>`;
         razonEl.hidden = false;
@@ -154,11 +160,12 @@
     try {
       const r = await fetch(`/api/conteo?distrito=${encodeURIComponent(state.distrito)}&ubigeo=${state.ubigeo}`);
       const d = await r.json();
-      if (!d.meses || !d.meses.length) {
+      state.meses = (d && d.meses) || [];
+      if (!state.meses.length) {
         box.innerHTML = `<div class="empty">Estamos cargando los datos de ${titleCase(state.distrito)}. Déjanos tu contacto y te avisamos apenas estén.</div>`;
         return;
       }
-      box.innerHTML = d.meses.map(m =>
+      box.innerHTML = state.meses.map(m =>
         `<div class="mcard"><div class="num">${m.n}</div><div class="lbl">${m.mes}</div></div>`).join("");
     } catch {
       box.innerHTML = `<div class="empty">Déjanos tu contacto y te enviamos los nuevos negocios cada mes.</div>`;
@@ -198,15 +205,33 @@
   });
 
   // ---- Etapa 3: lista real (el lead ya se guardo progresivamente) ----------
-  let listaCargada = false;
-  async function cargarLista() {
-    if (listaCargada) return;
-    listaCargada = true;
-    saveLead({ etapa: 3 });  // marca que llego a la etapa 3 (vio la lista)
+  // Chips de mes: el usuario elige el mes; la lista se filtra por ESE mes con el
+  // MISMO filtro del conteo -> el numero del panorama cuadra con lo que se lista.
+  let stage3Init = false;
+  const mesesEl = $("#meses");
+  function renderMeses() {
+    if (!state.meses.length) { mesesEl.hidden = true; return; }
+    if (!state.mesSel) state.mesSel = state.meses[state.meses.length - 1].ym; // por defecto el mas reciente
+    mesesEl.innerHTML = state.meses.map(m =>
+      `<button class="mes-chip${m.ym === state.mesSel ? " on" : ""}" data-ym="${m.ym}">
+         ${m.mes} ${m.anio} · <b>${m.n}</b></button>`).join("");
+    mesesEl.hidden = false;
+  }
+  mesesEl.addEventListener("click", (e) => {
+    const c = e.target.closest(".mes-chip"); if (!c) return;
+    state.mesSel = c.dataset.ym;
+    renderMeses(); cargarLista(true);
+  });
+
+  async function cargarLista(force = false) {
+    if (stage3Init && !force) return;
+    if (!stage3Init) { stage3Init = true; saveLead({ etapa: 3 }); renderMeses(); }
     const cont = $("#lista"), count = $("#neg-count");
+    cont.innerHTML = `<div class="spinner"><div class="ring"></div><span>Buscando…</span></div>`;
     try {
       const r = await fetch(
-        `/api/negocios?distrito=${encodeURIComponent(state.distrito)}&ubigeo=${state.ubigeo}`
+        `/api/negocios?distrito=${encodeURIComponent(state.distrito)}&ubigeo=${state.ubigeo}` +
+        (state.mesSel ? `&mes=${state.mesSel}` : "")
       );
       const d = await r.json();
       const negocios = (d && d.negocios) || [];
@@ -251,21 +276,42 @@
   }
 
   // WhatsApp honesto: abre wa.me con mensaje pre-cargado; el usuario envia.
+  // Incluye PROVINCIA y DEPARTAMENTO (hay distritos homonimos en varias regiones).
   $("#btn-wa").addEventListener("click", () => {
-    const msg = `Hola, quiero recibir los nuevos negocios de ${titleCase(state.distrito)} cada mes. Mi RUC es ${state.ruc}.`;
+    const ubic = [state.distrito, state.provincia, state.departamento]
+      .filter(Boolean).map(titleCase).join(", ");
+    const msg = `Hola, quiero recibir los nuevos negocios de ${ubic} cada mes. Mi RUC es ${state.ruc}.`;
     window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
+    goto(4); // pantalla de cierre
   });
+
+  // Etapa 4 (cierre): volver a la lista.
+  $("#btn-volver-lista").addEventListener("click", () => goto(3));
+
+  // ---- Modal: Política de Privacidad y Términos (no rompe sin-scroll) -------
+  const modal = $("#modal-legal");
+  $("#lnk-legal").addEventListener("click", (e) => { e.preventDefault(); modal.hidden = false; });
+  modal.addEventListener("click", (e) => { if (e.target.closest("[data-close-modal]")) modal.hidden = true; });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") modal.hidden = true; });
 
   // ---- PWA: install + push (opcional, preparado) ---------------------------
   let deferredPrompt = null;
-  const btnInstall = $("#btn-install");
+  const btnsInstall = [$("#btn-install"), $("#btn-install-2")].filter(Boolean);
+  const installHint = $("#install-hint");
   window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault(); deferredPrompt = e; if (btnInstall) btnInstall.hidden = false;
+    e.preventDefault(); deferredPrompt = e;
+    btnsInstall.forEach(b => b.hidden = false);   // escritorio/Android con prompt nativo
   });
-  if (btnInstall) btnInstall.addEventListener("click", async () => {
-    if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; }
+  async function onInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt(); deferredPrompt = null;
+      btnsInstall.forEach(b => b.hidden = true);
+    } else if (installHint) {
+      installHint.hidden = false;                 // iOS / sin prompt: instruccion breve
+    }
     await activarPush();
-  });
+  }
+  btnsInstall.forEach(b => b.addEventListener("click", onInstall));
 
   async function activarPush() {
     try {
@@ -297,9 +343,15 @@
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
-  function originFromUrl() {
-    const o = new URLSearchParams(location.search).get("o");
-    return (["colegio", "facebook", "youtube"].includes(o)) ? o : "directo";
+  function origenFromUrl() {
+    // Captura el ORIGEN/UTM real de la convocatoria (colegio-X, facebook, youtube…).
+    // NADA de fingerprinting/geo/IP: solo parametros que vienen en el enlace.
+    const q = new URLSearchParams(location.search);
+    const raw = q.get("origen") || q.get("o") || q.get("utm_source") || q.get("ref") || "";
+    const camp = q.get("utm_campaign") || "";
+    let v = [raw, camp].filter(Boolean).join("-");
+    v = v.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
+    return v || "directo";
   }
   function urlBase64ToUint8Array(base64String) {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
