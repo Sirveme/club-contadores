@@ -103,9 +103,10 @@ async def api_lead(payload: dict, request: Request):
 
 
 @app.get("/api/negocios")
-async def api_negocios(distrito: str = "", ubigeo: str = ""):
-    negocios = await db.lista_negocios(ubigeo.strip(), distrito.strip())
-    return {"negocios": negocios}
+async def api_negocios(distrito: str = "", ubigeo: str = "", mes: str = ""):
+    # `mes` ('YYYY-MM') usa el MISMO filtro que /api/conteo -> el numero cuadra.
+    negocios = await db.lista_negocios(ubigeo.strip(), distrito.strip(), mes.strip())
+    return {"negocios": negocios, "total": len(negocios), "mes": mes}
 
 
 @app.post("/api/push/subscribe")
