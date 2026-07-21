@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import json
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -21,6 +22,9 @@ from .ruc import validar_ruc
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+
+# Logger que sale por stderr -> visible en los logs de Railway.
+log = logging.getLogger("uvicorn.error")
 
 # Prueba social configurable (irá subiendo). NO poner 1600.
 ESTUDIOS_TOTAL = os.getenv("ESTUDIOS_TOTAL", "800")
@@ -98,7 +102,10 @@ async def api_lead(payload: dict, request: Request):
     try:
         res = await db.upsert_lead(data)
     except Exception:
-        return JSONResponse({"ok": False}, status_code=200)  # nunca bloquear la UI
+        # LOGUEAR el error real (visible en los logs de Railway). Antes se tragaba
+        # la excepcion y devolvia 200: el lead no se guardaba y no se veia nada.
+        log.exception("FALLO guardando lead ruc=%s etapa=%s", data.get("ruc"), data.get("etapa"))
+        return JSONResponse({"ok": False, "error": "no_guardado"}, status_code=500)
     return {"ok": True, **res}
 
 

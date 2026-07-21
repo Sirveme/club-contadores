@@ -173,7 +173,10 @@ async def upsert_lead(data: dict) -> dict:
             (ruc, session_id, nombre, razon_social, distrito, ubigeo,
              whatsapp, email, origen, etapa_max, user_agent)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-        ON CONFLICT (ruc) DO UPDATE SET
+        -- El indice ux_inscrip_ruc es PARCIAL (WHERE ruc IS NOT NULL): la inferencia
+        -- del ON CONFLICT DEBE repetir ese predicado, si no Postgres lanza
+        -- "no unique or exclusion constraint matching the ON CONFLICT specification".
+        ON CONFLICT (ruc) WHERE ruc IS NOT NULL DO UPDATE SET
             -- session_id: se conserva el de PRIMER contacto (no lo pisa otra sesion).
             session_id    = COALESCE(inscripciones.session_id, EXCLUDED.session_id),
             nombre        = COALESCE(EXCLUDED.nombre,       inscripciones.nombre),
