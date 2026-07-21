@@ -236,19 +236,25 @@
   // Chips de mes: el usuario elige el mes; la lista se filtra por ESE mes con el
   // MISMO filtro del conteo -> el numero del panorama cuadra con lo que se lista.
   let stage3Init = false;
-  const mesesEl = $("#meses");
+  const mesWrap = $("#mes-wrap"), mesSelEl = $("#mes-sel");
+  const MES_LARGO = {
+    ene: "Enero", feb: "Febrero", mar: "Marzo", abr: "Abril", may: "Mayo", jun: "Junio",
+    jul: "Julio", ago: "Agosto", sep: "Setiembre", oct: "Octubre", nov: "Noviembre", dic: "Diciembre",
+  };
   function renderMeses() {
-    if (!state.meses.length) { mesesEl.hidden = true; return; }
-    if (!state.mesSel) state.mesSel = state.meses[state.meses.length - 1].ym; // por defecto el mas reciente
-    mesesEl.innerHTML = state.meses.map(m =>
-      `<button class="mes-chip${m.ym === state.mesSel ? " on" : ""}" data-ym="${m.ym}">
-         ${m.mes} ${m.anio} · <b>${m.n}</b></button>`).join("");
-    mesesEl.hidden = false;
+    if (!state.meses.length) { mesWrap.hidden = true; return; }
+    // Del MAS RECIENTE al mas antiguo (el backend los devuelve ascendentes).
+    const desc = state.meses.slice().sort((a, b) => b.ym.localeCompare(a.ym));
+    // Por defecto el mes mas reciente (los negocios mas frescos).
+    if (!state.mesSel || !desc.some(m => m.ym === state.mesSel)) state.mesSel = desc[0].ym;
+    mesSelEl.innerHTML = desc.map(m =>
+      `<option value="${m.ym}">${MES_LARGO[m.mes] || m.mes} ${m.anio}</option>`).join("");
+    mesSelEl.value = state.mesSel;
+    mesWrap.hidden = false;
   }
-  mesesEl.addEventListener("click", (e) => {
-    const c = e.target.closest(".mes-chip"); if (!c) return;
-    state.mesSel = c.dataset.ym;
-    renderMeses(); cargarLista(true);
+  mesSelEl.addEventListener("change", () => {
+    state.mesSel = mesSelEl.value;
+    cargarLista(true);   // lista + conteo se filtran por ese mes (siguen cuadrando)
   });
 
   // Los meses pueden no estar todavia si el usuario avanzo antes de que respondiera
