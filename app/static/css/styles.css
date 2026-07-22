@@ -155,8 +155,10 @@ body{
 .conteo .empty{ color:var(--muted); font-size:14px; padding:8px 0; }
 .loading-mini{ color:var(--muted); font-size:14px; }
 
-/* --- Etapa 3: lista con scroll interno --- */
-.stage3-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+/* --- Etapa 3: lista con scroll interno ---
+   El header, el selector de mes y las acciones NO se encogen (flex:0 0 auto);
+   SOLO .lista crece/encoge y hace scroll interno. Asi nada se aplasta. */
+.stage3-head{ flex:0 0 auto; display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
 .neg-count{ font-size:13px; color:var(--green); font-weight:700; white-space:nowrap; }
 .lista{
   flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
@@ -201,7 +203,7 @@ body{
   padding:2px 7px; border-radius:6px; font-weight:600; white-space:nowrap; font-size:10.5px; }
 .neg .ciiu{ font-size:10px; color:#7fa392; white-space:nowrap; }
 
-.stage3-actions{ padding-top:4px; }
+.stage3-actions{ flex:0 0 auto; padding-top:4px; }
 
 /* --- Descargar / Compartir --- */
 .tools{ display:flex; gap:8px; margin-bottom:8px; }
@@ -234,6 +236,15 @@ body{
 .razon-ok{ font-weight:800; }
 .razon-txt{ line-height:1.35; }
 
+/* Estado "sin datos" en el distrito: mensaje honesto + salida a otro distrito. */
+.vacio{ margin:auto; display:flex; flex-direction:column; align-items:center; gap:10px;
+  text-align:center; padding:16px 10px; color:var(--muted); max-width:300px; }
+.vacio-ico{ font-size:34px; opacity:.9; }
+.vacio-txt{ font-size:14px; line-height:1.5; margin:0; }
+.vacio-txt b{ color:var(--text); }
+.vacio-sub{ font-size:12.5px; margin:0; }
+.vacio .tool{ flex:0 0 auto; margin-top:2px; }
+
 .spinner{ margin:auto; display:flex; flex-direction:column; align-items:center; gap:12px; color:var(--muted); }
 .ring{ width:34px; height:34px; border-radius:99px; border:3px solid var(--line); border-top-color:var(--green); animation:spin .8s linear infinite; }
 @keyframes spin{ to{ transform:rotate(360deg);} }
@@ -250,9 +261,12 @@ body{
 /* --- Selector de mes (etapa 3) ---
    Dropdown en vez de chips: ocupa el MISMO espacio haya 2 meses o 12, asi el
    filtro escala con los meses que se acumulan sin romper el sin-scroll. */
-/* La etiqueta "Mes" va DENTRO del control (un solo bloque, no suelta al lado). */
+/* La etiqueta "Mes" va DENTRO del control (un solo bloque, no suelta al lado).
+   flex:0 0 auto + min-height fijo: NUNCA colapsa aunque la lista de abajo empuje
+   (antes el <select> se aplastaba a una rayita cuando la lista llenaba la etapa). */
 .mes-wrap{
-  display:flex; align-items:stretch; margin-top:10px;
+  flex:0 0 auto;                 /* el layout de la etapa 3 NO puede encogerlo */
+  display:flex; align-items:stretch; margin-top:10px; min-height:42px;
   background:var(--surface); border:1.5px solid var(--line); border-radius:10px;
   overflow:hidden;
 }
@@ -264,15 +278,16 @@ body{
 }
 .mes-sel{
   flex:1 1 auto; min-width:0; width:100%;
-  appearance:none; -webkit-appearance:none; border:0;
+  box-sizing:border-box; height:100%; min-height:42px; line-height:1.25;
+  appearance:none; -webkit-appearance:none; border:0; margin:0;
   background-color:transparent;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%2322c55e' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
   background-repeat:no-repeat; background-position:right 12px center;
-  border:1.5px solid var(--line); border-radius:10px; color:var(--text);
+  color:var(--text);
   padding:10px 34px 10px 12px; font-size:14px; font-weight:600;
   font-family:inherit; cursor:pointer; text-overflow:ellipsis;
 }
-.mes-sel:focus{ outline:none; border-color:var(--green); }
+.mes-sel:focus{ outline:none; }
 /* La lista desplegable la pinta el sistema; se fuerza el tema oscuro donde se puede. */
 .mes-sel option{ background:var(--bg2); color:var(--text); }
 
