@@ -77,14 +77,15 @@ async def conteo_por_mes(ubigeo: str, distrito: str) -> list[dict]:
 
     assert _pool is not None
     where, arg = _distrito_filter(ubigeo, distrito)
-    # mes_inscripcion es el campo COMUN ('YYYY-MM'); comparacion de texto ordena
-    # cronologicamente. Ultimos 3 meses = actual + 2 previos.
+    # TODOS los meses CON DATOS del distrito (no solo los ultimos 3): si se
+    # limitaba a 3 meses, un distrito con data mas antigua (ej. Colcamar) devolvia
+    # lista vacia, el selector de mes desaparecia y el usuario quedaba atrapado.
+    # El panorama de la etapa 2 muestra solo los ultimos 3; el selector, todos.
     rows = await _pool.fetch(
         f"""
         SELECT mes_inscripcion AS mes, COUNT(*) AS n
         FROM nuevos_negocios
-        WHERE {where}
-          AND mes_inscripcion >= to_char((CURRENT_DATE - INTERVAL '2 months'), 'YYYY-MM')
+        WHERE {where} AND mes_inscripcion IS NOT NULL
         GROUP BY mes_inscripcion
         ORDER BY mes_inscripcion
         """,
@@ -160,6 +161,15 @@ async def upsert_lead(data: dict) -> dict:
     Sin RUC no se guarda (no hay identidad todavia).
     """
     ruc = (data.get("ruc") or "").strip()
+    # Normalizacion al grabar: email en minusculas, distrito en MAYUSCULAS,
+    # razon social/nombre en MAYUSCULAS (consistente con nuevos_negocios).
+    if data.get("email"):
+        data["email"] = data["email"].strip().lower()
+    if data.get("distrito"):
+        data["distrito"] = data["distrito"].strip().upper()
+    for k in ("razon_social", "nombre"):
+        if data.get(k):
+            data[k] = data[k].strip().upper()
     estado = "completo" if (data.get("whatsapp") and data.get("email")) else "parcial"
     if not ruc:
         return {"estado": estado, "etapa_max": int(data.get("etapa") or 0), "guardado": False}
@@ -181,8 +191,16 @@ async def upsert_lead(data: dict) -> dict:
             session_id    = COALESCE(inscripciones.session_id, EXCLUDED.session_id),
             nombre        = COALESCE(EXCLUDED.nombre,       inscripciones.nombre),
             razon_social  = COALESCE(EXCLUDED.razon_social, inscripciones.razon_social),
-            distrito      = COALESCE(EXCLUDED.distrito,     inscripciones.distrito),
-            ubigeo        = COALESCE(EXCLUDED.ubigeo,       inscripciones.ubigeo),
+            -- REGLA: un RUC = UN distrito. La MISMA sesion (mismo session_id) SI
+            -- puede corregirlo (p.ej. si cayo en un distrito vacio y elige otro);
+            -- una sesion DISTINTA no lo pisa (keep-first). Los multiples distritos
+            -- son de la version de pago (S/ 15 c/u), aun no implementada.
+            distrito = CASE WHEN inscripciones.session_id = EXCLUDED.session_id
+                            THEN COALESCE(EXCLUDED.distrito, inscripciones.distrito)
+                            ELSE COALESCE(inscripciones.distrito, EXCLUDED.distrito) END,
+            ubigeo   = CASE WHEN inscripciones.session_id = EXCLUDED.session_id
+                            THEN COALESCE(EXCLUDED.ubigeo, inscripciones.ubigeo)
+                            ELSE COALESCE(inscripciones.ubigeo, EXCLUDED.ubigeo) END,
             whatsapp      = COALESCE(EXCLUDED.whatsapp,     inscripciones.whatsapp),
             email         = COALESCE(EXCLUDED.email,        inscripciones.email),
             origen        = COALESCE(inscripciones.origen,  EXCLUDED.origen),
@@ -197,6 +215,24 @@ async def upsert_lead(data: dict) -> dict:
         int(data.get("etapa") or 0), data.get("user_agent"),
     )
     return {"estado": row["estado"], "etapa_max": row["etapa_max"], "guardado": True}
+
+
+async def distrito_de_ruc(ruc: str) -> dict | None:
+    """
+    Distrito YA registrado para ese RUC (regla: un RUC = un distrito, el primero).
+    La UI lo usa para fijar el distrito y no dejar cambiarlo en la version gratuita.
+    """
+    ruc = (ruc or "").strip()
+    if not ruc or demo_mode():
+        return None
+    assert _pool is not None
+    row = await _pool.fetchrow(
+        "SELECT distrito, ubigeo FROM inscripciones WHERE ruc = $1 AND distrito IS NOT NULL",
+        ruc,
+    )
+    if not row:
+        return None
+    return {"distrito": row["distrito"], "ubigeo": row["ubigeo"]}
 
 
 async def guardar_push(sub: dict, ruc: str | None, distrito: str | None) -> None:
