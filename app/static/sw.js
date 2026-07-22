@@ -1,9 +1,9 @@
 /* Club de Contadores — Service Worker. Versionar en cada deploy (CACHE vX). */
-const CACHE = "club-contadores-v7";
+const CACHE = "club-contadores-v9";
 const CORE = [
   "/",
-  "/static/css/styles.css?v=7",
-  "/static/js/app.js?v=7",
+  "/static/css/styles.css?v=9",
+  "/static/js/app.js?v=9",
   "/manifest.webmanifest",
   "/distritos.json",
   "/static/icons/icon-192.png",
