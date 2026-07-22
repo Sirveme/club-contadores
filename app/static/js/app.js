@@ -3,7 +3,7 @@
   "use strict";
 
   // Numero de WhatsApp del Club (Peru). Cambiar por el real de Perú Sistemas.
-  const WA_NUMBER = "51999888777";
+  const WA_NUMBER = "51967317946";
 
   const CFG = window.__CFG__ || {};
   const state = { ruc: "", rucValidado: "", razon_social: "", tipo: "", distrito: "", ubigeo: "",
