@@ -63,7 +63,12 @@
   function goto(n) {
     stages.forEach(s => s.classList.toggle("active", +s.dataset.stage === n));
     dots.forEach((d, i) => d.classList.toggle("on", i <= n));
-    if (n === 2) cargarConteo();
+    if (n === 2) {
+      // Re-habilitar el boton: si no, queda disabled tras el primer uso y al
+      // volver a la etapa 2 (flujo "elegir otro distrito") no responde.
+      const bv = $("#btn-ver"); if (bv) bv.disabled = false;
+      cargarConteo();
+    }
     if (n === 3) cargarLista();
   }
   document.addEventListener("click", (e) => {
@@ -116,6 +121,10 @@
         `<br>${escapeHtml(d.razon_social || "Verificado en SUNAT")}</span>`;
       razonEl.hidden = false;
       saveLead({ etapa: 1 });   // CAPTURA TEMPRANA: apenas se confirma que existe
+      // Regla: un RUC = UN distrito. Si ya tiene uno, se fija y no se puede cambiar.
+      if (d.ubigeo_registrado || d.distrito_registrado) {
+        fijarDistrito(d.ubigeo_registrado, d.distrito_registrado);
+      }
       return true;
     } catch {
       razonEl.hidden = true;
@@ -165,6 +174,25 @@
     saveLead({ etapa: 1 });   // CAPTURA TEMPRANA: distrito apenas se selecciona
   }
 
+  // Un RUC = UN distrito (el primero). Si ya lo tiene, se fija y se bloquea el
+  // campo: cambiar de distrito sera parte de la version de pago.
+  function fijarDistrito(ubigeo, nombre) {
+    const x = DISTRITOS.find(o => o.u === ubigeo) ||
+              DISTRITOS.find(o => norm(o.d) === norm(nombre || ""));
+    if (x) {
+      pickDistrito(x);
+    } else if (nombre) {
+      state.distrito = nombre; state.ubigeo = ubigeo || "";
+      distEl.value = nombre;
+      $$(".dist-name").forEach(el => el.textContent = titleCase(nombre));
+    }
+    distEl.readOnly = true;
+    distEl.classList.add("fijo");
+    comboList.hidden = true;
+    const nota = $("#dist-fijo");
+    if (nota) nota.hidden = false;
+  }
+
   // Continuar → solo avanza con RUC EXISTENTE en SUNAT + distrito elegido.
   $("#btn-validar").addEventListener("click", async () => {
     err1.hidden = true;
@@ -193,7 +221,8 @@
         box.innerHTML = `<div class="empty">Estamos cargando los datos de ${titleCase(state.distrito)}. Déjanos tu contacto y te avisamos apenas estén.</div>`;
         return;
       }
-      box.innerHTML = state.meses.map(m =>
+      // El panorama muestra los ULTIMOS 3 meses; el selector de la etapa 3 lista todos.
+      box.innerHTML = state.meses.slice(-3).map(m =>
         `<div class="mcard"><div class="num">${m.n}</div><div class="lbl">${m.mes}</div></div>`).join("");
     } catch {
       box.innerHTML = `<div class="empty">Déjanos tu contacto y te enviamos los nuevos negocios cada mes.</div>`;
@@ -284,13 +313,43 @@
       );
       const d = await r.json();
       const negocios = (d && d.negocios) || [];
-      count.textContent = negocios.length ? `${negocios.length} negocios` : "";
+      count.textContent = negocios.length ? `${negocios.length} negocios` : "0 negocios";
       cont.innerHTML = negocios.length
         ? negocios.map(renderNegocio).join("")
-        : `<div class="spinner"><span>Aún estamos cargando los negocios de ${titleCase(state.distrito)}. Te los enviaremos por WhatsApp y email apenas estén listos.</span></div>`;
+        : vacioHtml();
     } catch {
       cont.innerHTML = `<div class="spinner"><span>No pudimos cargar la lista ahora. Ya guardamos tu registro; te la enviamos por WhatsApp.</span></div>`;
     }
+  }
+
+  // Estado "sin datos": mensaje HONESTO (no prometemos datos que dependen de SUNAT)
+  // + salida SIEMPRE disponible para elegir otro distrito sin recargar.
+  function vacioHtml() {
+    const otrosMeses = state.meses.length > 1
+      ? `<p class="vacio-sub">Prueba con otro mes en el selector de arriba.</p>` : "";
+    return `<div class="vacio">
+      <div class="vacio-ico">📭</div>
+      <p class="vacio-txt">Por ahora no hay nuevos negocios registrados en
+        <b>${escapeHtml(titleCase(state.distrito))}</b>. Si aparecen en los próximos meses, te avisaremos.</p>
+      ${otrosMeses}
+      <button class="tool" id="btn-otro-distrito" type="button">Elegir otro distrito</button>
+    </div>`;
+  }
+
+  // Elegir otro distrito SIN recargar: limpia el estado y vuelve a la etapa 1 con
+  // el campo de distrito editable.
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("#btn-otro-distrito")) cambiarDistrito();
+  });
+  function cambiarDistrito() {
+    state.distrito = ""; state.ubigeo = ""; state.provincia = ""; state.departamento = "";
+    state.meses = []; state.mesSel = ""; stage3Init = false;
+    distEl.value = ""; distEl.readOnly = false; distEl.classList.remove("fijo");
+    const nota = $("#dist-fijo"); if (nota) nota.hidden = true;
+    $("#lista").innerHTML = "";
+    $("#mes-wrap").hidden = true;
+    goto(1);
+    setTimeout(() => distEl.focus(), 60);
   }
 
   // Abreviaturas de régimen para que el badge quepa en móvil.
