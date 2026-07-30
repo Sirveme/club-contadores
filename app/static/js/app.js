@@ -9,7 +9,7 @@
   const state = { ruc: "", rucValidado: "", razon_social: "", tipo: "", distrito: "", ubigeo: "",
                   provincia: "", departamento: "",
                   whatsapp: "", email: "", origen: origenFromUrl(),
-                  meses: [], mesSel: "" };
+                  meses: [], mesSel: "", ultimo: null };
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -61,12 +61,14 @@
   const stages = $$(".stage");
   const dots = $$("#progress .dot");
   function goto(n) {
-    stages.forEach(s => s.classList.toggle("active", +s.dataset.stage === n));
-    dots.forEach((d, i) => d.classList.toggle("on", i <= n));
+    // Compara como STRING → soporta etapas numéricas y la etapa "lock" (desbloqueo).
+    stages.forEach(s => s.classList.toggle("active", String(s.dataset.stage) === String(n)));
+    if (typeof n === "number") dots.forEach((d, i) => d.classList.toggle("on", i <= n));
     if (n === 2) {
       // Re-habilitar el boton: si no, queda disabled tras el primer uso y al
       // volver a la etapa 2 (flujo "elegir otro distrito") no responde.
       const bv = $("#btn-ver"); if (bv) bv.disabled = false;
+      const bs = $("#btn-ver-sin-wa"); if (bs) bs.disabled = false;
       cargarConteo();
     }
     if (n === 3) cargarLista();
@@ -186,8 +188,10 @@
       distEl.value = nombre;
       $$(".dist-name").forEach(el => el.textContent = titleCase(nombre));
     }
-    distEl.readOnly = true;
-    distEl.classList.add("fijo");
+    // Multi-distrito: se PRERELLENA el distrito ya consultado, pero queda EDITABLE
+    // (puede cambiarlo para consultar otro; el límite lo decide el backend).
+    distEl.readOnly = false;
+    distEl.classList.remove("fijo");
     comboList.hidden = true;
     const nota = $("#dist-fijo");
     if (nota) nota.hidden = false;
@@ -248,18 +252,26 @@
   emailEl.addEventListener("input", debounce(guardarEmail, 900));
   emailEl.addEventListener("blur", guardarEmail);
 
-  $("#btn-ver").addEventListener("click", async () => {
+  // WhatsApp es OPCIONAL; el email es obligatorio. `conWa=false` = "Continuar sin
+  // WhatsApp" (avanza igual, 1 distrito). Con WhatsApp válido → hasta 3 distritos.
+  function avanzarEtapa3(conWa) {
     err2.hidden = true;
-    const wa = waEl.value.replace(/\D/g, "");
     const email = emailEl.value.trim();
-    if (wa.length !== 9) return showErr(err2, "Ingresa un WhatsApp de 9 dígitos.");
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showErr(err2, "Ingresa un email válido.");
-    state.whatsapp = wa; state.email = email;
-    // Guardado al avanzar a etapa 3 (lead completo: WhatsApp + email).
-    saveLead({ whatsapp: wa, email, etapa: 3 });
-    const btn = $("#btn-ver"); btn.disabled = true;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+      return showErr(err2, "Ingresa un email válido.");
+    let wa = conWa ? waEl.value.replace(/\D/g, "") : "";
+    if (conWa && wa && !(wa.length === 9 && wa[0] === "9"))
+      return showErr(err2, "El WhatsApp debe tener 9 dígitos y empezar en 9.");
+    wa = (wa.length === 9 && wa[0] === "9") ? wa : "";   // vacío o inválido → sin WhatsApp
+    state.email = email; state.whatsapp = wa;
+    const payload = { email, etapa: 3 };
+    if (wa) payload.whatsapp = wa;   // nunca enviar cadena vacía
+    saveLead(payload);
+    $("#btn-ver").disabled = true; $("#btn-ver-sin-wa").disabled = true;
     goto(3); // entra a etapa 3 (muestra spinner) mientras traemos la lista
-  });
+  }
+  $("#btn-ver").addEventListener("click", () => avanzarEtapa3(true));
+  $("#btn-ver-sin-wa").addEventListener("click", () => avanzarEtapa3(false));
 
   // ---- Etapa 3: lista real (el lead ya se guardo progresivamente) ----------
   // Chips de mes: el usuario elige el mes; la lista se filtra por ESE mes con el
@@ -309,14 +321,21 @@
     try {
       const r = await fetch(
         `/api/negocios?distrito=${encodeURIComponent(state.distrito)}&ubigeo=${state.ubigeo}` +
-        (state.mesSel ? `&mes=${state.mesSel}` : "")
+        (state.mesSel ? `&mes=${state.mesSel}` : "") +
+        (state.ruc ? `&ruc=${encodeURIComponent(state.ruc)}` : "")
       );
       const d = await r.json();
+      // GATE: sin cupo para este distrito nuevo (sin WhatsApp) → pantalla de
+      // desbloqueo. NO se pierde el distrito que ya tiene.
+      if (d && d.bloqueado) { stage3Init = false; mostrarDesbloqueo(); return; }
       const negocios = (d && d.negocios) || [];
       count.textContent = negocios.length ? `${negocios.length} negocios` : "0 negocios";
       cont.innerHTML = negocios.length
         ? negocios.map(renderNegocio).join("")
         : vacioHtml();
+      // Snapshot del distrito accedido con éxito (para "volver a mi distrito").
+      state.ultimo = { distrito: state.distrito, ubigeo: state.ubigeo,
+                       provincia: state.provincia, departamento: state.departamento };
     } catch {
       cont.innerHTML = `<div class="spinner"><span>No pudimos cargar la lista ahora. Ya guardamos tu registro; te la enviamos por WhatsApp.</span></div>`;
     }
@@ -342,6 +361,10 @@
     if (e.target.closest("#btn-otro-distrito")) cambiarDistrito();
   });
   function cambiarDistrito() {
+    // Recordar el distrito actual (con acceso) para poder "volver a mi distrito"
+    // si el nuevo queda bloqueado por el límite.
+    if (state.ubigeo) state.ultimo = { distrito: state.distrito, ubigeo: state.ubigeo,
+                                       provincia: state.provincia, departamento: state.departamento };
     state.distrito = ""; state.ubigeo = ""; state.provincia = ""; state.departamento = "";
     state.meses = []; state.mesSel = ""; stage3Init = false;
     distEl.value = ""; distEl.readOnly = false; distEl.classList.remove("fijo");
@@ -351,6 +374,38 @@
     goto(1);
     setTimeout(() => distEl.focus(), 60);
   }
+
+  // ---- Pantalla de DESBLOQUEO (2º distrito sin WhatsApp) --------------------
+  function mostrarDesbloqueo() {
+    const dn = document.querySelector('[data-stage="lock"] .lock-dist');
+    if (dn) dn.textContent = titleCase(state.distrito) || "otro distrito";
+    const errL = $("#err-lock"); if (errL) errL.hidden = true;
+    const inp = $("#whatsapp-lock"); if (inp) inp.value = "";
+    goto("lock");
+    setTimeout(() => inp && inp.focus(), 60);
+  }
+  // Agregar WhatsApp aquí desbloquea 3 distritos y trae el distrito intentado.
+  $("#btn-desbloquear").addEventListener("click", () => {
+    const errL = $("#err-lock");
+    const wa = ($("#whatsapp-lock").value || "").replace(/\D/g, "");
+    if (!(wa.length === 9 && wa[0] === "9"))
+      return showErr(errL, "El WhatsApp debe tener 9 dígitos y empezar en 9.");
+    state.whatsapp = wa;
+    saveLead({ whatsapp: wa, etapa: 3 });   // sube el límite a 3
+    stage3Init = false;
+    goto(3);   // reintenta el distrito: ahora el gate lo permite y lo registra
+  });
+  // Volver a mi distrito (el que ya tengo): no pierde el acceso.
+  $("#btn-lock-volver").addEventListener("click", () => {
+    if (state.ultimo) {
+      state.distrito = state.ultimo.distrito; state.ubigeo = state.ultimo.ubigeo;
+      state.provincia = state.ultimo.provincia; state.departamento = state.ultimo.departamento;
+      state.meses = []; state.mesSel = ""; stage3Init = false;
+      goto(3);
+    } else {
+      goto(1);
+    }
+  });
 
   // Abreviaturas de régimen para que el badge quepa en móvil.
   const REGIMEN_CORTO = {
@@ -391,7 +446,8 @@
   // ---- Descargar (CSV) y Compartir ------------------------------------------
   $("#btn-descargar").addEventListener("click", () => {
     const url = `/api/negocios.csv?distrito=${encodeURIComponent(state.distrito)}` +
-                `&ubigeo=${state.ubigeo}` + (state.mesSel ? `&mes=${state.mesSel}` : "");
+                `&ubigeo=${state.ubigeo}` + (state.mesSel ? `&mes=${state.mesSel}` : "") +
+                (state.ruc ? `&ruc=${encodeURIComponent(state.ruc)}` : "");
     const a = document.createElement("a");
     a.href = url; a.rel = "noopener";
     document.body.appendChild(a); a.click(); a.remove();
