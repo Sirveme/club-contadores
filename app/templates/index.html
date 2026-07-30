@@ -8,7 +8,7 @@
   <meta name="description" content="El directorio de contadores del Perú + los nuevos negocios de tu distrito cada mes.">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=10">
+  <link rel="stylesheet" href="/static/css/styles.css?v=11">
 </head>
 <body>
   <div class="app" id="app">
@@ -69,7 +69,8 @@
       </label>
 
       <p id="dist-fijo" class="nota-fija" hidden>
-        Tu RUC ya está registrado en este distrito. Por ahora cada RUC consulta un solo distrito.
+        Este es el distrito que ya consultaste. Puedes cambiarlo para ver otro
+        — con WhatsApp consultas hasta 3 distritos.
       </p>
 
       <div id="err1" class="err" hidden></div>
@@ -85,21 +86,23 @@
 
       <div id="conteo" class="conteo"><div class="loading-mini">Consultando…</div></div>
 
-      <p class="step-sub small">Déjanos dónde enviártelos cada mes:</p>
-      <label class="field">
-        <span>WhatsApp</span>
-        <input id="whatsapp" inputmode="tel" maxlength="9" placeholder="967 317 946" autocomplete="off">
-      </label>
       <label class="field">
         <span>Email</span>
         <input id="email" inputmode="email" type="email" placeholder="tu@correo.com" autocomplete="off">
       </label>
+      <label class="field">
+        <span>WhatsApp (opcional)</span>
+        <input id="whatsapp" inputmode="tel" maxlength="9" placeholder="967 317 946" autocomplete="off">
+      </label>
+      <p class="field-help">Si dejas tu WhatsApp te aviso el mismo día que publicamos
+        los negocios del mes, y puedes consultar <b>hasta 3 distritos</b> en lugar de uno.</p>
+      <p class="field-trust">Solo lo uso para enviarte tu archivo y el aviso mensual.
+        No lo comparto ni lo vendo. <a href="#" id="lnk-legal">Política de privacidad</a>.</p>
 
       <div id="err2" class="err" hidden></div>
 
       <button class="cta" id="btn-ver">Ver los nuevos negocios de <span class="dist-name">tu distrito</span></button>
-      <p class="consent">Al registrarte aceptas nuestra
-        <a href="#" id="lnk-legal">Política de Privacidad y Términos</a>.</p>
+      <button class="cta cta--sec" id="btn-ver-sin-wa">Continuar sin WhatsApp</button>
       <button class="ghost" data-back="1">← Volver</button>
     </section>
 
@@ -161,6 +164,26 @@
       </div>
     </section>
 
+    <!-- DESBLOQUEO — al intentar un 2º distrito sin WhatsApp (no quita el que ya tiene) -->
+    <section class="stage" data-stage="lock">
+      <div class="lock-box">
+        <div class="lock-ico">🔓</div>
+        <h2 class="step-title">Consulta hasta 3 distritos</h2>
+        <p class="step-sub">Ya tienes acceso a tu primer distrito. Para consultar
+          <b><span class="lock-dist">otro distrito</span></b> (y hasta 3 en total),
+          déjanos tu WhatsApp — así también te avisamos el mismo día que publicamos
+          los negocios del mes.</p>
+        <label class="field">
+          <span>WhatsApp</span>
+          <input id="whatsapp-lock" inputmode="tel" maxlength="9" placeholder="967 317 946" autocomplete="off">
+        </label>
+        <p class="field-trust">Solo lo uso para tu archivo y el aviso mensual. No lo comparto ni lo vendo.</p>
+        <div id="err-lock" class="err" hidden></div>
+        <button class="cta" id="btn-desbloquear">Agregar WhatsApp y ver este distrito</button>
+        <button class="ghost" id="btn-lock-volver">← Volver a mi distrito</button>
+      </div>
+    </section>
+
   </div>
 
   <!-- MODAL: Política de Privacidad y Términos -->
@@ -205,6 +228,6 @@
       demo: {{ 'true' if demo else 'false' }}
     };
   </script>
-  <script src="/static/js/app.js?v=10"></script>
+  <script src="/static/js/app.js?v=11"></script>
 </body>
 </html>
