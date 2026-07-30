@@ -23,6 +23,18 @@ def demo_mode() -> bool:
     return not DATABASE_URL
 
 
+def norm_whatsapp(raw: str | None) -> str | None:
+    """WhatsApp válido = 9 dígitos que empiezan en 9. Devuelve el número o None
+    (NUNCA cadena vacía). Se guarda NULL si viene vacío o con formato inválido."""
+    d = "".join(c for c in (raw or "") if c.isdigit())
+    return d if (len(d) == 9 and d.startswith("9")) else None
+
+
+def limite_distritos(whatsapp: str | None) -> int:
+    """Regla de negocio: 3 distritos si dejó WhatsApp válido; si no, 1."""
+    return 3 if norm_whatsapp(whatsapp) else 1
+
+
 # --- Datos DEMO (solo cuando no hay DATABASE_URL) ---------------------------
 _DEMO_NEGOCIOS = [
     # distrito, ruc, razon_social, tipo, giro, fecha_inscripcion, direccion, ciiu, regimen
@@ -170,7 +182,10 @@ async def upsert_lead(data: dict) -> dict:
     for k in ("razon_social", "nombre"):
         if data.get(k):
             data[k] = data[k].strip().upper()
-    estado = "completo" if (data.get("whatsapp") and data.get("email")) else "parcial"
+    # WhatsApp OPCIONAL: normaliza (9 dígitos, inicia en 9) o NULL — nunca "".
+    data["whatsapp"] = norm_whatsapp(data.get("whatsapp"))
+    # estado 'completo' = tiene CORREO (el WhatsApp ya no es requisito).
+    estado = "completo" if data.get("email") else "parcial"
     if not ruc:
         return {"estado": estado, "etapa_max": int(data.get("etapa") or 0), "guardado": False}
     if demo_mode():
@@ -233,6 +248,49 @@ async def distrito_de_ruc(ruc: str) -> dict | None:
     if not row:
         return None
     return {"distrito": row["distrito"], "ubigeo": row["ubigeo"]}
+
+
+async def acceso_distrito(ruc: str, ubigeo: str, distrito: str | None) -> dict:
+    """GATE de acceso multi-distrito (fuente de verdad: inscripcion_distritos).
+
+    Regla: límite = 3 si la inscripción dejó WhatsApp, 1 si no. Antes de ENTREGAR
+    la data de un distrito, se verifica aquí (backend, no solo el front):
+      - Si ya tiene ese distrito → permitido (no cuenta doble).
+      - Si es nuevo y hay cupo   → lo registra y permite.
+      - Si es nuevo y no hay cupo → BLOQUEADO (la UI ofrece agregar WhatsApp).
+    Devuelve {ok, limite, usados, ya_tenia, motivo}. En demo o sin RUC, permite
+    (no hay identidad que limitar)."""
+    ruc = (ruc or "").strip()
+    ubigeo = (ubigeo or "").strip()
+    if demo_mode() or not ruc or not ubigeo:
+        return {"ok": True, "limite": 1, "usados": 0, "ya_tenia": True, "motivo": None}
+    assert _pool is not None
+    insc = await _pool.fetchrow(
+        "SELECT id, whatsapp FROM inscripciones WHERE ruc = $1", ruc)
+    if not insc:
+        # Sin inscripción aún (no debería pasar: se crea en etapa 1). No bloquear.
+        return {"ok": True, "limite": 1, "usados": 0, "ya_tenia": True, "motivo": None}
+    limite = limite_distritos(insc["whatsapp"])
+    async with _pool.acquire() as con:
+        async with con.transaction():
+            ya = await con.fetchval(
+                "SELECT 1 FROM inscripcion_distritos "
+                "WHERE inscripcion_id = $1 AND ubigeo = $2", insc["id"], ubigeo)
+            usados = await con.fetchval(
+                "SELECT count(*) FROM inscripcion_distritos WHERE inscripcion_id = $1",
+                insc["id"])
+            if ya:
+                return {"ok": True, "limite": limite, "usados": usados,
+                        "ya_tenia": True, "motivo": None}
+            if usados >= limite:
+                return {"ok": False, "limite": limite, "usados": usados,
+                        "ya_tenia": False, "motivo": "limite"}
+            await con.execute(
+                "INSERT INTO inscripcion_distritos (inscripcion_id, ubigeo, distrito) "
+                "VALUES ($1, $2, $3) ON CONFLICT (inscripcion_id, ubigeo) DO NOTHING",
+                insc["id"], ubigeo, (distrito or "").strip().upper() or None)
+    return {"ok": True, "limite": limite, "usados": usados + 1,
+            "ya_tenia": False, "motivo": None}
 
 
 async def guardar_push(sub: dict, ruc: str | None, distrito: str | None) -> None:

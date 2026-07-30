@@ -62,10 +62,40 @@ async def index(request: Request):
 
 
 # --- API del embudo ---------------------------------------------------------
+# RUCs ya confirmados en el padron de SUNAT (cache de proceso). Evita repetir la
+# llamada a la API en cada guardado parcial del lead.
+RUC_VERIFICADOS: set[str] = set()
+
+
+async def ruc_confirmado(ruc: str) -> bool:
+    """True si el RUC existe en SUNAT. Consulta una sola vez por RUC."""
+    ruc = (ruc or "").strip()
+    if not ruc:
+        return False
+    if ruc in RUC_VERIFICADOS:
+        return True
+    res = await validar_ruc(ruc)
+    if res.get("ok"):
+        RUC_VERIFICADOS.add(ruc)
+        return True
+    return False
+
+
 @app.post("/api/validar-ruc")
 async def api_validar_ruc(payload: dict):
     ruc = str(payload.get("ruc", "")).strip()
     res = await validar_ruc(ruc)
+    if res.get("ok"):
+        RUC_VERIFICADOS.add(res.get("ruc") or ruc)
+        # Regla: un RUC = UN distrito. Si ya tiene uno registrado, se devuelve
+        # para que la UI lo fije y no permita cambiarlo (version gratuita).
+        try:
+            ya = await db.distrito_de_ruc(res.get("ruc") or ruc)
+        except Exception:
+            ya = None
+        if ya:
+            res["distrito_registrado"] = ya["distrito"]
+            res["ubigeo_registrado"] = ya["ubigeo"]
     status = 200 if res.get("ok") else 422
     return JSONResponse(res, status_code=status)
 
@@ -88,6 +118,14 @@ async def api_lead(payload: dict, request: Request):
     session_id = (payload.get("session_id") or "").strip()
     if not session_id:
         return JSONResponse({"ok": False, "error": "session_id requerido"}, status_code=422)
+
+    # La VALIDACION ocurre ANTES de cualquier insercion: si SUNAT no reconoce el
+    # RUC, no se graba nada (ni como parcial). No basta con validar en el front:
+    # este endpoint recibe beacons y podria llamarse con cualquier RUC.
+    ruc_in = (payload.get("ruc") or "").strip()
+    if not await ruc_confirmado(ruc_in):
+        log.warning("Lead RECHAZADO: RUC %r no confirmado en SUNAT", ruc_in)
+        return JSONResponse({"ok": False, "error": "ruc_no_validado"}, status_code=422)
     data = {
         "session_id": session_id[:40],
         "nombre": (payload.get("nombre") or "").strip() or None,
@@ -112,10 +150,19 @@ async def api_lead(payload: dict, request: Request):
 
 
 @app.get("/api/negocios")
-async def api_negocios(distrito: str = "", ubigeo: str = "", mes: str = ""):
+async def api_negocios(distrito: str = "", ubigeo: str = "", mes: str = "", ruc: str = ""):
+    # GATE (backend): verifica/registra el distrito contra el límite del lead
+    # (con WhatsApp → 3 distritos, sin WhatsApp → 1). Si ya lo alcanzó, NO entrega
+    # la data: la UI ofrece agregar WhatsApp para desbloquear. Nunca degrada al que
+    # ya tiene acceso a su distrito.
+    acc = await db.acceso_distrito(ruc, ubigeo, distrito)
+    if not acc["ok"]:
+        return {"bloqueado": True, "limite": acc["limite"], "usados": acc["usados"],
+                "distrito": distrito, "negocios": [], "total": 0, "mes": mes}
     # `mes` ('YYYY-MM') usa el MISMO filtro que /api/conteo -> el numero cuadra.
     negocios = await db.lista_negocios(ubigeo.strip(), distrito.strip(), mes.strip())
-    return {"negocios": negocios, "total": len(negocios), "mes": mes}
+    return {"negocios": negocios, "total": len(negocios), "mes": mes,
+            "limite": acc["limite"], "usados": acc["usados"]}
 
 
 @app.post("/api/push/subscribe")
@@ -129,8 +176,14 @@ async def api_push_subscribe(payload: dict):
 
 
 @app.get("/api/negocios.csv")
-async def api_negocios_csv(distrito: str = "", ubigeo: str = "", mes: str = ""):
+async def api_negocios_csv(distrito: str = "", ubigeo: str = "", mes: str = "", ruc: str = ""):
     """Descarga la lista visible (distrito + mes) como CSV listo para Excel."""
+    # Mismo GATE que /api/negocios (el distrito ya suele estar registrado desde la
+    # vista; aquí solo se ASEGURA que no se entregue un distrito sobre el límite).
+    acc = await db.acceso_distrito(ruc, ubigeo, distrito)
+    if not acc["ok"]:
+        return JSONResponse(
+            {"ok": False, "bloqueado": True, "limite": acc["limite"]}, status_code=403)
     negocios = await db.lista_negocios(ubigeo.strip(), distrito.strip(), mes.strip())
     cols = [("ruc", "RUC"), ("razon_social", "Razon Social"), ("giro", "Giro"),
             ("ciiu", "CIIU"), ("tipo", "Tipo"), ("regimen", "Regimen"),
