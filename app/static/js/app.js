@@ -9,7 +9,7 @@
   const state = { ruc: "", rucValidado: "", razon_social: "", tipo: "", distrito: "", ubigeo: "",
                   provincia: "", departamento: "",
                   whatsapp: "", email: "", origen: origenFromUrl(),
-                  meses: [], mesSel: "", ultimo: null };
+                  meses: [], mesSel: "", ultimo: null, enPadron: false };
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -89,11 +89,51 @@
     rucEl.value = rucEl.value.replace(/\D/g, "").slice(0, 11);
     if (rucEl.value !== state.rucValidado) {   // cambio el RUC -> deja de estar validado
       razonEl.hidden = true; err1.hidden = true;
-      state.ruc = ""; state.razon_social = ""; state.rucValidado = "";
+      state.ruc = ""; state.razon_social = ""; state.rucValidado = ""; state.enPadron = false;
     }
   });
-  // Validacion apenas termina de escribir el RUC (blur), sin esperar al boton.
-  rucEl.addEventListener("blur", () => { if (rucEl.value.trim().length === 11) validarRuc(); });
+  // Apenas termina de escribir el RUC (blur), sin esperar al boton.
+  rucEl.addEventListener("blur", () => { if (rucEl.value.trim().length === 11) manejarRuc(); });
+
+  // RECONOCIMIENTO: primero busca el RUC en el padron de contadores. Si esta,
+  // lo saluda y fija su distrito (no lo pregunta). Si no, cae a la validacion
+  // SUNAT existente + distrito manual.
+  async function manejarRuc() {
+    const ruc = rucEl.value.trim();
+    if (ruc.length !== 11) { showErr(err1, "Ingresa un RUC de 11 dígitos."); return false; }
+    if (state.rucValidado === ruc) return true;
+    err1.hidden = true;
+    razonEl.className = "razon cargando"; razonEl.textContent = "Buscando tu RUC…"; razonEl.hidden = false;
+    try {
+      const r = await fetch("/api/reconocer-ruc", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruc }),
+      });
+      const d = await r.json();
+      if (d && d.en_padron) { aplicarPadron(ruc, d); return true; }
+    } catch { /* si falla el reconocimiento, cae a la validacion normal */ }
+    return await validarRuc();   // no esta en el padron -> flujo SUNAT + distrito manual
+  }
+
+  // RUC reconocido en el padron: saluda y fija el distrito automaticamente.
+  function aplicarPadron(ruc, d) {
+    state.ruc = ruc; state.rucValidado = ruc; state.enPadron = true;
+    state.tipo = d.tipo || ""; state.razon_social = d.razon_social || "";
+    state.distrito = d.distrito || ""; state.ubigeo = d.ubigeo || "";
+    state.provincia = d.provincia || ""; state.departamento = d.departamento || "";
+    state.meses = d.meses || []; state.mesSel = ""; stage3Init = false;
+    distEl.value = titleCase(d.distrito || ""); distEl.readOnly = true; distEl.classList.add("fijo");
+    comboList.hidden = true;
+    $$(".dist-name").forEach(el => el.textContent = titleCase(d.distrito || ""));
+    const nota = $("#dist-fijo"); if (nota) nota.hidden = true;
+    razonEl.className = "razon";
+    razonEl.innerHTML =
+      `<span class="razon-ok">✓</span><span class="razon-txt">` +
+      `¡Hola! Como estás en el distrito <b>${escapeHtml(titleCase(d.distrito || ""))}</b>, ` +
+      `aquí están los negocios nuevos de tu zona.</span>`;
+    razonEl.hidden = false;
+    saveLead({ etapa: 1 });
+  }
 
   async function validarRuc() {
     const ruc = rucEl.value.trim();
@@ -197,14 +237,16 @@
     if (nota) nota.hidden = false;
   }
 
-  // Continuar → solo avanza con RUC EXISTENTE en SUNAT + distrito elegido.
+  // Continuar → avanza con RUC reconocido (padron) o validado (SUNAT) + distrito.
   $("#btn-validar").addEventListener("click", async () => {
     err1.hidden = true;
     const btn = $("#btn-validar"); btn.disabled = true; btn.textContent = "Validando…";
     try {
-      const ok = await validarRuc();
+      const ok = await manejarRuc();
       if (!ok) return;                                   // el mensaje ya se mostro
       if (!state.distrito) { showErr(err1, "Elige tu distrito de la lista."); return; }
+      // Dice ser contador pero NO esta en el padron: se registra para seguimiento.
+      if (!state.enPadron) registrarNoListado(state.ruc, state.distrito, "no_encontrado");
       saveLead({ etapa: 2 });
       await sleep(250);
       goto(2);
@@ -212,6 +254,13 @@
       btn.disabled = false; btn.textContent = "Continuar";
     }
   });
+
+  function registrarNoListado(ruc, distrito, marca) {
+    fetch("/api/no-listado", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ruc, distrito, marca }), keepalive: true,
+    }).catch(() => {});
+  }
 
   // ---- Etapa 2: conteo adelanto + captura ----------------------------------
   async function cargarConteo() {
@@ -348,10 +397,10 @@
       ? `<p class="vacio-sub">Prueba con otro mes en el selector de arriba.</p>` : "";
     return `<div class="vacio">
       <div class="vacio-ico">📭</div>
-      <p class="vacio-txt">Por ahora no hay nuevos negocios registrados en
-        <b>${escapeHtml(titleCase(state.distrito))}</b>. Si aparecen en los próximos meses, te avisaremos.</p>
+      <p class="vacio-txt">Aún no tenemos negocios nuevos registrados en
+        <b>${escapeHtml(titleCase(state.distrito))}</b> para este periodo. Apenas los tengamos, te avisaremos.</p>
       ${otrosMeses}
-      <button class="tool" id="btn-otro-distrito" type="button">Elegir otro distrito</button>
+      <button class="tool" id="btn-otro-distrito" type="button">Consultar otro distrito</button>
     </div>`;
   }
 
@@ -366,7 +415,7 @@
     if (state.ubigeo) state.ultimo = { distrito: state.distrito, ubigeo: state.ubigeo,
                                        provincia: state.provincia, departamento: state.departamento };
     state.distrito = ""; state.ubigeo = ""; state.provincia = ""; state.departamento = "";
-    state.meses = []; state.mesSel = ""; stage3Init = false;
+    state.meses = []; state.mesSel = ""; stage3Init = false; state.enPadron = false;
     distEl.value = ""; distEl.readOnly = false; distEl.classList.remove("fijo");
     const nota = $("#dist-fijo"); if (nota) nota.hidden = true;
     $("#lista").innerHTML = "";
