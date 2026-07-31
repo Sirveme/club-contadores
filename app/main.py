@@ -68,12 +68,20 @@ RUC_VERIFICADOS: set[str] = set()
 
 
 async def ruc_confirmado(ruc: str) -> bool:
-    """True si el RUC existe en SUNAT. Consulta una sola vez por RUC."""
+    """True si el RUC es valido. Un RUC del PADRON de contadores ya es valido (es
+    data de SUNAT) y no depende de que la API este arriba; si no, se consulta
+    SUNAT una sola vez por RUC."""
     ruc = (ruc or "").strip()
     if not ruc:
         return False
     if ruc in RUC_VERIFICADOS:
         return True
+    try:
+        if await db.padron_lookup(ruc):
+            RUC_VERIFICADOS.add(ruc)
+            return True
+    except Exception:
+        pass
     res = await validar_ruc(ruc)
     if res.get("ok"):
         RUC_VERIFICADOS.add(ruc)
@@ -147,6 +155,46 @@ async def api_lead(payload: dict, request: Request):
         log.exception("FALLO guardando lead ruc=%s etapa=%s", data.get("ruc"), data.get("etapa"))
         return JSONResponse({"ok": False, "error": "no_guardado"}, status_code=500)
     return {"ok": True, **res}
+
+
+@app.post("/api/reconocer-ruc")
+async def api_reconocer_ruc(payload: dict):
+    """RECONOCIMIENTO DE RUC (TAREA 3). Si el RUC esta en el padron de contadores,
+    devuelve su distrito (del ubigeo) para saludarlo y mostrar los negocios de su
+    zona sin preguntar el distrito. Ademas indica si ese distrito tiene negocios
+    en los meses disponibles; si NO, se registra en contadores_no_listados
+    (marca 'sin_data') para saber donde hay contadores esperando data."""
+    ruc = str(payload.get("ruc", "")).strip()
+    if not ruc_mod.ruc_formato_valido(ruc):
+        return {"en_padron": False, "formato_ok": False}
+    p = await db.padron_lookup(ruc)
+    if not p:
+        return {"en_padron": False, "ruc": ruc}
+    meses = await db.conteo_por_mes(p.get("ubigeo") or "", p.get("distrito") or "")
+    tiene = len(meses) > 0
+    if not tiene:
+        try:
+            await db.log_no_listado(ruc, p.get("distrito"), "sin_data")
+        except Exception:
+            log.exception("no pude registrar sin_data ruc=%s", ruc)
+    return {"en_padron": True, **p, "tiene_negocios": tiene, "meses": meses}
+
+
+@app.post("/api/no-listado")
+async def api_no_listado(payload: dict):
+    """Registra un RUC 'no_encontrado' (dice ser contador pero no esta en el
+    padron; cae al flujo manual). Idempotente por RUC."""
+    ruc = str(payload.get("ruc", "")).strip()
+    distrito = (payload.get("distrito") or "").strip() or None
+    marca = (payload.get("marca") or "no_encontrado").strip()
+    if not ruc_mod.ruc_formato_valido(ruc):
+        return JSONResponse({"ok": False, "error": "ruc_invalido"}, status_code=422)
+    try:
+        await db.log_no_listado(ruc, distrito, marca)
+    except Exception:
+        log.exception("no pude registrar no_listado ruc=%s", ruc)
+        return JSONResponse({"ok": False}, status_code=200)
+    return {"ok": True}
 
 
 @app.get("/api/negocios")

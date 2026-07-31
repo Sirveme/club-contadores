@@ -62,6 +62,17 @@ def _demo_negocios_por_distrito(distrito: str):
     return [n for n in _DEMO_NEGOCIOS if n[0] == d]
 
 
+# Padron DEMO (solo sin BD): un contador con data (Miraflores) y otro sin data.
+_DEMO_PADRON = {
+    "10111111111": {"razon_social": "CONTADOR DEMO CON DATA", "tipo": "natural",
+                    "ubigeo": "150122", "distrito": "MIRAFLORES",
+                    "provincia": "LIMA", "departamento": "LIMA"},
+    "10999999999": {"razon_social": "CONTADOR DEMO SIN DATA", "tipo": "natural",
+                    "ubigeo": "010504", "distrito": "COLCAMAR",
+                    "provincia": "LUYA", "departamento": "AMAZONAS"},
+}
+
+
 # --- Ciclo de vida del pool -------------------------------------------------
 async def connect() -> None:
     global _pool
@@ -75,6 +86,46 @@ async def disconnect() -> None:
     if _pool is not None:
         await _pool.close()
         _pool = None
+
+
+# --- Padron de contadores (TAREA 3) -----------------------------------------
+async def padron_lookup(ruc: str) -> dict | None:
+    """Busca el RUC en contadores_padron. Devuelve dict con razon_social, tipo,
+    ubigeo, distrito, provincia, departamento; o None si no esta en el padron."""
+    ruc = (ruc or "").strip()
+    if not ruc:
+        return None
+    if demo_mode():
+        d = _DEMO_PADRON.get(ruc)
+        return {"ruc": ruc, **d} if d else None
+    assert _pool is not None
+    row = await _pool.fetchrow(
+        "SELECT ruc, razon_social, tipo, ubigeo, distrito, provincia, departamento "
+        "FROM contadores_padron WHERE ruc = $1",
+        ruc,
+    )
+    return dict(row) if row else None
+
+
+async def log_no_listado(ruc: str, distrito: str | None, marca: str) -> None:
+    """Registra un RUC a seguir: 'no_encontrado' (no esta en el padron) o
+    'sin_data' (en el padron pero su distrito aun no tiene negocios). Upsert por
+    RUC para no duplicar."""
+    ruc = (ruc or "").strip()
+    if not ruc or demo_mode():
+        return
+    assert _pool is not None
+    await _pool.execute(
+        """
+        INSERT INTO contadores_no_listados (ruc, distrito_elegido, marca)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (ruc) DO UPDATE SET
+            distrito_elegido = EXCLUDED.distrito_elegido,
+            marca = EXCLUDED.marca,
+            actualizado_en = now()
+        """,
+        ruc, distrito, marca,
+    )
 
 
 # --- Consultas del embudo ---------------------------------------------------
