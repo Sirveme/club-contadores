@@ -7,6 +7,7 @@ Stack: FastAPI + PostgreSQL (asyncpg) + Jinja2 + Vanilla JS. Deploy Railway.
 from __future__ import annotations
 
 import os
+import sys
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -23,6 +24,49 @@ from .ruc import validar_ruc
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+
+# Motor de estadisticas (esta en la raiz del proyecto).
+ROOT_DIR = BASE_DIR.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+import estadisticas as est  # noqa: E402
+
+SITE_BASE = os.getenv("SITE_BASE", "https://contadores.perusistemas.pro").rstrip("/")
+MESES_ES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+            "agosto", "setiembre", "octubre", "noviembre", "diciembre"]
+
+
+_MINUS = {"DE", "DEL", "LA", "LAS", "LOS", "Y", "EL", "EN"}
+
+
+def titulo(s: str) -> str:
+    """Title Case peruano: 'SAN JUAN DE LURIGANCHO' -> 'San Juan de Lurigancho'."""
+    palabras = (s or "").split()
+    out = []
+    for i, w in enumerate(palabras):
+        out.append(w.capitalize() if (i == 0 or w.upper() not in _MINUS) else w.lower())
+    return " ".join(out)
+
+
+def _periodo_txt(desde: str, hasta: str) -> str:
+    (yd, md), (yh, mh) = desde.split("-"), hasta.split("-")
+    if desde == hasta:
+        return f"{MESES_ES[int(md)]} {yd}"
+    if yd == yh:
+        return f"{MESES_ES[int(md)]}–{MESES_ES[int(mh)]} {yd}"
+    return f"{MESES_ES[int(md)]} {yd} – {MESES_ES[int(mh)]} {yh}"
+
+
+def _meses_rango(desde: str, hasta: str) -> list[str]:
+    y, m = map(int, desde.split("-"))
+    y2, m2 = map(int, hasta.split("-"))
+    out = []
+    while (y, m) <= (y2, m2):
+        out.append(f"{y:04d}-{m:02d}")
+        m += 1
+        if m > 12:
+            m, y = 1, y + 1
+    return out
 
 # Logger que sale por stderr -> visible en los logs de Railway.
 log = logging.getLogger("uvicorn.error")
@@ -44,6 +88,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Club de Contadores", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates.env.filters["titulo"] = lambda s: titulo(s)  # Title Case peruano en plantillas
 
 
 # --- Pagina (embudo, una sola vista) ----------------------------------------
@@ -261,6 +306,170 @@ async def health():
     return {"ok": True, "demo": db.demo_mode(),
             "ruc_validacion_activa": ruc_mod.validacion_activa(),
             "ruc_estricto": ruc_mod.RUC_VALIDACION_ESTRICTA}
+
+
+# ============================================================================
+# REPORTES — panel interno (live) + paginas publicas (leen cache JSON) + sitemap
+# ============================================================================
+def _cita(r: dict, url: str) -> str:
+    anio = (r.get("actualizado") or "2026")[:4]
+    per = _periodo_txt(r["periodo"]["desde"], r["periodo"]["hasta"])
+    terr = titulo(r["territorio"]) + (f", {titulo(r['departamento'])}" if r["nivel"] == "provincia" else "")
+    return (f"Perú Sistemas Pro E.I.R.L. ({anio}). Nuevos negocios en {terr}: "
+            f"altas de RUC ({per}). Club de Contadores — contadores.perusistemas.pro. "
+            f"Fuente: SUNAT. {url} (consultado el {r.get('actualizado')}).")
+
+
+def _meta_publica(r: dict, url: str) -> dict:
+    per = _periodo_txt(r["periodo"]["desde"], r["periodo"]["hasta"])
+    terr, dep = titulo(r["territorio"]), titulo(r.get("departamento", ""))
+    if r["nivel"] == "departamento":
+        title = f"Nuevos negocios en {terr}: {r['total']} altas de RUC ({per})"
+        desc = (f"En {terr} se registraron {r['total']} empresas nuevas ({per}). "
+                f"Ranking de provincias, rubros (CIIU) y régimen tributario. Fuente: SUNAT.")
+    else:
+        title = f"Nuevos negocios en {terr} ({dep}): {r['total']} altas ({per})"
+        desc = (f"En {terr}, {dep}, se registraron {r['total']} empresas "
+                f"nuevas ({per}). Distritos, rubros (CIIU) y régimen tributario. Fuente: SUNAT.")
+    return {"title": f"{title} | Club de Contadores", "description": desc,
+            "url": url, "image": f"{SITE_BASE}/static/icons/icon-512.png"}
+
+
+def _ctx_publico(request, r):
+    url = f"{SITE_BASE}/reportes/{r['slug']}" if r["nivel"] == "departamento" \
+        else f"{SITE_BASE}/reportes/{r['departamento_slug']}/{r['slug']}"
+    per = _periodo_txt(r["periodo"]["desde"], r["periodo"]["hasta"])
+    return {"request": request, "r": r, "periodo_txt": per,
+            "meta": _meta_publica(r, url), "cita": _cita(r, url)}
+
+
+@app.get("/sitemap.xml")
+async def sitemap():
+    idx = est.indice_cache() or {"departamentos": [], "provincias": []}
+    lastmod = idx.get("actualizado", "")
+    urls = [f"{SITE_BASE}/reportes"]
+    for d in idx["departamentos"]:
+        urls.append(f"{SITE_BASE}/reportes/{d['slug']}")
+    for p in idx["provincias"]:
+        urls.append(f"{SITE_BASE}/reportes/{p['dep_slug']}/{p['slug']}")
+    body = ['<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for u in urls:
+        body.append(f"  <url><loc>{u}</loc>"
+                    + (f"<lastmod>{lastmod}</lastmod>" if lastmod else "") + "</url>")
+    body.append("</urlset>")
+    return Response("\n".join(body), media_type="application/xml")
+
+
+@app.get("/panel/reportes", response_class=HTMLResponse)
+async def panel_reportes(request: Request):
+    idx = est.indice_cache()
+    if not idx:
+        return HTMLResponse("<p>No hay cache. Corre: python estadisticas.py --regen</p>", status_code=503)
+    provs_por_dep: dict[str, list] = {}
+    for p in sorted(idx["provincias"], key=lambda x: x["nombre"]):
+        provs_por_dep.setdefault(p["dep_slug"], []).append({"slug": p["slug"], "nombre": p["nombre"]})
+    meses = _meses_rango(idx["periodo"]["desde"], idx["periodo"]["hasta"])
+    return templates.TemplateResponse(request, "reportes/panel.html", {
+        "departamentos": sorted(idx["departamentos"], key=lambda x: x["nombre"]),
+        "provincias_por_dep": provs_por_dep, "meses": meses, "periodo": idx["periodo"],
+        "periodo_txt": _periodo_txt(idx["periodo"]["desde"], idx["periodo"]["hasta"])})
+
+
+@app.get("/panel/reportes/resultado", response_class=HTMLResponse)
+async def panel_resultado(request: Request, dep: str = "", prov: str = "",
+                          desde: str = "", hasta: str = ""):
+    g = est.geo()
+    if not dep or dep not in g["slug_dep"]:
+        return HTMLResponse('<p class="sub">Elige una región.</p>')
+    idx = est.indice_cache() or {}
+    desde = desde or idx.get("periodo", {}).get("desde")
+    hasta = hasta or idx.get("periodo", {}).get("hasta")
+    if desde > hasta:
+        desde, hasta = hasta, desde
+    dep_pref = g["slug_dep"][dep]
+    dep_nombre = g["departamentos"][dep_pref]["nombre"]
+    try:
+        if prov and (dep, prov) in g["slug_prov"]:
+            prov_pref = g["slug_prov"][(dep, prov)]
+            prov_nombre = g["provincias"][prov_pref]["nombre"]
+            r = await est.generar_reporte_async(dep_nombre, prov_nombre, desde, hasta, escribir=False)
+        else:
+            r = await est.generar_reporte_async(dep_nombre, None, desde, hasta,
+                                                nivel="departamento", escribir=False)
+    except Exception:
+        log.exception("panel_resultado fallo dep=%s prov=%s", dep, prov)
+        return HTMLResponse('<p class="sub">No pude generar el reporte.</p>', status_code=500)
+    return templates.TemplateResponse(request, "reportes/_resultado.html",
+                                      {"r": r, "periodo_txt": _periodo_txt(desde, hasta)})
+
+
+@app.get("/reportes/descargar")
+async def reportes_descargar(prefijo: str = "", tipo: str = "principal"):
+    import re as _re
+    if not _re.fullmatch(r"\d{2}|\d{4}", prefijo):
+        return JSONResponse({"error": "prefijo invalido"}, status_code=400)
+    if tipo == "json":
+        p = est.OUT_DATA / f"{prefijo}.json"
+        return FileResponse(p, media_type="application/json", filename=p.name) if p.exists() \
+            else JSONResponse({"error": "no existe"}, status_code=404)
+    if tipo == "rubros":
+        p = est.OUT_CSV / f"{prefijo}-rubros.csv"
+    else:  # principal: distritos (provincia) o provincias (departamento)
+        cand = est.OUT_CSV / (f"{prefijo}-distritos.csv" if len(prefijo) == 4
+                              else f"{prefijo}-provincias.csv")
+        p = cand
+    if not p.exists():
+        return JSONResponse({"error": "no existe"}, status_code=404)
+    return FileResponse(p, media_type="text/csv", filename=p.name)
+
+
+@app.get("/reportes", response_class=HTMLResponse)
+async def reportes_index(request: Request):
+    idx = est.indice_cache()
+    if not idx:
+        return HTMLResponse("Sin datos.", status_code=503)
+    deps = sorted(idx["departamentos"], key=lambda x: x["nombre"])
+    per = _periodo_txt(idx["periodo"]["desde"], idx["periodo"]["hasta"])
+    chips = "".join(
+        f'<a class="chip" href="/reportes/{d["slug"]}">{d["nombre"]} <small>{d["total"]}</small></a>'
+        for d in deps)
+    html = f"""<!DOCTYPE html><html lang="es-PE"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reportes de nuevos negocios por región — Club de Contadores</title>
+<meta name="description" content="Altas de RUC por departamento y provincia del Perú ({per}). Fuente: SUNAT.">
+<link rel="canonical" href="{SITE_BASE}/reportes">
+<link rel="stylesheet" href="/static/css/reportes.css?v=1"></head>
+<body><main class="wrap">
+<div class="brand-row"><div class="brand-mark">₡</div><div class="brand-name">Club de Contadores · Perú Sistemas</div></div>
+<h1>Nuevos negocios por región</h1>
+<p class="sub">Altas de RUC en el Perú · {per} · Fuente: SUNAT</p>
+<section class="card"><h2>Elige un departamento</h2><div class="chips">{chips}</div></section>
+</main></body></html>"""
+    return HTMLResponse(html)
+
+
+@app.get("/reportes/{dep}", response_class=HTMLResponse)
+async def reporte_departamento(request: Request, dep: str):
+    g = est.geo()
+    if dep not in g["slug_dep"]:
+        return HTMLResponse("Departamento no encontrado.", status_code=404)
+    r = est.cargar_cache(g["slug_dep"][dep])
+    if not r:
+        return HTMLResponse("Reporte no disponible.", status_code=404)
+    return templates.TemplateResponse(request, "reportes/publico.html", _ctx_publico(request, r))
+
+
+@app.get("/reportes/{dep}/{prov}", response_class=HTMLResponse)
+async def reporte_provincia(request: Request, dep: str, prov: str):
+    g = est.geo()
+    key = (dep, prov)
+    if key not in g["slug_prov"]:
+        return HTMLResponse("Provincia no encontrada.", status_code=404)
+    r = est.cargar_cache(g["slug_prov"][key])
+    if not r:
+        return HTMLResponse("Reporte no disponible.", status_code=404)
+    return templates.TemplateResponse(request, "reportes/publico.html", _ctx_publico(request, r))
 
 
 # --- PWA: service worker y manifest en la raiz ------------------------------
