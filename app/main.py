@@ -339,19 +339,23 @@ def _ctx_publico(request, r):
     url = f"{SITE_BASE}/reportes/{r['slug']}" if r["nivel"] == "departamento" \
         else f"{SITE_BASE}/reportes/{r['departamento_slug']}/{r['slug']}"
     per = _periodo_txt(r["periodo"]["desde"], r["periodo"]["hasta"])
-    return {"request": request, "r": r, "periodo_txt": per,
+    # noindex a las PROVINCIAS con volumen bajo (<30). Los 25 departamentos SIEMPRE
+    # se indexan. La pagina sigue accesible por enlace directo (robots follow).
+    noindex = r["nivel"] == "provincia" and r.get("volumen_bajo", False)
+    return {"request": request, "r": r, "periodo_txt": per, "noindex": noindex,
             "meta": _meta_publica(r, url), "cita": _cita(r, url)}
 
 
 @app.get("/sitemap.xml")
 async def sitemap():
-    idx = est.indice_cache() or {"departamentos": [], "provincias": []}
-    lastmod = idx.get("actualizado", "")
+    cons = est.cargar_consolidado() or {"reportes": {}}
+    lastmod = cons.get("actualizado", "")
     urls = [f"{SITE_BASE}/reportes"]
-    for d in idx["departamentos"]:
-        urls.append(f"{SITE_BASE}/reportes/{d['slug']}")
-    for p in idx["provincias"]:
-        urls.append(f"{SITE_BASE}/reportes/{p['dep_slug']}/{p['slug']}")
+    for r in cons["reportes"].values():
+        if r["nivel"] == "departamento":
+            urls.append(f"{SITE_BASE}/reportes/{r['slug']}")           # siempre
+        elif not r.get("volumen_bajo"):
+            urls.append(f"{SITE_BASE}/reportes/{r['departamento_slug']}/{r['slug']}")  # solo con volumen
     body = ['<?xml version="1.0" encoding="UTF-8"?>',
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for u in urls:
@@ -363,17 +367,23 @@ async def sitemap():
 
 @app.get("/panel/reportes", response_class=HTMLResponse)
 async def panel_reportes(request: Request):
-    idx = est.indice_cache()
-    if not idx:
+    cons = est.cargar_consolidado()
+    if not cons:
         return HTMLResponse("<p>No hay cache. Corre: python estadisticas.py --regen</p>", status_code=503)
-    provs_por_dep: dict[str, list] = {}
-    for p in sorted(idx["provincias"], key=lambda x: x["nombre"]):
-        provs_por_dep.setdefault(p["dep_slug"], []).append({"slug": p["slug"], "nombre": p["nombre"]})
-    meses = _meses_rango(idx["periodo"]["desde"], idx["periodo"]["hasta"])
+    deps, provs_por_dep = [], {}
+    for r in cons["reportes"].values():
+        if r["nivel"] == "departamento":
+            deps.append({"slug": r["slug"], "nombre": titulo(r["territorio"])})
+        else:
+            provs_por_dep.setdefault(r["departamento_slug"], []).append(
+                {"slug": r["slug"], "nombre": titulo(r["territorio"])})
+    for k in provs_por_dep:
+        provs_por_dep[k].sort(key=lambda x: x["nombre"])
+    meses = _meses_rango(cons["periodo"]["desde"], cons["periodo"]["hasta"])
     return templates.TemplateResponse(request, "reportes/panel.html", {
-        "departamentos": sorted(idx["departamentos"], key=lambda x: x["nombre"]),
-        "provincias_por_dep": provs_por_dep, "meses": meses, "periodo": idx["periodo"],
-        "periodo_txt": _periodo_txt(idx["periodo"]["desde"], idx["periodo"]["hasta"])})
+        "departamentos": sorted(deps, key=lambda x: x["nombre"]),
+        "provincias_por_dep": provs_por_dep, "meses": meses, "periodo": cons["periodo"],
+        "periodo_txt": _periodo_txt(cons["periodo"]["desde"], cons["periodo"]["hasta"])})
 
 
 @app.get("/panel/reportes/resultado", response_class=HTMLResponse)
@@ -382,9 +392,9 @@ async def panel_resultado(request: Request, dep: str = "", prov: str = "",
     g = est.geo()
     if not dep or dep not in g["slug_dep"]:
         return HTMLResponse('<p class="sub">Elige una región.</p>')
-    idx = est.indice_cache() or {}
-    desde = desde or idx.get("periodo", {}).get("desde")
-    hasta = hasta or idx.get("periodo", {}).get("hasta")
+    cons = est.cargar_consolidado() or {}
+    desde = desde or cons.get("periodo", {}).get("desde")
+    hasta = hasta or cons.get("periodo", {}).get("hasta")
     if desde > hasta:
         desde, hasta = hasta, desde
     dep_pref = g["slug_dep"][dep]
@@ -393,10 +403,9 @@ async def panel_resultado(request: Request, dep: str = "", prov: str = "",
         if prov and (dep, prov) in g["slug_prov"]:
             prov_pref = g["slug_prov"][(dep, prov)]
             prov_nombre = g["provincias"][prov_pref]["nombre"]
-            r = await est.generar_reporte_async(dep_nombre, prov_nombre, desde, hasta, escribir=False)
+            r = await est.generar_reporte_async(dep_nombre, prov_nombre, desde, hasta)
         else:
-            r = await est.generar_reporte_async(dep_nombre, None, desde, hasta,
-                                                nivel="departamento", escribir=False)
+            r = await est.generar_reporte_async(dep_nombre, None, desde, hasta, nivel="departamento")
     except Exception:
         log.exception("panel_resultado fallo dep=%s prov=%s", dep, prov)
         return HTMLResponse('<p class="sub">No pude generar el reporte.</p>', status_code=500)
@@ -404,35 +413,67 @@ async def panel_resultado(request: Request, dep: str = "", prov: str = "",
                                       {"r": r, "periodo_txt": _periodo_txt(desde, hasta)})
 
 
+def _reporte_por_prefijo(prefijo: str):
+    cons = est.cargar_consolidado()
+    if not cons:
+        return None
+    for r in cons["reportes"].values():
+        if r.get("prefijo_ubigeo") == prefijo:
+            return r
+    return None
+
+
+def _csv_response(columnas, filas, filename):
+    import csv as _csv
+    import io as _io
+    buf = _io.StringIO()
+    w = _csv.writer(buf, delimiter=";")
+    w.writerow([h for _, h in columnas])
+    for fila in filas:
+        w.writerow([fila.get(k) for k, _ in columnas])
+    contenido = "﻿" + buf.getvalue()   # BOM para Excel es-PE
+    return Response(contenido, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
 @app.get("/reportes/descargar")
 async def reportes_descargar(prefijo: str = "", tipo: str = "principal"):
+    """Construye el archivo AL VUELO desde el JSON consolidado (no hay CSV en disco)."""
     import re as _re
     if not _re.fullmatch(r"\d{2}|\d{4}", prefijo):
         return JSONResponse({"error": "prefijo invalido"}, status_code=400)
-    if tipo == "json":
-        p = est.OUT_DATA / f"{prefijo}.json"
-        return FileResponse(p, media_type="application/json", filename=p.name) if p.exists() \
-            else JSONResponse({"error": "no existe"}, status_code=404)
-    if tipo == "rubros":
-        p = est.OUT_CSV / f"{prefijo}-rubros.csv"
-    else:  # principal: distritos (provincia) o provincias (departamento)
-        cand = est.OUT_CSV / (f"{prefijo}-distritos.csv" if len(prefijo) == 4
-                              else f"{prefijo}-provincias.csv")
-        p = cand
-    if not p.exists():
+    r = _reporte_por_prefijo(prefijo)
+    if not r:
         return JSONResponse({"error": "no existe"}, status_code=404)
-    return FileResponse(p, media_type="text/csv", filename=p.name)
+    slug = r["slug"] if r["nivel"] == "departamento" else f"{r['departamento_slug']}-{r['slug']}"
+    if tipo == "json":
+        return Response(json.dumps(r, ensure_ascii=False, indent=2),
+                        media_type="application/json",
+                        headers={"Content-Disposition": f'attachment; filename="{slug}.json"'})
+    if tipo == "rubros":
+        cols = [("ciiu", "CIIU"), ("descripcion", "Descripcion"), ("n", "Altas"),
+                ("pct", "%"), ("muestra_insuficiente", "MuestraInsuficiente")]
+        return _csv_response(cols, r.get("top_rubros", []), f"{slug}-rubros.csv")
+    # principal: distritos (provincia) o provincias (departamento)
+    if r["nivel"] == "provincia":
+        cols = [("ubigeo", "Ubigeo"), ("distrito", "Distrito"), ("n", "Altas"),
+                ("pct", "%"), ("muestra_insuficiente", "MuestraInsuficiente")]
+        return _csv_response(cols, r.get("top_distritos", []), f"{slug}-distritos.csv")
+    cols = [("prefijo", "Ubigeo"), ("provincia", "Provincia"), ("n", "Altas"),
+            ("pct", "%"), ("muestra_insuficiente", "MuestraInsuficiente")]
+    return _csv_response(cols, r.get("ranking_provincias", []), f"{slug}-provincias.csv")
 
 
 @app.get("/reportes", response_class=HTMLResponse)
 async def reportes_index(request: Request):
-    idx = est.indice_cache()
-    if not idx:
+    cons = est.cargar_consolidado()
+    if not cons:
         return HTMLResponse("Sin datos.", status_code=503)
-    deps = sorted(idx["departamentos"], key=lambda x: x["nombre"])
-    per = _periodo_txt(idx["periodo"]["desde"], idx["periodo"]["hasta"])
+    deps = sorted((r for r in cons["reportes"].values() if r["nivel"] == "departamento"),
+                  key=lambda x: x["territorio"])
+    per = _periodo_txt(cons["periodo"]["desde"], cons["periodo"]["hasta"])
     chips = "".join(
-        f'<a class="chip" href="/reportes/{d["slug"]}">{d["nombre"]} <small>{d["total"]}</small></a>'
+        f'<a class="chip" href="/reportes/{d["slug"]}">{titulo(d["territorio"])} <small>{d["total"]}</small></a>'
         for d in deps)
     html = f"""<!DOCTYPE html><html lang="es-PE"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -451,24 +492,17 @@ async def reportes_index(request: Request):
 
 @app.get("/reportes/{dep}", response_class=HTMLResponse)
 async def reporte_departamento(request: Request, dep: str):
-    g = est.geo()
-    if dep not in g["slug_dep"]:
+    r = est.cargar_reporte(dep)
+    if not r or r.get("nivel") != "departamento":
         return HTMLResponse("Departamento no encontrado.", status_code=404)
-    r = est.cargar_cache(g["slug_dep"][dep])
-    if not r:
-        return HTMLResponse("Reporte no disponible.", status_code=404)
     return templates.TemplateResponse(request, "reportes/publico.html", _ctx_publico(request, r))
 
 
 @app.get("/reportes/{dep}/{prov}", response_class=HTMLResponse)
 async def reporte_provincia(request: Request, dep: str, prov: str):
-    g = est.geo()
-    key = (dep, prov)
-    if key not in g["slug_prov"]:
+    r = est.cargar_reporte(f"{dep}/{prov}")
+    if not r or r.get("nivel") != "provincia":
         return HTMLResponse("Provincia no encontrada.", status_code=404)
-    r = est.cargar_cache(g["slug_prov"][key])
-    if not r:
-        return HTMLResponse("Reporte no disponible.", status_code=404)
     return templates.TemplateResponse(request, "reportes/publico.html", _ctx_publico(request, r))
 
 
