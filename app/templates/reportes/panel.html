@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1512">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Panel de reportes — interno</title>
+  <link rel="stylesheet" href="/static/css/reportes.css?v=1">
+  <script src="/static/js/htmx.min.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand-row"><div class="brand-mark">₡</div>
+      <div class="brand-name">Panel de reportes · interno</div></div>
+    <h1>Explorar reportes</h1>
+    <p class="sub">Panel interno (no indexado). Muestra todo, incluida la calidad de datos
+      y las categorías con muestra insuficiente. Periodo disponible: {{ periodo_txt }}.</p>
+
+    <div class="panel-controls"
+         hx-get="/panel/reportes/resultado" hx-target="#resultado" hx-trigger="change"
+         hx-include="[name='dep'],[name='prov'],[name='desde'],[name='hasta']">
+      <div class="fld"><label for="dep">Región</label>
+        <select id="dep" name="dep">
+          <option value="">— elige región —</option>
+          {% for d in departamentos %}<option value="{{ d.slug }}">{{ d.nombre }}</option>{% endfor %}
+        </select></div>
+      <div class="fld"><label for="prov">Provincia</label>
+        <select id="prov" name="prov">
+          <option value="">Todo el departamento</option>
+        </select></div>
+      <div class="fld"><label for="desde">Desde</label>
+        <select id="desde" name="desde">
+          {% for m in meses %}<option value="{{ m }}" {{ 'selected' if m==periodo.desde }}>{{ m }}</option>{% endfor %}
+        </select></div>
+      <div class="fld"><label for="hasta">Hasta</label>
+        <select id="hasta" name="hasta">
+          {% for m in meses %}<option value="{{ m }}" {{ 'selected' if m==periodo.hasta }}>{{ m }}</option>{% endfor %}
+        </select></div>
+      <span class="htmx-indicator">Calculando…</span>
+    </div>
+
+    <div id="resultado">
+      <p class="sub">Elige una región para ver su reporte. La opción “Todo el departamento”
+        muestra el nivel regional; elige una provincia para el detalle provincial.</p>
+    </div>
+  </main>
+
+  <script>
+    // Provincia encadenada a la región (se puebla desde el índice geográfico).
+    const PROVS = {{ provincias_por_dep | tojson }};
+    const depSel = document.getElementById('dep'), provSel = document.getElementById('prov');
+    depSel.addEventListener('change', () => {
+      const lista = PROVS[depSel.value] || [];
+      provSel.innerHTML = '<option value="">Todo el departamento</option>' +
+        lista.map(p => `<option value="${p.slug}">${p.nombre}</option>`).join('');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{# Partial que devuelve HTMX al cambiar los selects del panel. Recibe `r`. #}
+<div class="rep-head">
+  <h1 style="font-size:22px">{{ r.territorio }}
+    <span style="font-size:13px;color:var(--muted)">({{ 'departamento' if r.nivel=='departamento' else 'provincia de ' ~ r.departamento }})</span>
+  </h1>
+  <p class="sub">Altas de RUC {{ periodo_txt }} · ubigeo {{ r.prefijo_ubigeo }}
+    · <a href="/reportes/{{ r.departamento_slug if r.nivel=='provincia' else r.slug }}{{ '/' ~ r.slug if r.nivel=='provincia' else '' }}" target="_blank">ver página pública ↗</a></p>
+</div>
+
+{% include "reportes/_cuerpo.html" %}
+
+<div class="btnrow">
+  <a class="btn" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=json">⬇ JSON</a>
+  <a class="btn sec" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=principal">⬇ CSV {{ 'provincias' if r.nivel=='departamento' else 'distritos' }}</a>
+  <a class="btn sec" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=rubros">⬇ CSV rubros</a>
+</div>

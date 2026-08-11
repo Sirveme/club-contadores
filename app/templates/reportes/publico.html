@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1512">
+  <title>{{ meta.title }}</title>
+  <meta name="description" content="{{ meta.description }}">
+  <link rel="canonical" href="{{ meta.url }}">
+  <!-- Open Graph (Facebook / WhatsApp) -->
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Club de Contadores — Perú Sistemas">
+  <meta property="og:title" content="{{ meta.title }}">
+  <meta property="og:description" content="{{ meta.description }}">
+  <meta property="og:url" content="{{ meta.url }}">
+  <meta property="og:image" content="{{ meta.image }}">
+  <meta property="og:locale" content="es_PE">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ meta.title }}">
+  <meta name="twitter:description" content="{{ meta.description }}">
+  <meta name="twitter:image" content="{{ meta.image }}">
+  <link rel="icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/css/reportes.css?v=1">
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand-row">
+      <div class="brand-mark">₡</div>
+      <div class="brand-name">Club de Contadores · Perú Sistemas</div>
+    </div>
+
+    <nav class="crumbs">
+      <a href="/reportes">Reportes</a>
+      {% if r.nivel == 'provincia' %}
+      · <a href="/reportes/{{ r.departamento_slug }}">{{ r.departamento|titulo }}</a>
+      · {{ r.territorio|titulo }}
+      {% else %}· {{ r.territorio|titulo }}{% endif %}
+    </nav>
+
+    <header class="rep-head">
+      <h1>Nuevos negocios en <b>{{ r.territorio|titulo }}</b></h1>
+      <p class="sub">
+        {% if r.nivel == 'provincia' %}Provincia de {{ r.departamento|titulo }} · {% else %}Departamento · {% endif %}
+        Altas de RUC {{ periodo_txt }} · {{ r.total }} empresas nuevas
+      </p>
+    </header>
+
+    {% include "reportes/_cuerpo.html" %}
+
+    {# Navegación cruzada #}
+    {% if r.nivel == 'departamento' and r.ranking_provincias %}
+    <section class="card">
+      <h2>Ver por provincia</h2>
+      <div class="chips">
+        {% for p in r.ranking_provincias %}
+        <a class="chip" href="/reportes/{{ r.slug }}/{{ p.provincia_slug }}">{{ p.provincia|titulo }}
+          <small>{{ p.n }}</small></a>
+        {% endfor %}
+      </div>
+    </section>
+    {% elif r.nivel == 'provincia' %}
+    <section class="card">
+      <h2>Más de la región</h2>
+      <div class="chips">
+        <a class="chip" href="/reportes/{{ r.departamento_slug }}">← Todo {{ r.departamento|titulo }}</a>
+      </div>
+    </section>
+    {% endif %}
+
+    {# Descarga #}
+    <div class="btnrow">
+      <a class="btn" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=principal">⬇ Descargar CSV</a>
+      <a class="btn sec" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=rubros">⬇ CSV de rubros</a>
+    </div>
+
+    {# Cómo citar #}
+    <section class="citar">
+      <h3>Cómo citar este reporte</h3>
+      <div class="cita-box" id="cita">{{ cita }}</div>
+      <div class="btnrow">
+        <button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('cita').innerText).then(()=>{this.textContent='¡Copiado!'})">Copiar cita</button>
+        <button class="btn sec" onclick="navigator.clipboard.writeText('{{ meta.url }}').then(()=>{this.textContent='¡Enlace copiado!'})">Copiar enlace</button>
+      </div>
+    </section>
+
+    {# Fuente y atribución #}
+    <p class="fuente">
+      <b>Fuente:</b> SUNAT — altas de RUC obtenidas mediante solicitud de acceso a la información
+      pública. <b>Procesamiento:</b> Perú Sistemas Pro E.I.R.L. (RUC 20615446565).
+      <b>Periodo:</b> {{ periodo_txt }}. <b>Actualizado:</b> {{ r.actualizado }}.<br>
+      Este reporte publica solo cifras agregadas; no incluye datos individuales de contribuyentes.
+    </p>
+  </main>
+</body>
+</html>
