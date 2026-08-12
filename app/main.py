@@ -89,6 +89,8 @@ app = FastAPI(title="Club de Contadores", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.filters["titulo"] = lambda s: titulo(s)  # Title Case peruano en plantillas
+templates.env.filters["miles"] = lambda n: f"{int(n):,}" if n is not None else ""   # 51,477
+templates.env.filters["pct"] = lambda v: f"{v:.2f}" if v is not None else ""         # 2 decimales
 
 
 # --- Pagina (embudo, una sola vista) ----------------------------------------
@@ -387,7 +389,12 @@ def _ctx_publico(request, r):
         meta["image"] = mapa["abs"]
     return {"request": request, "r": r, "periodo_txt": per, "noindex": noindex,
             "meta": meta, "mapa": mapa, "cita": _cita(r, url),
-            "cita_breve": _cita_breve(r, url), "cita_html": _cita_html(r, url)}
+            "cita_breve": _cita_breve(r, url), "cita_html": _cita_html(r, url),
+            "analisis": est.cargar_analisis(est.clave_territorio(r)), "analisis_foto": _foto_autor()}
+
+
+def _foto_autor():
+    return "/static/img/duilio.webp" if (STATIC_DIR / "img" / "duilio.webp").exists() else None
 
 
 @app.get("/sitemap.xml")
