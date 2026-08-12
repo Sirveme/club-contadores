@@ -246,3 +246,19 @@ body.tiene-barra{ padding-bottom:0; }
 .firma-foto{ width:38px; height:38px; border-radius:99px; object-fit:cover; border:1px solid var(--line); }
 .firma-txt{ font-size:12.5px; color:var(--muted); }
 .firma-txt b{ color:var(--text); }
+
+/* ============================================================
+   Ajustes v4: dimensión + complemento en indicadores; notas por bloque
+   ============================================================ */
+.kpi .dim{ font-size:10.5px; color:var(--muted); text-transform:uppercase;
+  letter-spacing:.4px; font-weight:700; margin-bottom:5px; }
+.kpi .compl{ font-size:11px; color:var(--muted); margin-top:4px; }
+
+/* Nota por bloque: <details> nativo (sin JS) */
+.nota{ margin-top:11px; border-top:1px dashed var(--line); padding-top:9px; }
+.nota summary{ cursor:pointer; font-size:12.5px; font-weight:600; color:var(--green);
+  list-style:none; user-select:none; }
+.nota summary::-webkit-details-marker{ display:none; }
+.nota summary::before{ content:'▸'; display:inline-block; margin-right:6px; transition:transform .15s; }
+.nota[open] summary::before{ transform:rotate(90deg); }
+.nota p{ margin:8px 0 0; font-size:13px; color:var(--muted); line-height:1.5; }
