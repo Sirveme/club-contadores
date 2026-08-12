@@ -102,3 +102,105 @@ table.mini{ width:100%; border-collapse:collapse; font-size:13px; }
 table.mini th,table.mini td{ text-align:left; padding:5px 6px; border-bottom:1px solid #16302533; }
 table.mini td.n{ text-align:right; font-variant-numeric:tabular-nums; }
 .ins-badge{ color:var(--amber); font-size:11px; }
+
+/* ============================================================
+   Observatorio — extensiones (marca, hallazgos, evolución, mapa,
+   calidad, jerarquía de color, barra inferior, modales)
+   ============================================================ */
+
+/* Marca */
+.obs-brand{ display:flex; align-items:center; gap:11px; text-decoration:none; color:var(--text);
+  margin:2px 0 14px; }
+.obs-brand .brand-mark{ width:38px; height:38px; border-radius:10px; display:grid; place-items:center;
+  font-weight:800; font-size:20px; color:#04150d; background:linear-gradient(145deg,var(--green),var(--green-d)); }
+.obs-brand small{ color:var(--muted); font-size:12px; }
+
+/* Jerarquía de color en barras: 1er lugar FUERTE, resto medio, insuf. ÁMBAR */
+.bar .fill{ background:var(--green-d); }                    /* verde medio (por defecto) */
+.bar .fill.fuerte{ background:linear-gradient(90deg,var(--green-d),var(--green)); }  /* destacado */
+.bar .fill.amber{ background:#7a6320; }                     /* muestra insuficiente */
+.bar.ins .cap{ color:var(--muted); }
+.bar .val b{ color:var(--text); }
+
+/* Hallazgos */
+.hallazgos{ margin:8px 0 4px; }
+.hallazgos > h2{ font-size:16px; margin:0 0 10px; }
+.kpi.principal{ border-color:var(--green-d); background:linear-gradient(160deg,#123a2a,var(--surface)); }
+.kpi.principal .num{ color:var(--green); }
+.kpi .num.delta.up{ color:var(--green); } .kpi .num.delta.down{ color:var(--danger); }
+.destacan{ list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.destacan li{ background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--green);
+  border-radius:10px; padding:10px 12px; font-size:14px; }
+
+/* Evolución mensual (columnas CSS) */
+.evo{ display:flex; align-items:flex-end; gap:10px; height:150px; padding-top:6px; }
+.evo-col{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; height:100%; }
+.evo-n{ font-size:11.5px; color:var(--muted); margin-bottom:4px; font-variant-numeric:tabular-nums; }
+.evo-bar-wrap{ flex:1; width:100%; max-width:54px; display:flex; align-items:flex-end; }
+.evo-bar{ width:100%; border-radius:6px 6px 0 0; background:var(--green-d); min-height:3px; }
+.evo-bar.fuerte{ background:linear-gradient(180deg,var(--green),var(--green-d)); }
+.evo-x{ font-size:11px; color:var(--muted); margin-top:6px; }
+
+/* Concentración */
+.conc{ margin:10px 0 0; font-size:13px; color:var(--muted); }
+.conc b{ color:var(--text); }
+
+/* Calidad (más visible: señal de rigor) */
+.card.calidad{ border-color:var(--green-soft); }
+.card.calidad h2{ color:var(--green); }
+.qc-grid{ display:flex; gap:10px; margin-bottom:8px; }
+.qc-item{ flex:1; background:#0e1c17; border:1px solid var(--line); border-radius:10px; padding:10px;
+  text-align:center; display:flex; flex-direction:column; gap:3px; }
+.qc-n{ font-size:19px; font-weight:800; color:var(--green); }
+.qc-item span:last-child{ font-size:11.5px; color:var(--muted); }
+.qc-nota{ font-size:12px; color:var(--muted); margin:0; }
+.amber-txt{ color:var(--amber); }
+
+/* Mapa (reserva altura con aspect-ratio; sin salto de layout) */
+.mapa{ margin:14px 0; }
+.mapa img{ width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:14px;
+  border:1px solid var(--line); background:#0e1c17; display:block; }
+
+/* Sobre el Observatorio */
+.sobre{ background:var(--surface); border:1px solid var(--line); border-radius:14px;
+  padding:13px 15px; margin:14px 0; }
+.sobre h3{ font-size:14px; margin:0 0 6px; }
+.sobre p{ margin:0; font-size:13.5px; color:#cfe6da; }
+
+/* Observatorio: foto autor + listas */
+.autor-foto img{ width:120px; height:120px; object-fit:cover; border-radius:14px; border:1px solid var(--line); }
+.lista{ margin:0; padding-left:18px; }
+.lista li{ margin:6px 0; }
+
+/* Barra fija inferior: Citar (principal) · Compartir · Descargar */
+body.tiene-barra{ padding-bottom:76px; }
+.barra{ position:fixed; left:0; right:0; bottom:0; z-index:90; display:flex; gap:8px;
+  padding:10px max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-bottom));
+  background:rgba(11,21,18,.92); backdrop-filter:blur(8px); border-top:1px solid var(--line); }
+.barra-btn{ flex:1; text-align:center; text-decoration:none; cursor:pointer; font-size:14px; font-weight:700;
+  padding:12px 8px; border-radius:11px; border:1px solid var(--line); background:var(--surface); color:var(--text); }
+.barra-btn.principal{ flex:1.4; background:linear-gradient(145deg,var(--green),var(--green-d)); color:#04150d; border:0; }
+@media (min-width:720px){ .barra{ max-width:440px; margin:0 auto; border-radius:14px 14px 0 0; } }
+
+/* Modales (Citar / Compartir) */
+.modal{ position:fixed; inset:0; z-index:120; display:flex; align-items:flex-end; justify-content:center; }
+.modal[hidden]{ display:none; }
+.modal-bg{ position:absolute; inset:0; background:rgba(2,10,7,.72); }
+.modal-box{ position:relative; width:100%; max-width:440px; max-height:86dvh; display:flex; flex-direction:column;
+  background:var(--bg2); border:1px solid var(--line); border-radius:18px 18px 0 0; }
+.modal-head{ display:flex; align-items:center; justify-content:space-between; padding:13px 15px;
+  border-bottom:1px solid var(--line); }
+.modal-head h3{ margin:0; font-size:16px; }
+.modal-x{ background:transparent; border:0; color:var(--muted); font-size:18px; cursor:pointer; }
+.modal-body{ overflow-y:auto; padding:14px 15px 18px; }
+.cita-lbl{ font-size:12px; color:var(--muted); font-weight:600; margin:10px 0 5px; }
+.cita-lbl:first-child{ margin-top:0; }
+.cita-box{ background:#0e1c17; border:1px solid var(--line); border-radius:9px; padding:10px;
+  font-size:12.5px; color:#cfe6da; white-space:pre-wrap; word-break:break-word; }
+.cita-box.mono{ font-family:ui-monospace,Menlo,Consolas,monospace; }
+.share{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.sh{ text-align:center; text-decoration:none; cursor:pointer; padding:12px; border-radius:11px;
+  font-weight:700; font-size:14px; border:0; color:#04150d; }
+.sh.wa{ background:#25d366; } .sh.fb{ background:#4267B2; color:#eaf0ff; }
+.sh.li{ background:#0a66c2; color:#eaf0ff; } .sh.cp{ background:var(--surface); color:var(--text); border:1px solid var(--line); }
+@media (min-width:560px){ .modal{ align-items:center; } .modal-box{ border-radius:18px; } }
