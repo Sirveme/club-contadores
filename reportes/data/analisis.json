@@ -1,6 +1,29 @@
 {
   "nacional": {
     "texto": "El Perú registró más de 51 mil nuevas empresas en el bimestre, con una clara concentración en Lima, que explica cerca de cuatro de cada diez altas. Esto confirma la centralización de la actividad empresarial formal, aunque regiones como La Libertad, Arequipa y Cusco aparecen como polos secundarios.\n\nEl predominio del Nuevo RUS y del Régimen MYPE Tributario refleja que la mayoría de estos negocios nacen pequeños. Es un dato a seguir en los próximos meses: cuántos de estos emprendimientos escalan de régimen y cuántos permanecen en la base.",
-    "fecha": "2026-08-11"
+    "fecha": "2026-08-11",
+    "notas": {
+      "evolucion": "Compara el número de altas de cada mes. No es una proyección: solo muestra lo efectivamente registrado en el periodo.",
+      "tipo_contribuyente": "Distingue personas naturales con negocio de personas jurídicas (empresas). Ambas suman el total; no se comparan con el régimen.",
+      "regimen": "Es el régimen tributario elegido al inscribirse. El Nuevo RUS y el RMT concentran a los negocios más pequeños.",
+      "actividades": "Rubro económico principal (CIIU) declarado por cada nuevo negocio.",
+      "ranking": "Ordena los departamentos por cantidad de altas. Lima concentra buena parte por su tamaño poblacional y económico."
+    }
+  },
+  "loreto": {
+    "texto": "Loreto mantiene un ritmo estable de creación de empresas, muy concentrado en Maynas —donde está Iquitos—, que reúne la mayoría de las altas del departamento.",
+    "fecha": "2026-08-11",
+    "notas": {
+      "ranking": "Ordena las provincias del departamento por cantidad de altas. La concentración en Maynas refleja el peso de Iquitos como capital regional.",
+      "regimen": "El Régimen Especial y el Nuevo RUS predominan, coherente con el tamaño de los negocios amazónicos."
+    }
+  },
+  "loreto/maynas": {
+    "texto": "En Maynas, la actividad se concentra en Iquitos y en rubros de comercio y servicios ligados al consumo urbano.",
+    "fecha": "2026-08-11",
+    "notas": {
+      "actividades": "Predominan restaurantes y comercio minorista, típico de una economía urbana de servicios.",
+      "evolucion": "El leve aumento mensual es consistente con la estacionalidad del comercio local."
+    }
   }
 }
