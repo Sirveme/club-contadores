@@ -316,14 +316,54 @@ def _cita(r: dict, url: str) -> str:
     per = _periodo_txt(r["periodo"]["desde"], r["periodo"]["hasta"])
     terr = titulo(r["territorio"]) + (f", {titulo(r['departamento'])}" if r["nivel"] == "provincia" else "")
     return (f"Perú Sistemas Pro E.I.R.L. ({anio}). Nuevos negocios en {terr}: "
-            f"altas de RUC ({per}). Club de Contadores — contadores.perusistemas.pro. "
-            f"Fuente: SUNAT. {url} (consultado el {r.get('actualizado')}).")
+            f"altas de RUC ({per}). Observatorio de Nuevos Negocios — "
+            f"contadores.perusistemas.pro. Fuente: SUNAT. {url} "
+            f"(consultado el {r.get('actualizado')}).")
+
+
+def _cita_breve(r: dict, url: str) -> str:
+    per = _periodo_txt(r["periodo"]["desde"], r["periodo"]["hasta"])
+    terr = titulo(r["territorio"])
+    return (f"Observatorio de Nuevos Negocios (Perú Sistemas): nuevos negocios en "
+            f"{terr}, {per}. {url}")
+
+
+def _cita_html(r: dict, url: str) -> str:
+    terr = titulo(r["territorio"])
+    return (f'&lt;a href="{url}"&gt;Nuevos negocios en {terr} — Observatorio de Nuevos '
+            f'Negocios (Perú Sistemas)&lt;/a&gt;')
+
+
+def _url_publica(r: dict) -> str:
+    if r["nivel"] == "nacional":
+        return f"{SITE_BASE}/reportes"
+    if r["nivel"] == "departamento":
+        return f"{SITE_BASE}/reportes/{r['slug']}"
+    return f"{SITE_BASE}/reportes/{r['departamento_slug']}/{r['slug']}"
+
+
+def _mapa(r: dict):
+    """Mapa MANUAL (imagen que sube Duilio). Si no existe, no se renderiza."""
+    if r["nivel"] == "nacional":
+        rel = f"mapas/nacional-{r['periodo']['desde']}_{r['periodo']['hasta']}.webp"
+    elif r["nivel"] == "departamento":
+        rel = f"mapas/dep/{r['slug']}.webp"
+    else:  # provincia -> reutiliza el mapa de su departamento
+        rel = f"mapas/dep/{r['departamento_slug']}.webp"
+    if (STATIC_DIR / rel).exists():
+        return {"url": f"/static/{rel}", "abs": f"{SITE_BASE}/static/{rel}",
+                "alt": f"Mapa de {titulo(r['territorio'])}"}
+    return None
 
 
 def _meta_publica(r: dict, url: str) -> dict:
     per = _periodo_txt(r["periodo"]["desde"], r["periodo"]["hasta"])
-    terr, dep = titulo(r["territorio"]), titulo(r.get("departamento", ""))
-    if r["nivel"] == "departamento":
+    terr, dep = titulo(r["territorio"]), titulo(r.get("departamento") or "")
+    if r["nivel"] == "nacional":
+        title = f"Nuevos negocios en el Perú: {r['total']} altas de RUC ({per})"
+        desc = (f"En el Perú se registraron {r['total']} empresas nuevas ({per}). "
+                f"Ranking de departamentos, rubros (CIIU) y régimen tributario. Fuente: SUNAT.")
+    elif r["nivel"] == "departamento":
         title = f"Nuevos negocios en {terr}: {r['total']} altas de RUC ({per})"
         desc = (f"En {terr} se registraron {r['total']} empresas nuevas ({per}). "
                 f"Ranking de provincias, rubros (CIIU) y régimen tributario. Fuente: SUNAT.")
@@ -331,30 +371,34 @@ def _meta_publica(r: dict, url: str) -> dict:
         title = f"Nuevos negocios en {terr} ({dep}): {r['total']} altas ({per})"
         desc = (f"En {terr}, {dep}, se registraron {r['total']} empresas "
                 f"nuevas ({per}). Distritos, rubros (CIIU) y régimen tributario. Fuente: SUNAT.")
-    return {"title": f"{title} | Club de Contadores", "description": desc,
+    return {"title": f"{title} | Observatorio de Nuevos Negocios", "description": desc,
             "url": url, "image": f"{SITE_BASE}/static/icons/icon-512.png"}
 
 
 def _ctx_publico(request, r):
-    url = f"{SITE_BASE}/reportes/{r['slug']}" if r["nivel"] == "departamento" \
-        else f"{SITE_BASE}/reportes/{r['departamento_slug']}/{r['slug']}"
+    url = _url_publica(r)
     per = _periodo_txt(r["periodo"]["desde"], r["periodo"]["hasta"])
-    # noindex a las PROVINCIAS con volumen bajo (<30). Los 25 departamentos SIEMPRE
-    # se indexan. La pagina sigue accesible por enlace directo (robots follow).
+    # noindex a las PROVINCIAS con volumen bajo (<30). Los departamentos y el
+    # nacional SIEMPRE se indexan. La pagina sigue accesible por enlace directo.
     noindex = r["nivel"] == "provincia" and r.get("volumen_bajo", False)
+    meta = _meta_publica(r, url)
+    mapa = _mapa(r)
+    if mapa:  # si hay mapa, es la imagen de Open Graph de esa pagina
+        meta["image"] = mapa["abs"]
     return {"request": request, "r": r, "periodo_txt": per, "noindex": noindex,
-            "meta": _meta_publica(r, url), "cita": _cita(r, url)}
+            "meta": meta, "mapa": mapa, "cita": _cita(r, url),
+            "cita_breve": _cita_breve(r, url), "cita_html": _cita_html(r, url)}
 
 
 @app.get("/sitemap.xml")
 async def sitemap():
     cons = est.cargar_consolidado() or {"reportes": {}}
     lastmod = cons.get("actualizado", "")
-    urls = [f"{SITE_BASE}/reportes"]
+    urls = [f"{SITE_BASE}/reportes", f"{SITE_BASE}/observatorio"]  # nacional = /reportes
     for r in cons["reportes"].values():
         if r["nivel"] == "departamento":
             urls.append(f"{SITE_BASE}/reportes/{r['slug']}")           # siempre
-        elif not r.get("volumen_bajo"):
+        elif r["nivel"] == "provincia" and not r.get("volumen_bajo"):
             urls.append(f"{SITE_BASE}/reportes/{r['departamento_slug']}/{r['slug']}")  # solo con volumen
     body = ['<?xml version="1.0" encoding="UTF-8"?>',
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
@@ -440,12 +484,14 @@ def _csv_response(columnas, filas, filename):
 async def reportes_descargar(prefijo: str = "", tipo: str = "principal"):
     """Construye el archivo AL VUELO desde el JSON consolidado (no hay CSV en disco)."""
     import re as _re
-    if not _re.fullmatch(r"\d{2}|\d{4}", prefijo):
+    if not _re.fullmatch(r"|\d{2}|\d{4}", prefijo):   # '' = nacional, 2 = depto, 4 = provincia
         return JSONResponse({"error": "prefijo invalido"}, status_code=400)
     r = _reporte_por_prefijo(prefijo)
     if not r:
         return JSONResponse({"error": "no existe"}, status_code=404)
-    slug = r["slug"] if r["nivel"] == "departamento" else f"{r['departamento_slug']}-{r['slug']}"
+    slug = ("peru" if r["nivel"] == "nacional" else
+            r["slug"] if r["nivel"] == "departamento" else
+            f"{r['departamento_slug']}-{r['slug']}")
     if tipo == "json":
         return Response(json.dumps(r, ensure_ascii=False, indent=2),
                         media_type="application/json",
@@ -454,7 +500,10 @@ async def reportes_descargar(prefijo: str = "", tipo: str = "principal"):
         cols = [("ciiu", "CIIU"), ("descripcion", "Descripcion"), ("n", "Altas"),
                 ("pct", "%"), ("muestra_insuficiente", "MuestraInsuficiente")]
         return _csv_response(cols, r.get("top_rubros", []), f"{slug}-rubros.csv")
-    # principal: distritos (provincia) o provincias (departamento)
+    if r["nivel"] == "nacional":
+        cols = [("prefijo", "Ubigeo"), ("departamento", "Departamento"), ("n", "Altas"),
+                ("pct", "%"), ("muestra_insuficiente", "MuestraInsuficiente")]
+        return _csv_response(cols, r.get("ranking_departamentos", []), "peru-departamentos.csv")
     if r["nivel"] == "provincia":
         cols = [("ubigeo", "Ubigeo"), ("distrito", "Distrito"), ("n", "Altas"),
                 ("pct", "%"), ("muestra_insuficiente", "MuestraInsuficiente")]
@@ -465,29 +514,20 @@ async def reportes_descargar(prefijo: str = "", tipo: str = "principal"):
 
 
 @app.get("/reportes", response_class=HTMLResponse)
-async def reportes_index(request: Request):
-    cons = est.cargar_consolidado()
-    if not cons:
-        return HTMLResponse("Sin datos.", status_code=503)
-    deps = sorted((r for r in cons["reportes"].values() if r["nivel"] == "departamento"),
-                  key=lambda x: x["territorio"])
-    per = _periodo_txt(cons["periodo"]["desde"], cons["periodo"]["hasta"])
-    chips = "".join(
-        f'<a class="chip" href="/reportes/{d["slug"]}">{titulo(d["territorio"])} <small>{d["total"]}</small></a>'
-        for d in deps)
-    html = f"""<!DOCTYPE html><html lang="es-PE"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reportes de nuevos negocios por región — Club de Contadores</title>
-<meta name="description" content="Altas de RUC por departamento y provincia del Perú ({per}). Fuente: SUNAT.">
-<link rel="canonical" href="{SITE_BASE}/reportes">
-<link rel="stylesheet" href="/static/css/reportes.css?v=1"></head>
-<body><main class="wrap">
-<div class="brand-row"><div class="brand-mark">₡</div><div class="brand-name">Club de Contadores · Perú Sistemas</div></div>
-<h1>Nuevos negocios por región</h1>
-<p class="sub">Altas de RUC en el Perú · {per} · Fuente: SUNAT</p>
-<section class="card"><h2>Elige un departamento</h2><div class="chips">{chips}</div></section>
-</main></body></html>"""
-    return HTMLResponse(html)
+async def reportes_nacional(request: Request):
+    r = est.cargar_reporte("nacional")
+    if not r:
+        return HTMLResponse("Reporte no disponible. Corre: python estadisticas.py --regen",
+                            status_code=503)
+    return templates.TemplateResponse(request, "reportes/publico.html", _ctx_publico(request, r))
+
+
+@app.get("/observatorio", response_class=HTMLResponse)
+async def observatorio(request: Request):
+    foto_rel = "img/duilio.webp"
+    foto = f"/static/{foto_rel}" if (STATIC_DIR / foto_rel).exists() else None
+    return templates.TemplateResponse(request, "reportes/observatorio.html",
+                                      {"request": request, "foto": foto, "site_base": SITE_BASE})
 
 
 @app.get("/reportes/{dep}", response_class=HTMLResponse)
