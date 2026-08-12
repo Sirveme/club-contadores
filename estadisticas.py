@@ -144,8 +144,9 @@ def slug_de_prefijo(prefijo: str) -> dict:
 
 # --- Consultas (parametrizadas: $1 prefijo, $2 desde, $3 hasta) --------------
 async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
-    plen = len(prefijo)  # 2 (departamento) o 4 (provincia) — entero fijo, no input
-    W = f"left(ubigeo,{plen}) = $1 AND mes_inscripcion BETWEEN $2 AND $3"
+    # W unificado: prefijo='' (nacional) no filtra por ubigeo; prefijo de 2/4
+    # digitos filtra por departamento/provincia. Parametrizado ($1/$2/$3).
+    W = "($1 = '' OR left(ubigeo, length($1)) = $1) AND mes_inscripcion BETWEEN $2 AND $3"
     args = (prefijo, desde, hasta)
 
     total = await conn.fetchval(f"SELECT count(*) FROM nuevos_negocios WHERE {W}", *args)
@@ -156,8 +157,9 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
     meses = [{"mes": r["mes"], "n": r["n"]} for r in por_mes]
     variacion = None
     if len(meses) >= 2:
-        a, b = meses[0]["n"], meses[-1]["n"]
-        variacion = {"de": meses[0]["mes"], "a": meses[-1]["mes"],
+        # variacion contra el periodo INMEDIATO anterior (ultimo vs penultimo).
+        a, b = meses[-2]["n"], meses[-1]["n"]
+        variacion = {"de": meses[-2]["mes"], "a": meses[-1]["mes"],
                      "absoluta": b - a, "porcentual": _pct(b - a, a) if a else None}
 
     # 2) natural vs juridica
@@ -188,10 +190,26 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
     resultado = {
         "total": total, "por_mes": meses, "variacion": variacion, "por_tipo": tipos,
         "top_rubros": top_rubros, "regimenes": regimenes,
+        # Concentracion del top 10 de actividades (suma de sus %).
+        "top_rubros_concentracion": round(sum(r["pct"] for r in top_rubros[:10]), 1),
     }
 
     # --- Metricas por nivel ---
-    if nivel == "provincia":
+    if nivel == "nacional":
+        # Ranking de los 25 departamentos (metrica principal del nivel pais).
+        gd = geo()["departamentos"]
+        dep_rows = await conn.fetch(
+            f"SELECT left(ubigeo,2) pref, count(*) n FROM nuevos_negocios WHERE {W} "
+            f"AND ubigeo IS NOT NULL AND ubigeo <> '' GROUP BY 1 ORDER BY 2 DESC, 1", *args)
+        resultado["ranking_departamentos"] = [{
+            "prefijo": r["pref"], "departamento": gd.get(r["pref"], {}).get("nombre", r["pref"]),
+            "departamento_slug": gd.get(r["pref"], {}).get("slug", r["pref"]),
+            "n": r["n"], "pct": _pct(r["n"], total), "muestra_insuficiente": r["n"] < MIN_MUESTRA
+        } for r in dep_rows]
+        resultado["ranking_concentracion"] = round(
+            sum(x["pct"] for x in resultado["ranking_departamentos"][:10]), 1)
+
+    elif nivel == "provincia":
         # 3) top 10 distritos (nombre limpio de distritos.json)
         nombres = geo()["distritos"]
         dist_rows = await conn.fetch(
@@ -201,6 +219,8 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
             "ubigeo": r["ubigeo"], "distrito": nombres.get(r["ubigeo"]) or "(ubigeo sin nombre)",
             "n": r["n"], "pct": _pct(r["n"], total), "muestra_insuficiente": r["n"] < MIN_MUESTRA
         } for r in dist_rows]
+        resultado["ranking_concentracion"] = round(
+            sum(x["pct"] for x in resultado["top_distritos"][:10]), 1)
 
         # NUEVO: peso de la provincia dentro de su departamento
         dep_pref = prefijo[:2]
@@ -228,6 +248,8 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
             "provincia_slug": gp.get(r["pref"], {}).get("slug", r["pref"]),
             "n": r["n"], "pct": _pct(r["n"], total), "muestra_insuficiente": r["n"] < MIN_MUESTRA
         } for r in prov_rows]
+        resultado["ranking_concentracion"] = round(
+            sum(x["pct"] for x in resultado["ranking_provincias"][:10]), 1)
 
         # Ranking nacional de departamentos (puesto de ~25)
         resultado["ranking_nacional"] = await _ranking_nacional(
@@ -296,7 +318,8 @@ def generar_reporte(departamento, provincia=None, mes_desde=None, mes_hasta=None
     database_url = database_url or os.getenv("DATABASE_URL", "").strip()
     if not database_url:
         raise RuntimeError("Falta DATABASE_URL (env, .env o parametro).")
-    prefijo = resolver_prefijo(departamento, provincia if nivel == "provincia" else None)
+    prefijo = "" if nivel == "nacional" else \
+        resolver_prefijo(departamento, provincia if nivel == "provincia" else None)
     data = asyncio.run(_run(nivel, prefijo, mes_desde, mes_hasta, comparables, database_url))
     return _armar_reporte(nivel, prefijo, mes_desde, mes_hasta, data)
 
@@ -311,7 +334,8 @@ async def generar_reporte_async(departamento, provincia=None, mes_desde=None, me
     database_url = database_url or os.getenv("DATABASE_URL", "").strip()
     if not database_url:
         raise RuntimeError("Falta DATABASE_URL.")
-    prefijo = resolver_prefijo(departamento, provincia if nivel == "provincia" else None)
+    prefijo = "" if nivel == "nacional" else \
+        resolver_prefijo(departamento, provincia if nivel == "provincia" else None)
     data = await _run(nivel, prefijo, mes_desde, mes_hasta, comparables, database_url)
     return _armar_reporte(nivel, prefijo, mes_desde, mes_hasta, data)
 
@@ -356,6 +380,9 @@ async def _regen(mes_desde, mes_hasta, database_url):
             "AND mes_inscripcion BETWEEN $1 AND $2 ORDER BY 1", mes_desde, mes_hasta)]
 
         reportes: dict[str, dict] = {}
+        # Nivel NACIONAL (clave 'nacional' -> ruta /reportes).
+        data = await _stats(conn, "nacional", "", mes_desde, mes_hasta, None)
+        reportes["nacional"] = _armar_reporte("nacional", "", mes_desde, mes_hasta, data)
         for pref in dep_prefs:
             data = await _stats(conn, "departamento", pref, mes_desde, mes_hasta, None)
             rep = _armar_reporte("departamento", pref, mes_desde, mes_hasta, data)
@@ -379,16 +406,89 @@ async def _regen(mes_desde, mes_hasta, database_url):
 
 
 def _armar_reporte(nivel, prefijo, desde, hasta, data):
-    info = slug_de_prefijo(prefijo)
-    if nivel == "departamento":
-        dep_nombre, dep_slug = info["nombre"], info["slug"]
+    if nivel == "nacional":
+        territorio, slug_, dep_nombre, dep_slug = "Perú", "nacional", None, None
+    elif nivel == "departamento":
+        info = slug_de_prefijo(prefijo)
+        territorio, slug_, dep_nombre, dep_slug = info["nombre"], info["slug"], info["nombre"], info["slug"]
     else:
+        info = slug_de_prefijo(prefijo)
         pv = geo()["provincias"][prefijo]
-        dep_nombre, dep_slug = pv["dep_nombre"], pv["dep_slug"]
-    return {"nivel": nivel, "prefijo_ubigeo": prefijo, "territorio": info["nombre"],
-            "slug": info["slug"], "departamento": dep_nombre, "departamento_slug": dep_slug,
-            "periodo": {"desde": desde, "hasta": hasta},
-            "actualizado": dt.date.today().isoformat(), **data}
+        territorio, slug_, dep_nombre, dep_slug = info["nombre"], info["slug"], pv["dep_nombre"], pv["dep_slug"]
+    rep = {"nivel": nivel, "prefijo_ubigeo": prefijo, "territorio": territorio,
+           "slug": slug_, "departamento": dep_nombre, "departamento_slug": dep_slug,
+           "periodo": {"desde": desde, "hasta": hasta},
+           "actualizado": dt.date.today().isoformat(), **data}
+    rep["hallazgos"] = _hallazgos(rep)
+    return rep
+
+
+# --- Hallazgos automaticos (indicadores + frases por REGLAS con umbral) ------
+# Umbrales de las reglas: una frase SOLO se dispara si se cumple su umbral;
+# jamas se genera texto que la data no sustente.
+UMBRAL_LIDER = 40        # % del territorio lider
+UMBRAL_VARIACION = 10    # % de variacion (±)
+UMBRAL_REGIMEN = 30      # % del regimen predominante
+UMBRAL_TOP10_ACT = 50    # % que concentra el top 10 de actividades
+
+
+def _ranking_principal(r):
+    """Devuelve (lista, clave_nombre) del ranking segun el nivel."""
+    if r["nivel"] == "nacional":
+        return r.get("ranking_departamentos", []), "departamento"
+    if r["nivel"] == "departamento":
+        return r.get("ranking_provincias", []), "provincia"
+    return r.get("top_distritos", []), "distrito"
+
+
+def _hallazgos(r):
+    total = r["total"]
+    var = r.get("variacion") or {}
+    var_pct = var.get("porcentual")
+    tipo_nat = next((t for t in r["por_tipo"] if t["tipo"] == "natural"), None)
+    pct_nat = tipo_nat["pct"] if tipo_nat else 0.0
+    reg = r["regimenes"][0] if r.get("regimenes") else None
+
+    indicadores = {
+        "total": total,
+        "variacion_pct": var_pct,
+        "pct_natural": pct_nat,
+        "regimen_predominante": ({"regimen": reg["regimen"], "pct": reg["pct"]} if reg else None),
+    }
+
+    de = "del país" if r["nivel"] == "nacional" else f"de {_titulo(r['territorio'])}"
+    destacan = []
+    ranking, _ = _ranking_principal(r)
+    lider = ranking[0] if ranking else None
+    lider_nombre = None
+    if lider:
+        lider_nombre = lider.get("departamento") or lider.get("provincia") or lider.get("distrito")
+
+    # Regla 1: concentracion del territorio lider > 40%
+    if lider and lider["pct"] > UMBRAL_LIDER:
+        destacan.append(f"{_titulo(lider_nombre)} concentra el {lider['pct']}% de los nuevos negocios {de}.")
+    # Regla 2: variacion mensual > ±10%
+    if var_pct is not None and abs(var_pct) >= UMBRAL_VARIACION:
+        verbo = "subieron" if var_pct > 0 else "bajaron"
+        destacan.append(f"Las altas {verbo} {abs(var_pct)}% en {var['a']} respecto a {var['de']}.")
+    # Regla 3: regimen predominante > 30%
+    if reg and reg["pct"] > UMBRAL_REGIMEN:
+        destacan.append(f"El {reg['regimen']} es el régimen más frecuente ({reg['pct']}% de los casos).")
+    # Regla 4: concentracion del top 10 de actividades > 50%
+    if r.get("top_rubros_concentracion", 0) > UMBRAL_TOP10_ACT:
+        destacan.append(f"Las 10 principales actividades concentran el "
+                        f"{r['top_rubros_concentracion']}% de los nuevos negocios.")
+
+    return {"indicadores": indicadores, "destacan": destacan[:3]}
+
+
+def _titulo(s):
+    """Title Case peruano (misma logica que la web, para las frases de hallazgos)."""
+    minus = {"DE", "DEL", "LA", "LAS", "LOS", "Y", "EL", "EN"}
+    out = []
+    for i, w in enumerate((s or "").split()):
+        out.append(w.capitalize() if (i == 0 or w.upper() not in minus) else w.lower())
+    return " ".join(out)
 
 
 def regenerar_todo(mes_desde=None, mes_hasta=None, database_url=None):
