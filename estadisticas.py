@@ -475,14 +475,17 @@ def _hallazgos(r):
     var = r.get("variacion") or {}
     var_pct = var.get("porcentual")
     tipo_nat = next((t for t in r["por_tipo"] if t["tipo"] == "natural"), None)
+    tipo_jur = next((t for t in r["por_tipo"] if t["tipo"] == "juridica"), None)
     pct_nat = tipo_nat["pct"] if tipo_nat else 0.0
+    pct_jur = tipo_jur["pct"] if tipo_jur else 0.0
     reg = r["regimenes"][0] if r.get("regimenes") else None
 
     indicadores = {
         "total": total,
         "variacion_pct": var_pct,
         "pct_natural": pct_nat,
-        "regimen_predominante": ({"regimen": reg["regimen"], "pct": reg["pct"]} if reg else None),
+        "pct_juridica": pct_jur,
+        "regimen_predominante": ({"regimen": reg["regimen"], "pct": reg["pct"], "n": reg["n"]} if reg else None),
     }
 
     de = "del país" if r["nivel"] == "nacional" else f"de {_titulo(r['territorio'])}"
