@@ -191,7 +191,7 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
         "total": total, "por_mes": meses, "variacion": variacion, "por_tipo": tipos,
         "top_rubros": top_rubros, "regimenes": regimenes,
         # Concentracion del top 10 de actividades (suma de sus %).
-        "top_rubros_concentracion": round(sum(r["pct"] for r in top_rubros[:10]), 1),
+        "top_rubros_concentracion": round(sum(r["pct"] for r in top_rubros[:10]), 2),
     }
 
     # --- Metricas por nivel ---
@@ -207,7 +207,7 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
             "n": r["n"], "pct": _pct(r["n"], total), "muestra_insuficiente": r["n"] < MIN_MUESTRA
         } for r in dep_rows]
         resultado["ranking_concentracion"] = round(
-            sum(x["pct"] for x in resultado["ranking_departamentos"][:10]), 1)
+            sum(x["pct"] for x in resultado["ranking_departamentos"][:10]), 2)
 
     elif nivel == "provincia":
         # 3) top 10 distritos (nombre limpio de distritos.json)
@@ -220,7 +220,7 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
             "n": r["n"], "pct": _pct(r["n"], total), "muestra_insuficiente": r["n"] < MIN_MUESTRA
         } for r in dist_rows]
         resultado["ranking_concentracion"] = round(
-            sum(x["pct"] for x in resultado["top_distritos"][:10]), 1)
+            sum(x["pct"] for x in resultado["top_distritos"][:10]), 2)
 
         # NUEVO: peso de la provincia dentro de su departamento
         dep_pref = prefijo[:2]
@@ -249,7 +249,7 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
             "n": r["n"], "pct": _pct(r["n"], total), "muestra_insuficiente": r["n"] < MIN_MUESTRA
         } for r in prov_rows]
         resultado["ranking_concentracion"] = round(
-            sum(x["pct"] for x in resultado["ranking_provincias"][:10]), 1)
+            sum(x["pct"] for x in resultado["ranking_provincias"][:10]), 2)
 
         # Ranking nacional de departamentos (puesto de ~25)
         resultado["ranking_nacional"] = await _ranking_nacional(
@@ -358,9 +358,38 @@ def cargar_consolidado() -> dict | None:
 
 
 def cargar_reporte(clave: str) -> dict | None:
-    """clave = '<dep_slug>' o '<dep_slug>/<prov_slug>'."""
+    """clave = 'nacional' | '<dep_slug>' | '<dep_slug>/<prov_slug>'."""
     cons = cargar_consolidado()
     return cons["reportes"].get(clave) if cons else None
+
+
+# --- Analisis MANUAL y editable (NUNCA lo toca --regen) ----------------------
+# reportes/data/analisis.json, con clave por territorio: { texto, fecha }.
+ANALISIS = OUT_DATA / "analisis.json"
+_CACHE_AN = {"mtime": None, "data": None}
+
+
+def cargar_analisis(clave: str) -> dict | None:
+    """Devuelve {texto, fecha} para el territorio, o None si no hay entrada."""
+    if not ANALISIS.exists():
+        return None
+    m = ANALISIS.stat().st_mtime
+    if _CACHE_AN["mtime"] != m:
+        try:
+            _CACHE_AN["data"] = json.loads(ANALISIS.read_text(encoding="utf-8"))
+        except Exception:
+            _CACHE_AN["data"] = {}
+        _CACHE_AN["mtime"] = m
+    ent = (_CACHE_AN["data"] or {}).get(clave)
+    return ent if (ent and ent.get("texto")) else None
+
+
+def clave_territorio(r: dict) -> str:
+    if r["nivel"] == "nacional":
+        return "nacional"
+    if r["nivel"] == "departamento":
+        return r["slug"]
+    return f"{r['departamento_slug']}/{r['slug']}"
 
 
 # --- Precomputo de TODO (comando de regeneracion) ---------------------------
@@ -466,18 +495,18 @@ def _hallazgos(r):
 
     # Regla 1: concentracion del territorio lider > 40%
     if lider and lider["pct"] > UMBRAL_LIDER:
-        destacan.append(f"{_titulo(lider_nombre)} concentra el {lider['pct']}% de los nuevos negocios {de}.")
+        destacan.append(f"{_titulo(lider_nombre)} concentra el {lider['pct']:.2f}% de los nuevos negocios {de}.")
     # Regla 2: variacion mensual > ±10%
     if var_pct is not None and abs(var_pct) >= UMBRAL_VARIACION:
         verbo = "subieron" if var_pct > 0 else "bajaron"
-        destacan.append(f"Las altas {verbo} {abs(var_pct)}% en {var['a']} respecto a {var['de']}.")
+        destacan.append(f"Las altas {verbo} {abs(var_pct):.2f}% en {var['a']} respecto a {var['de']}.")
     # Regla 3: regimen predominante > 30%
     if reg and reg["pct"] > UMBRAL_REGIMEN:
-        destacan.append(f"El {reg['regimen']} es el régimen más frecuente ({reg['pct']}% de los casos).")
+        destacan.append(f"El {reg['regimen']} es el régimen más frecuente ({reg['pct']:.2f}% de los casos).")
     # Regla 4: concentracion del top 10 de actividades > 50%
     if r.get("top_rubros_concentracion", 0) > UMBRAL_TOP10_ACT:
         destacan.append(f"Las 10 principales actividades concentran el "
-                        f"{r['top_rubros_concentracion']}% de los nuevos negocios.")
+                        f"{r['top_rubros_concentracion']:.2f}% de los nuevos negocios.")
 
     return {"indicadores": indicadores, "destacan": destacan[:3]}
 
