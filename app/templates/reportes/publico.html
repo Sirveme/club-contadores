@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#0b1512">
   <title>{{ meta.title }}</title>
   <meta name="description" content="{{ meta.description }}">
+  {% if noindex %}<meta name="robots" content="noindex, follow">{% endif %}
   <link rel="canonical" href="{{ meta.url }}">
-  <!-- Open Graph (Facebook / WhatsApp) -->
   <meta property="og:type" content="article">
-  <meta property="og:site_name" content="Club de Contadores — Perú Sistemas">
+  <meta property="og:site_name" content="Observatorio de Nuevos Negocios · Perú Sistemas">
   <meta property="og:title" content="{{ meta.title }}">
   <meta property="og:description" content="{{ meta.description }}">
   <meta property="og:url" content="{{ meta.url }}">
@@ -20,35 +20,51 @@
   <meta name="twitter:description" content="{{ meta.description }}">
   <meta name="twitter:image" content="{{ meta.image }}">
   <link rel="icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/css/reportes.css?v=1">
+  <link rel="stylesheet" href="/static/css/reportes.css?v=2">
 </head>
-<body>
+<body class="tiene-barra">
   <main class="wrap">
-    <div class="brand-row">
-      <div class="brand-mark">₡</div>
-      <div class="brand-name">Club de Contadores · Perú Sistemas</div>
-    </div>
+    <a class="obs-brand" href="/reportes">
+      <span class="brand-mark">₡</span>
+      <span><b>Observatorio de Nuevos Negocios</b><br><small>Un proyecto de Perú Sistemas</small></span>
+    </a>
 
     <nav class="crumbs">
-      <a href="/reportes">Reportes</a>
-      {% if r.nivel == 'provincia' %}
-      · <a href="/reportes/{{ r.departamento_slug }}">{{ r.departamento|titulo }}</a>
-      · {{ r.territorio|titulo }}
-      {% else %}· {{ r.territorio|titulo }}{% endif %}
+      <a href="/reportes">Perú</a>
+      {% if r.nivel == 'departamento' %} · {{ r.territorio|titulo }}
+      {% elif r.nivel == 'provincia' %}
+      · <a href="/reportes/{{ r.departamento_slug }}">{{ r.departamento|titulo }}</a> · {{ r.territorio|titulo }}
+      {% endif %}
     </nav>
 
     <header class="rep-head">
       <h1>Nuevos negocios en <b>{{ r.territorio|titulo }}</b></h1>
       <p class="sub">
-        {% if r.nivel == 'provincia' %}Provincia de {{ r.departamento|titulo }} · {% else %}Departamento · {% endif %}
+        {% if r.nivel == 'nacional' %}Perú · {% elif r.nivel == 'provincia' %}Provincia de {{ r.departamento|titulo }} · {% else %}Departamento · {% endif %}
         Altas de RUC {{ periodo_txt }} · {{ r.total }} empresas nuevas
       </p>
     </header>
 
+    {% if mapa %}
+    <figure class="mapa">
+      <img src="{{ mapa.url }}" alt="{{ mapa.alt }}" loading="lazy">
+    </figure>
+    {% endif %}
+
     {% include "reportes/_cuerpo.html" %}
 
     {# Navegación cruzada #}
-    {% if r.nivel == 'departamento' and r.ranking_provincias %}
+    {% if r.nivel == 'nacional' %}
+    <section class="card">
+      <h2>Ver por departamento</h2>
+      <div class="chips">
+        {% for d in r.ranking_departamentos %}
+        <a class="chip" href="/reportes/{{ d.departamento_slug }}">{{ d.departamento|titulo }}
+          <small>{{ d.n }}</small></a>
+        {% endfor %}
+      </div>
+    </section>
+    {% elif r.nivel == 'departamento' and r.ranking_provincias %}
     <section class="card">
       <h2>Ver por provincia</h2>
       <div class="chips">
@@ -63,33 +79,97 @@
       <h2>Más de la región</h2>
       <div class="chips">
         <a class="chip" href="/reportes/{{ r.departamento_slug }}">← Todo {{ r.departamento|titulo }}</a>
+        <a class="chip" href="/reportes">← Perú</a>
       </div>
     </section>
     {% endif %}
 
-    {# Descarga #}
-    <div class="btnrow">
-      <a class="btn" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=principal">⬇ Descargar CSV</a>
-      <a class="btn sec" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=rubros">⬇ CSV de rubros</a>
-    </div>
-
-    {# Cómo citar #}
-    <section class="citar">
-      <h3>Cómo citar este reporte</h3>
-      <div class="cita-box" id="cita">{{ cita }}</div>
-      <div class="btnrow">
-        <button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('cita').innerText).then(()=>{this.textContent='¡Copiado!'})">Copiar cita</button>
-        <button class="btn sec" onclick="navigator.clipboard.writeText('{{ meta.url }}').then(()=>{this.textContent='¡Enlace copiado!'})">Copiar enlace</button>
-      </div>
-    </section>
-
-    {# Fuente y atribución #}
+    {# Fuente y atribución (texto exacto) #}
     <p class="fuente">
-      <b>Fuente:</b> SUNAT — altas de RUC obtenidas mediante solicitud de acceso a la información
-      pública. <b>Procesamiento:</b> Perú Sistemas Pro E.I.R.L. (RUC 20615446565).
-      <b>Periodo:</b> {{ periodo_txt }}. <b>Actualizado:</b> {{ r.actualizado }}.<br>
-      Este reporte publica solo cifras agregadas; no incluye datos individuales de contribuyentes.
+      Fuente: SUNAT — altas de RUC obtenidas mediante solicitudes de acceso a la información
+      pública (Ley N° 27806). Elaboración: Perú Sistemas Pro E.I.R.L. (RUC 20615446565).
+      Periodo: {{ periodo_txt }}. Actualizado: {{ r.actualizado }}.
+      Este reporte es una elaboración independiente y no constituye una publicación oficial de
+      SUNAT ni cuenta con su aval.
     </p>
+
+    {# Sobre el Observatorio #}
+    <section class="sobre">
+      <h3>Sobre el Observatorio</h3>
+      <p>El Observatorio de Nuevos Negocios procesa las altas de RUC publicadas por SUNAT para
+        mostrar, de forma agregada, cómo evoluciona la creación de empresas en el Perú.
+        <a href="/observatorio">Conoce la metodología →</a></p>
+    </section>
   </main>
+
+  {# Barra fija: CITAR (principal) · COMPARTIR · DESCARGAR #}
+  <div class="barra">
+    <button class="barra-btn principal" id="b-citar">✎ Citar</button>
+    <button class="barra-btn" id="b-compartir">↗ Compartir</button>
+    <a class="barra-btn" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=principal">↓ Descargar</a>
+  </div>
+
+  {# Modal Citar #}
+  <div class="modal" id="modal-citar" hidden>
+    <div class="modal-bg" data-cerrar></div>
+    <div class="modal-box">
+      <div class="modal-head"><h3>Citar este reporte</h3>
+        <button class="modal-x" data-cerrar aria-label="Cerrar">✕</button></div>
+      <div class="modal-body">
+        <p class="cita-lbl">Cita académica</p>
+        <div class="cita-box" id="cita-aca">{{ cita }}</div>
+        <p class="cita-lbl">Cita breve</p>
+        <div class="cita-box" id="cita-brv">{{ cita_breve }}</div>
+        <p class="cita-lbl">HTML con enlace</p>
+        <div class="cita-box mono" id="cita-html">{{ cita_html }}</div>
+        <div class="btnrow">
+          <button class="btn" data-copiar="cita-aca">Copiar cita</button>
+          <button class="btn sec" data-copiar-txt="{{ meta.url }}">Copiar enlace</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Modal Compartir #}
+  <div class="modal" id="modal-compartir" hidden>
+    <div class="modal-bg" data-cerrar></div>
+    <div class="modal-box">
+      <div class="modal-head"><h3>Compartir</h3>
+        <button class="modal-x" data-cerrar aria-label="Cerrar">✕</button></div>
+      <div class="modal-body">
+        <div class="share">
+          <a class="sh wa" id="sh-wa" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="sh fb" id="sh-fb" target="_blank" rel="noopener">Facebook</a>
+          <a class="sh li" id="sh-li" target="_blank" rel="noopener">LinkedIn</a>
+          <button class="sh cp" data-copiar-txt="{{ meta.url }}">Copiar enlace</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var URL = {{ meta.url | tojson }};
+      var TXT = {{ (meta.title) | tojson }};
+      function open(id){ document.getElementById(id).hidden = false; }
+      function closeAll(){ document.querySelectorAll('.modal').forEach(function(m){ m.hidden = true; }); }
+      document.getElementById('b-citar').onclick = function(){ open('modal-citar'); };
+      document.getElementById('b-compartir').onclick = function(){ open('modal-compartir'); };
+      document.addEventListener('click', function(e){
+        if (e.target.closest('[data-cerrar]')) closeAll();
+        var c = e.target.closest('[data-copiar]');
+        if (c){ var el = document.getElementById(c.getAttribute('data-copiar'));
+          navigator.clipboard.writeText(el.innerText).then(function(){ c.textContent = '¡Copiado!'; }); }
+        var t = e.target.closest('[data-copiar-txt]');
+        if (t){ navigator.clipboard.writeText(t.getAttribute('data-copiar-txt')).then(function(){ t.textContent = '¡Copiado!'; }); }
+      });
+      document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeAll(); });
+      // Compartir: WhatsApp primero (canal principal en Perú), luego FB y LinkedIn.
+      var msg = encodeURIComponent(TXT + ' ' + URL);
+      document.getElementById('sh-wa').href = 'https://wa.me/?text=' + msg;
+      document.getElementById('sh-fb').href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(URL);
+      document.getElementById('sh-li').href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(URL);
+    })();
+  </script>
 </body>
 </html>

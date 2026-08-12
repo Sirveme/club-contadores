@@ -1,4 +1,6 @@
-{# Cuerpo del reporte (reutilizado por panel y paginas publicas). Recibe `r`. #}
+{# Cuerpo del reporte (panel + paginas publicas). Recibe `r`.
+   Jerarquia de color: 1er lugar = verde FUERTE; barras normales = verde medio;
+   muestra insuficiente / volumen bajo = AMBAR; apoyo = gris. #}
 {% macro barras(items, cap_attr, sub_attr=None, cap_titulo=False) %}
   {% set maxn = (items | map(attribute='n') | max) if items else 1 %}
   <div class="bars">
@@ -7,31 +9,62 @@
       <div class="cap">{{ (it[cap_attr]|titulo) if cap_titulo else it[cap_attr] }}{% if sub_attr and it[sub_attr] %} <small>· {{ it[sub_attr] }}</small>{% endif %}
         {% if it.muestra_insuficiente %}<span class="ins-tag">muestra insuficiente</span>{% endif %}
       </div>
-      <div class="val">{{ it.n }} · {{ it.pct }}%</div>
-      <div class="track"><div class="fill" style="width:{{ (it.n / maxn * 100) | round(1) }}%"></div></div>
+      <div class="val"><b>{{ it.n }}</b> · {{ it.pct }}%</div>
+      <div class="track"><div class="fill {{ 'fuerte' if (loop.first and not it.muestra_insuficiente) else '' }} {{ 'amber' if it.muestra_insuficiente else '' }}"
+        style="width:{{ (it.n / maxn * 100) | round(1) }}%"></div></div>
     </div>
     {% endfor %}
   </div>
 {% endmacro %}
 
+{% set h = r.hallazgos %}
+
 {% if r.volumen_bajo %}
 <div class="aviso">⚠ <b>Volumen bajo</b>: en este periodo se registraron solo {{ r.total }} altas
-(menos de {{ r.umbral_volumen_bajo }}). Los porcentajes se muestran como referencia, no como
-tendencia firme.</div>
+(menos de {{ r.umbral_volumen_bajo }}). Los porcentajes son referenciales, no una tendencia firme.</div>
 {% endif %}
 
-<div class="kpis">
-  <div class="kpi"><div class="num">{{ r.total }}</div><div class="lbl">Altas totales en el periodo</div></div>
-  {% for m in r.por_mes %}
-  <div class="kpi"><div class="num">{{ m.n }}</div><div class="lbl">Altas {{ m.mes }}</div></div>
-  {% endfor %}
-  {% if r.variacion and r.variacion.porcentual is not none %}
-  <div class="kpi"><div class="num">{{ '%+d' % r.variacion.absoluta }}</div>
-    <div class="lbl">Variación {{ r.variacion.de }} → {{ r.variacion.a }}</div>
-    <div class="delta {{ 'up' if r.variacion.absoluta >= 0 else 'down' }}">{{ '%+.1f' % r.variacion.porcentual }}%</div>
+{# ---- PRINCIPALES HALLAZGOS: 4 indicadores + 3 datos que destacan ---- #}
+<section class="hallazgos">
+  <h2>Principales hallazgos</h2>
+  <div class="kpis">
+    <div class="kpi principal"><div class="num">{{ h.indicadores.total }}</div>
+      <div class="lbl">Empresas nuevas</div></div>
+    {% if h.indicadores.variacion_pct is not none %}
+    <div class="kpi"><div class="num delta {{ 'up' if h.indicadores.variacion_pct >= 0 else 'down' }}">{{ '%+.1f' % h.indicadores.variacion_pct }}%</div>
+      <div class="lbl">Variación mensual</div></div>
+    {% endif %}
+    <div class="kpi"><div class="num">{{ h.indicadores.pct_natural }}%</div>
+      <div class="lbl">Personas naturales</div></div>
+    {% if h.indicadores.regimen_predominante %}
+    <div class="kpi"><div class="num">{{ h.indicadores.regimen_predominante.pct }}%</div>
+      <div class="lbl">{{ h.indicadores.regimen_predominante.regimen }}</div></div>
+    {% endif %}
   </div>
+  {% if h.destacan %}
+  <ul class="destacan">
+    {% for d in h.destacan %}<li>{{ d }}</li>{% endfor %}
+  </ul>
   {% endif %}
-</div>
+</section>
+
+{# ---- EVOLUCION MENSUAL (serie observada; sin proyecciones) ---- #}
+{% if r.por_mes | length >= 2 %}
+<section class="card">
+  <h2>Evolución mensual</h2>
+  {% set maxm = (r.por_mes | map(attribute='n') | max) %}
+  <div class="evo">
+    {% for m in r.por_mes %}
+    <div class="evo-col">
+      <div class="evo-n">{{ m.n }}</div>
+      <div class="evo-bar-wrap"><div class="evo-bar {{ 'fuerte' if loop.last else '' }}"
+        style="height:{{ (m.n / maxm * 100) | round(1) }}%"></div></div>
+      <div class="evo-x">{{ m.mes }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
 <div class="split">
   <section class="card">
@@ -44,10 +77,23 @@ tendencia firme.</div>
   </section>
 </div>
 
-{% if r.nivel == 'departamento' %}
+{% if r.nivel == 'nacional' %}
+<section class="card">
+  <h2>Ranking de departamentos</h2>
+  {{ barras(r.ranking_departamentos, 'departamento', None, cap_titulo=True) }}
+  {% if r.ranking_concentracion %}
+  <p class="conc">Los 10 principales departamentos concentran el
+    <b>{{ r.ranking_concentracion }}%</b> de los nuevos negocios del país.</p>
+  {% endif %}
+</section>
+{% elif r.nivel == 'departamento' %}
 <section class="card">
   <h2>Ranking de provincias del departamento</h2>
   {{ barras(r.ranking_provincias, 'provincia', None, cap_titulo=True) }}
+  {% if r.ranking_concentracion %}
+  <p class="conc">Las 10 principales provincias concentran el
+    <b>{{ r.ranking_concentracion }}%</b> de las altas del departamento.</p>
+  {% endif %}
 </section>
 {% else %}
 <section class="card">
@@ -59,14 +105,23 @@ tendencia firme.</div>
 <section class="card">
   <h2>Distritos con más altas</h2>
   {{ barras(r.top_distritos, 'distrito', None, cap_titulo=True) }}
+  {% if r.ranking_concentracion %}
+  <p class="conc">Los 10 principales distritos concentran el
+    <b>{{ r.ranking_concentracion }}%</b> de las altas de la provincia.</p>
+  {% endif %}
 </section>
 {% endif %}
 
 <section class="card">
   <h2>Rubros más frecuentes <span class="muestra">(CIIU)</span></h2>
   {{ barras(r.top_rubros, 'descripcion', 'ciiu') }}
+  {% if r.top_rubros_concentracion %}
+  <p class="conc">Las 10 principales actividades concentran el
+    <b>{{ r.top_rubros_concentracion }}%</b> de los nuevos negocios.</p>
+  {% endif %}
 </section>
 
+{% if r.ranking_nacional %}
 <section class="card">
   <h2>Posición nacional</h2>
   <p class="sub" style="margin:0">
@@ -79,13 +134,17 @@ tendencia firme.</div>
     {% endif %}
   </p>
 </section>
+{% endif %}
 
-<section class="card qc">
-  <h2>Calidad de los datos</h2>
-  <p style="margin:0">De {{ r.calidad.total_universo }} registros del periodo:
-    sin ubigeo <b>{{ r.calidad.sin_ubigeo.n }}</b> ({{ r.calidad.sin_ubigeo.pct }}%),
-    sin CIIU <b>{{ r.calidad.sin_ciiu.n }}</b> ({{ r.calidad.sin_ciiu.pct }}%),
-    sin régimen <b>{{ r.calidad.sin_regimen.n }}</b> ({{ r.calidad.sin_regimen.pct }}%).
-    Las categorías con menos de {{ r.calidad.umbral_muestra_insuficiente }} casos se marcan como
-    <span style="color:var(--amber)">muestra insuficiente</span>.</p>
+{# ---- CALIDAD DE LOS DATOS (se conserva y se hace mas visible: senal de rigor) ---- #}
+<section class="card calidad">
+  <h2>✔ Calidad de los datos</h2>
+  <div class="qc-grid">
+    <div class="qc-item"><span class="qc-n">{{ r.calidad.sin_ubigeo.pct }}%</span><span>sin ubigeo</span></div>
+    <div class="qc-item"><span class="qc-n">{{ r.calidad.sin_ciiu.pct }}%</span><span>sin CIIU</span></div>
+    <div class="qc-item"><span class="qc-n">{{ r.calidad.sin_regimen.pct }}%</span><span>sin régimen</span></div>
+  </div>
+  <p class="qc-nota">De {{ r.calidad.total_universo }} registros del periodo. Las categorías con menos
+    de {{ r.calidad.umbral_muestra_insuficiente }} casos se marcan como
+    <span class="amber-txt">muestra insuficiente</span> y no se presentan como dato firme.</p>
 </section>

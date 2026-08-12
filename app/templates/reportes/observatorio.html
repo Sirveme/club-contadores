@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1512">
+  <title>Sobre el Observatorio de Nuevos Negocios · Perú Sistemas</title>
+  <meta name="description" content="Metodología, fuentes y equipo del Observatorio de Nuevos Negocios: cómo procesamos las altas de RUC de SUNAT para reportes públicos por región.">
+  <link rel="canonical" href="{{ site_base }}/observatorio">
+  <link rel="stylesheet" href="/static/css/reportes.css?v=2">
+</head>
+<body>
+  <main class="wrap">
+    <a class="obs-brand" href="/reportes">
+      <span class="brand-mark">₡</span>
+      <span><b>Observatorio de Nuevos Negocios</b><br><small>Un proyecto de Perú Sistemas</small></span>
+    </a>
+
+    <header class="rep-head">
+      <h1>Sobre el <b>Observatorio</b></h1>
+      <p class="sub">Cómo procesamos la información y quiénes estamos detrás.</p>
+    </header>
+
+    {% if foto %}
+    <figure class="autor-foto"><img src="{{ foto }}" alt="Duilio Restuccia Eslava" loading="lazy"></figure>
+    {% endif %}
+
+    <section class="card">
+      <h2>Quiénes somos</h2>
+      <p>El Observatorio de Nuevos Negocios es un proyecto de <b>Perú Sistemas Pro E.I.R.L.</b>
+        (RUC 20615446565) que hace visible, de forma agregada y abierta, el ritmo de creación de
+        empresas en el Perú.</p>
+    </section>
+
+    <section class="card">
+      <h2>Qué información procesamos</h2>
+      <p>Trabajamos con las <b>altas de RUC</b> (empresas y personas con negocio recién inscritas)
+        que publica SUNAT. Presentamos únicamente <b>cifras agregadas</b> por territorio, actividad
+        y régimen. No difundimos datos individuales de contribuyentes (RUC, razón social ni
+        dirección): ese detalle no forma parte de estos reportes.</p>
+    </section>
+
+    <section class="card">
+      <h2>Cómo obtenemos los datos</h2>
+      <p>Los obtenemos mediante <b>solicitudes de acceso a la información pública</b> amparadas en la
+        <b>Ley N° 27806</b>, Ley de Transparencia y Acceso a la Información Pública. La fuente es
+        SUNAT; la elaboración y el procesamiento son de Perú Sistemas Pro.</p>
+    </section>
+
+    <section class="card">
+      <h2>Metodología</h2>
+      <ul class="lista">
+        <li>El territorio se determina por el <b>ubigeo</b> (código oficial), no por el nombre en texto.</li>
+        <li>El <b>régimen tributario</b> se deriva del código de tributo de renta.</li>
+        <li>Las categorías con menos de <b>5 casos</b> se marcan como “muestra insuficiente”.</li>
+        <li>Un territorio con menos de <b>30 altas</b> en el periodo se marca como “volumen bajo”.</li>
+        <li>La variación se calcula contra el <b>periodo inmediato anterior</b>. No publicamos
+          proyecciones ni pronósticos: solo la serie observada.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Periodicidad</h2>
+      <p>Actualizamos los reportes conforme SUNAT entrega nuevos periodos. Cada reporte indica su
+        periodo y su fecha de actualización.</p>
+    </section>
+
+    <section class="card">
+      <h2>Limitaciones</h2>
+      <p>Es una <b>elaboración independiente</b> y <b>no constituye una publicación oficial de SUNAT
+        ni cuenta con su aval</b>. Un alta de RUC indica una inscripción, no necesariamente actividad
+        económica sostenida. Puede haber registros sin ubigeo, CIIU o régimen; ese porcentaje se
+        informa en el bloque de calidad de cada reporte.</p>
+    </section>
+
+    <section class="card">
+      <h2>Equipo</h2>
+      <p><b>Autor:</b> Duilio Restuccia Eslava.<br>
+        <b>Publica:</b> Perú Sistemas Pro E.I.R.L. (RUC 20615446565).</p>
+    </section>
+
+    <p class="fuente"><a href="/reportes">← Ver los reportes</a></p>
+  </main>
+</body>
+</html>
