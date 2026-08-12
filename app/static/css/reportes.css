@@ -204,3 +204,45 @@ body.tiene-barra{ padding-bottom:76px; }
 .sh.wa{ background:#25d366; } .sh.fb{ background:#4267B2; color:#eaf0ff; }
 .sh.li{ background:#0a66c2; color:#eaf0ff; } .sh.cp{ background:var(--surface); color:var(--text); border:1px solid var(--line); }
 @media (min-width:560px){ .modal{ align-items:center; } .modal-box{ border-radius:18px; } }
+
+/* ============================================================
+   Ajustes v3: barra móvil-only (hide-on-scroll) + acciones en línea
+   (escritorio) + copiar por formato + Lectura del Observatorio
+   ============================================================ */
+.barra{ display:none; transition:transform .25s ease;
+  padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom));
+  background:rgba(11,21,18,.82); }
+.barra.oculta{ transform:translateY(130%); }
+.barra-btn{ display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 6px; }
+.barra-btn .bi{ font-size:17px; line-height:1; }
+.barra-btn .bl{ font-size:11px; font-weight:600; }
+body.tiene-barra{ padding-bottom:0; }
+@media (max-width:719px){
+  .barra{ display:flex; }
+  body.tiene-barra{ padding-bottom:64px; }
+  .acciones-inline{ display:none; }
+}
+@media (min-width:720px){ .barra{ display:none !important; } }
+
+/* Acciones en línea (escritorio) */
+.acciones-inline{ background:var(--surface); border:1px solid var(--line); border-radius:14px;
+  padding:14px 16px; margin:14px 0; }
+.acciones-inline h3{ font-size:14px; margin:0 0 10px; }
+.acc-row{ display:flex; flex-wrap:wrap; gap:8px; }
+
+/* Copiar por formato + confirmación */
+.cita-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:10px 0 5px; }
+.cita-row:first-child{ margin-top:0; }
+.cita-row .cita-lbl{ margin:0; }
+.copybtn{ background:transparent; border:1px solid var(--line); color:var(--text); cursor:pointer;
+  font-size:12px; font-weight:700; padding:5px 10px; border-radius:8px; white-space:nowrap; }
+.copybtn.ok, .btn.ok, .sh.ok{ background:var(--green); color:#04150d; border-color:var(--green); }
+
+/* Lectura del Observatorio (análisis manual) */
+.card.lectura{ border-left:3px solid var(--green); }
+.card.lectura p{ margin:0 0 10px; font-size:14.5px; line-height:1.6; }
+.card.lectura p:last-of-type{ margin-bottom:0; }
+.firma{ display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:11px; border-top:1px solid var(--line); }
+.firma-foto{ width:38px; height:38px; border-radius:99px; object-fit:cover; border:1px solid var(--line); }
+.firma-txt{ font-size:12.5px; color:var(--muted); }
+.firma-txt b{ color:var(--text); }
