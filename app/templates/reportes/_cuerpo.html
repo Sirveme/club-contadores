@@ -18,6 +18,13 @@
 {% endmacro %}
 
 {% set h = r.hallazgos %}
+{% set notas = (analisis.notas if analisis else None) or {} %}
+{# Nota por bloque (manual): <details> nativo, sin JS. Solo si hay nota. #}
+{% macro nota(clave) %}
+  {% if notas.get(clave) %}
+  <details class="nota"><summary>Qué dice este dato</summary><p>{{ notas.get(clave) }}</p></details>
+  {% endif %}
+{% endmacro %}
 
 {% if r.volumen_bajo %}
 <div class="aviso">⚠ <b>Volumen bajo</b>: en este periodo se registraron solo {{ r.total|miles }} altas
@@ -27,18 +34,34 @@
 {# ---- PRINCIPALES HALLAZGOS: 4 indicadores + 3 datos que destacan ---- #}
 <section class="hallazgos">
   <h2>Principales hallazgos</h2>
+  {# Cada indicador declara su DIMENSION (gris, encima del valor). Son
+     dimensiones distintas: los porcentajes NO son sumables entre si. #}
   <div class="kpis">
-    <div class="kpi principal"><div class="num">{{ h.indicadores.total|miles }}</div>
-      <div class="lbl">Empresas nuevas</div></div>
+    <div class="kpi principal">
+      <div class="dim">Total</div>
+      <div class="num">{{ h.indicadores.total|miles }}</div>
+      <div class="lbl">Empresas nuevas</div>
+    </div>
     {% if h.indicadores.variacion_pct is not none %}
-    <div class="kpi"><div class="num delta {{ 'up' if h.indicadores.variacion_pct >= 0 else 'down' }}">{{ '%+.2f' % h.indicadores.variacion_pct }}%</div>
-      <div class="lbl">Variación mensual</div></div>
+    <div class="kpi">
+      <div class="dim">Variación mensual</div>
+      <div class="num delta {{ 'up' if h.indicadores.variacion_pct >= 0 else 'down' }}">{{ '%+.2f' % h.indicadores.variacion_pct }}%</div>
+      <div class="lbl">vs. mes anterior</div>
+    </div>
     {% endif %}
-    <div class="kpi"><div class="num">{{ h.indicadores.pct_natural|pct }}%</div>
-      <div class="lbl">Personas naturales</div></div>
+    <div class="kpi">
+      <div class="dim">Tipo de contribuyente</div>
+      <div class="num">{{ h.indicadores.pct_natural|pct }}%</div>
+      <div class="lbl">Personas naturales</div>
+      <div class="compl">Jurídicas: {{ h.indicadores.pct_juridica|pct }}%</div>
+    </div>
     {% if h.indicadores.regimen_predominante %}
-    <div class="kpi"><div class="num">{{ h.indicadores.regimen_predominante.pct|pct }}%</div>
-      <div class="lbl">{{ h.indicadores.regimen_predominante.regimen }}</div></div>
+    <div class="kpi">
+      <div class="dim">Régimen tributario</div>
+      <div class="num">{{ h.indicadores.regimen_predominante.pct|pct }}%</div>
+      <div class="lbl">{{ h.indicadores.regimen_predominante.regimen }}</div>
+      <div class="compl">el más frecuente · {{ h.indicadores.regimen_predominante.n|miles }} de {{ h.indicadores.total|miles }}</div>
+    </div>
     {% endif %}
   </div>
   {% if h.destacan %}
@@ -79,6 +102,7 @@
     </div>
     {% endfor %}
   </div>
+  {{ nota('evolucion') }}
 </section>
 {% endif %}
 
@@ -86,10 +110,12 @@
   <section class="card">
     <h2>Persona natural vs jurídica</h2>
     {{ barras(r.por_tipo, 'tipo') }}
+    {{ nota('tipo_contribuyente') }}
   </section>
   <section class="card">
     <h2>Régimen tributario</h2>
     {{ barras(r.regimenes, 'regimen') }}
+    {{ nota('regimen') }}
   </section>
 </div>
 
@@ -101,6 +127,7 @@
   <p class="conc">Los 10 principales departamentos concentran el
     <b>{{ r.ranking_concentracion|pct }}%</b> de los nuevos negocios del país.</p>
   {% endif %}
+  {{ nota('ranking') }}
 </section>
 {% elif r.nivel == 'departamento' %}
 <section class="card">
@@ -110,6 +137,7 @@
   <p class="conc">Las 10 principales provincias concentran el
     <b>{{ r.ranking_concentracion|pct }}%</b> de las altas del departamento.</p>
   {% endif %}
+  {{ nota('ranking') }}
 </section>
 {% else %}
 <section class="card">
@@ -125,6 +153,7 @@
   <p class="conc">Los 10 principales distritos concentran el
     <b>{{ r.ranking_concentracion|pct }}%</b> de las altas de la provincia.</p>
   {% endif %}
+  {{ nota('ranking') }}
 </section>
 {% endif %}
 
@@ -135,6 +164,7 @@
   <p class="conc">Las 10 principales actividades concentran el
     <b>{{ r.top_rubros_concentracion|pct }}%</b> de los nuevos negocios.</p>
   {% endif %}
+  {{ nota('actividades') }}
 </section>
 
 {% if r.ranking_nacional %}
