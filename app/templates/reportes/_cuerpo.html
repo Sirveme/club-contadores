@@ -9,7 +9,7 @@
       <div class="cap">{{ (it[cap_attr]|titulo) if cap_titulo else it[cap_attr] }}{% if sub_attr and it[sub_attr] %} <small>· {{ it[sub_attr] }}</small>{% endif %}
         {% if it.muestra_insuficiente %}<span class="ins-tag">muestra insuficiente</span>{% endif %}
       </div>
-      <div class="val"><b>{{ it.n }}</b> · {{ it.pct }}%</div>
+      <div class="val"><b>{{ it.n|miles }}</b> · {{ it.pct|pct }}%</div>
       <div class="track"><div class="fill {{ 'fuerte' if (loop.first and not it.muestra_insuficiente) else '' }} {{ 'amber' if it.muestra_insuficiente else '' }}"
         style="width:{{ (it.n / maxn * 100) | round(1) }}%"></div></div>
     </div>
@@ -20,7 +20,7 @@
 {% set h = r.hallazgos %}
 
 {% if r.volumen_bajo %}
-<div class="aviso">⚠ <b>Volumen bajo</b>: en este periodo se registraron solo {{ r.total }} altas
+<div class="aviso">⚠ <b>Volumen bajo</b>: en este periodo se registraron solo {{ r.total|miles }} altas
 (menos de {{ r.umbral_volumen_bajo }}). Los porcentajes son referenciales, no una tendencia firme.</div>
 {% endif %}
 
@@ -28,16 +28,16 @@
 <section class="hallazgos">
   <h2>Principales hallazgos</h2>
   <div class="kpis">
-    <div class="kpi principal"><div class="num">{{ h.indicadores.total }}</div>
+    <div class="kpi principal"><div class="num">{{ h.indicadores.total|miles }}</div>
       <div class="lbl">Empresas nuevas</div></div>
     {% if h.indicadores.variacion_pct is not none %}
-    <div class="kpi"><div class="num delta {{ 'up' if h.indicadores.variacion_pct >= 0 else 'down' }}">{{ '%+.1f' % h.indicadores.variacion_pct }}%</div>
+    <div class="kpi"><div class="num delta {{ 'up' if h.indicadores.variacion_pct >= 0 else 'down' }}">{{ '%+.2f' % h.indicadores.variacion_pct }}%</div>
       <div class="lbl">Variación mensual</div></div>
     {% endif %}
-    <div class="kpi"><div class="num">{{ h.indicadores.pct_natural }}%</div>
+    <div class="kpi"><div class="num">{{ h.indicadores.pct_natural|pct }}%</div>
       <div class="lbl">Personas naturales</div></div>
     {% if h.indicadores.regimen_predominante %}
-    <div class="kpi"><div class="num">{{ h.indicadores.regimen_predominante.pct }}%</div>
+    <div class="kpi"><div class="num">{{ h.indicadores.regimen_predominante.pct|pct }}%</div>
       <div class="lbl">{{ h.indicadores.regimen_predominante.regimen }}</div></div>
     {% endif %}
   </div>
@@ -48,6 +48,22 @@
   {% endif %}
 </section>
 
+{# ---- LECTURA DEL OBSERVATORIO: analisis manual (si existe para el territorio) ---- #}
+{% if analisis %}
+<section class="card lectura">
+  <h2>Lectura del Observatorio</h2>
+  {% for parrafo in analisis.texto.split('\n\n') %}
+  <p>{{ parrafo }}</p>
+  {% endfor %}
+  <div class="firma">
+    {% if analisis_foto %}<img class="firma-foto" src="{{ analisis_foto }}" alt="Duilio Restuccia Eslava" loading="lazy">{% endif %}
+    <div class="firma-txt">Análisis de <b>Duilio Restuccia Eslava</b>
+      {% if analisis.fecha %}· {{ analisis.fecha }}{% endif %}
+      · <a href="/observatorio">sobre el Observatorio</a></div>
+  </div>
+</section>
+{% endif %}
+
 {# ---- EVOLUCION MENSUAL (serie observada; sin proyecciones) ---- #}
 {% if r.por_mes | length >= 2 %}
 <section class="card">
@@ -56,7 +72,7 @@
   <div class="evo">
     {% for m in r.por_mes %}
     <div class="evo-col">
-      <div class="evo-n">{{ m.n }}</div>
+      <div class="evo-n">{{ m.n|miles }}</div>
       <div class="evo-bar-wrap"><div class="evo-bar {{ 'fuerte' if loop.last else '' }}"
         style="height:{{ (m.n / maxm * 100) | round(1) }}%"></div></div>
       <div class="evo-x">{{ m.mes }}</div>
@@ -83,7 +99,7 @@
   {{ barras(r.ranking_departamentos, 'departamento', None, cap_titulo=True) }}
   {% if r.ranking_concentracion %}
   <p class="conc">Los 10 principales departamentos concentran el
-    <b>{{ r.ranking_concentracion }}%</b> de los nuevos negocios del país.</p>
+    <b>{{ r.ranking_concentracion|pct }}%</b> de los nuevos negocios del país.</p>
   {% endif %}
 </section>
 {% elif r.nivel == 'departamento' %}
@@ -92,22 +108,22 @@
   {{ barras(r.ranking_provincias, 'provincia', None, cap_titulo=True) }}
   {% if r.ranking_concentracion %}
   <p class="conc">Las 10 principales provincias concentran el
-    <b>{{ r.ranking_concentracion }}%</b> de las altas del departamento.</p>
+    <b>{{ r.ranking_concentracion|pct }}%</b> de las altas del departamento.</p>
   {% endif %}
 </section>
 {% else %}
 <section class="card">
   <h2>Peso en {{ r.peso_en_departamento.departamento|titulo }}</h2>
-  <p class="sub" style="margin:0">Esta provincia concentra <b>{{ r.peso_en_departamento.pct }}%</b>
-    de las {{ r.peso_en_departamento.n_departamento }} altas del departamento
-    ({{ r.peso_en_departamento.n_provincia }} de {{ r.peso_en_departamento.n_departamento }}).</p>
+  <p class="sub" style="margin:0">Esta provincia concentra <b>{{ r.peso_en_departamento.pct|pct }}%</b>
+    de las {{ r.peso_en_departamento.n_departamento|miles }} altas del departamento
+    ({{ r.peso_en_departamento.n_provincia|miles }} de {{ r.peso_en_departamento.n_departamento|miles }}).</p>
 </section>
 <section class="card">
   <h2>Distritos con más altas</h2>
   {{ barras(r.top_distritos, 'distrito', None, cap_titulo=True) }}
   {% if r.ranking_concentracion %}
   <p class="conc">Los 10 principales distritos concentran el
-    <b>{{ r.ranking_concentracion }}%</b> de las altas de la provincia.</p>
+    <b>{{ r.ranking_concentracion|pct }}%</b> de las altas de la provincia.</p>
   {% endif %}
 </section>
 {% endif %}
@@ -117,7 +133,7 @@
   {{ barras(r.top_rubros, 'descripcion', 'ciiu') }}
   {% if r.top_rubros_concentracion %}
   <p class="conc">Las 10 principales actividades concentran el
-    <b>{{ r.top_rubros_concentracion }}%</b> de los nuevos negocios.</p>
+    <b>{{ r.top_rubros_concentracion|pct }}%</b> de los nuevos negocios.</p>
   {% endif %}
 </section>
 
@@ -140,11 +156,11 @@
 <section class="card calidad">
   <h2>✔ Calidad de los datos</h2>
   <div class="qc-grid">
-    <div class="qc-item"><span class="qc-n">{{ r.calidad.sin_ubigeo.pct }}%</span><span>sin ubigeo</span></div>
-    <div class="qc-item"><span class="qc-n">{{ r.calidad.sin_ciiu.pct }}%</span><span>sin CIIU</span></div>
-    <div class="qc-item"><span class="qc-n">{{ r.calidad.sin_regimen.pct }}%</span><span>sin régimen</span></div>
+    <div class="qc-item"><span class="qc-n">{{ r.calidad.sin_ubigeo.pct|pct }}%</span><span>sin ubigeo</span></div>
+    <div class="qc-item"><span class="qc-n">{{ r.calidad.sin_ciiu.pct|pct }}%</span><span>sin CIIU</span></div>
+    <div class="qc-item"><span class="qc-n">{{ r.calidad.sin_regimen.pct|pct }}%</span><span>sin régimen</span></div>
   </div>
-  <p class="qc-nota">De {{ r.calidad.total_universo }} registros del periodo. Las categorías con menos
+  <p class="qc-nota">De {{ r.calidad.total_universo|miles }} registros del periodo. Las categorías con menos
     de {{ r.calidad.umbral_muestra_insuficiente }} casos se marcan como
     <span class="amber-txt">muestra insuficiente</span> y no se presentan como dato firme.</p>
 </section>

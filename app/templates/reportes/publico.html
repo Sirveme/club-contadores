@@ -20,7 +20,7 @@
   <meta name="twitter:description" content="{{ meta.description }}">
   <meta name="twitter:image" content="{{ meta.image }}">
   <link rel="icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/css/reportes.css?v=2">
+  <link rel="stylesheet" href="/static/css/reportes.css?v=3">
 </head>
 <body class="tiene-barra">
   <main class="wrap">
@@ -29,6 +29,7 @@
       <span><b>Observatorio de Nuevos Negocios</b><br><small>Un proyecto de Perú Sistemas</small></span>
     </a>
 
+    {% if r.nivel != 'nacional' %}
     <nav class="crumbs">
       <a href="/reportes">Perú</a>
       {% if r.nivel == 'departamento' %} · {{ r.territorio|titulo }}
@@ -36,12 +37,13 @@
       · <a href="/reportes/{{ r.departamento_slug }}">{{ r.departamento|titulo }}</a> · {{ r.territorio|titulo }}
       {% endif %}
     </nav>
+    {% endif %}
 
     <header class="rep-head">
       <h1>Nuevos negocios en <b>{{ r.territorio|titulo }}</b></h1>
       <p class="sub">
-        {% if r.nivel == 'nacional' %}Perú · {% elif r.nivel == 'provincia' %}Provincia de {{ r.departamento|titulo }} · {% else %}Departamento · {% endif %}
-        Altas de RUC {{ periodo_txt }} · {{ r.total }} empresas nuevas
+        {% if r.nivel == 'provincia' %}Provincia de {{ r.departamento|titulo }} · {% elif r.nivel == 'departamento' %}Departamento · {% endif %}
+        Altas de RUC {{ periodo_txt }} · {{ r.total|miles }} empresas nuevas
       </p>
     </header>
 
@@ -60,7 +62,7 @@
       <div class="chips">
         {% for d in r.ranking_departamentos %}
         <a class="chip" href="/reportes/{{ d.departamento_slug }}">{{ d.departamento|titulo }}
-          <small>{{ d.n }}</small></a>
+          <small>{{ d.n|miles }}</small></a>
         {% endfor %}
       </div>
     </section>
@@ -70,7 +72,7 @@
       <div class="chips">
         {% for p in r.ranking_provincias %}
         <a class="chip" href="/reportes/{{ r.slug }}/{{ p.provincia_slug }}">{{ p.provincia|titulo }}
-          <small>{{ p.n }}</small></a>
+          <small>{{ p.n|miles }}</small></a>
         {% endfor %}
       </div>
     </section>
@@ -83,6 +85,16 @@
       </div>
     </section>
     {% endif %}
+
+    {# Acciones EN LÍNEA (escritorio; en móvil se usa la barra fija de abajo) #}
+    <section class="acciones-inline">
+      <h3>Cómo citar o compartir este reporte</h3>
+      <div class="acc-row">
+        <button class="btn act-citar">✎ Citar</button>
+        <button class="btn sec act-compartir">↗ Compartir</button>
+        <a class="btn sec" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=principal">↓ Descargar CSV</a>
+      </div>
+    </section>
 
     {# Fuente y atribución (texto exacto) #}
     <p class="fuente">
@@ -102,35 +114,35 @@
     </section>
   </main>
 
-  {# Barra fija: CITAR (principal) · COMPARTIR · DESCARGAR #}
-  <div class="barra">
-    <button class="barra-btn principal" id="b-citar">✎ Citar</button>
-    <button class="barra-btn" id="b-compartir">↗ Compartir</button>
-    <a class="barra-btn" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=principal">↓ Descargar</a>
+  {# Barra fija SOLO en móvil (se oculta al bajar, reaparece al subir) #}
+  <div class="barra" id="barra">
+    <button class="barra-btn principal act-citar"><span class="bi">✎</span><span class="bl">Citar</span></button>
+    <button class="barra-btn act-compartir"><span class="bi">↗</span><span class="bl">Compartir</span></button>
+    <a class="barra-btn" href="/reportes/descargar?prefijo={{ r.prefijo_ubigeo }}&tipo=principal"><span class="bi">↓</span><span class="bl">Descargar</span></a>
   </div>
 
-  {# Modal Citar #}
+  {# Modal Citar — cada formato con su propio botón Copiar #}
   <div class="modal" id="modal-citar" hidden>
     <div class="modal-bg" data-cerrar></div>
     <div class="modal-box">
       <div class="modal-head"><h3>Citar este reporte</h3>
         <button class="modal-x" data-cerrar aria-label="Cerrar">✕</button></div>
       <div class="modal-body">
-        <p class="cita-lbl">Cita académica</p>
+        <div class="cita-row"><span class="cita-lbl">Cita académica</span>
+          <button class="copybtn" data-copiar="cita-aca">Copiar</button></div>
         <div class="cita-box" id="cita-aca">{{ cita }}</div>
-        <p class="cita-lbl">Cita breve</p>
+        <div class="cita-row"><span class="cita-lbl">Cita breve</span>
+          <button class="copybtn" data-copiar="cita-brv">Copiar</button></div>
         <div class="cita-box" id="cita-brv">{{ cita_breve }}</div>
-        <p class="cita-lbl">HTML con enlace</p>
+        <div class="cita-row"><span class="cita-lbl">HTML con enlace</span>
+          <button class="copybtn" data-copiar="cita-html">Copiar</button></div>
         <div class="cita-box mono" id="cita-html">{{ cita_html }}</div>
-        <div class="btnrow">
-          <button class="btn" data-copiar="cita-aca">Copiar cita</button>
-          <button class="btn sec" data-copiar-txt="{{ meta.url }}">Copiar enlace</button>
-        </div>
+        <div class="btnrow"><button class="btn sec" data-copiar-txt="{{ meta.url }}">Copiar enlace</button></div>
       </div>
     </div>
   </div>
 
-  {# Modal Compartir #}
+  {# Modal Compartir — WhatsApp primero (canal principal en Perú) #}
   <div class="modal" id="modal-compartir" hidden>
     <div class="modal-bg" data-cerrar></div>
     <div class="modal-box">
@@ -153,22 +165,40 @@
       var TXT = {{ (meta.title) | tojson }};
       function open(id){ document.getElementById(id).hidden = false; }
       function closeAll(){ document.querySelectorAll('.modal').forEach(function(m){ m.hidden = true; }); }
-      document.getElementById('b-citar').onclick = function(){ open('modal-citar'); };
-      document.getElementById('b-compartir').onclick = function(){ open('modal-compartir'); };
+      // Botones por clase (existen en la barra móvil y en el bloque de escritorio).
+      document.querySelectorAll('.act-citar').forEach(function(b){ b.onclick = function(){ open('modal-citar'); }; });
+      document.querySelectorAll('.act-compartir').forEach(function(b){ b.onclick = function(){ open('modal-compartir'); }; });
+
+      function confirmar(btn){
+        if (btn.dataset.busy) return;
+        var prev = btn.textContent; btn.dataset.busy = '1';
+        btn.textContent = 'Copiado ✓'; btn.classList.add('ok');
+        setTimeout(function(){ btn.textContent = prev; btn.classList.remove('ok'); delete btn.dataset.busy; }, 2000);
+      }
       document.addEventListener('click', function(e){
-        if (e.target.closest('[data-cerrar]')) closeAll();
+        if (e.target.closest('[data-cerrar]')) return closeAll();
         var c = e.target.closest('[data-copiar]');
         if (c){ var el = document.getElementById(c.getAttribute('data-copiar'));
-          navigator.clipboard.writeText(el.innerText).then(function(){ c.textContent = '¡Copiado!'; }); }
+          navigator.clipboard.writeText(el.innerText).then(function(){ confirmar(c); }); return; }
         var t = e.target.closest('[data-copiar-txt]');
-        if (t){ navigator.clipboard.writeText(t.getAttribute('data-copiar-txt')).then(function(){ t.textContent = '¡Copiado!'; }); }
+        if (t){ navigator.clipboard.writeText(t.getAttribute('data-copiar-txt')).then(function(){ confirmar(t); }); }
       });
       document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeAll(); });
-      // Compartir: WhatsApp primero (canal principal en Perú), luego FB y LinkedIn.
+
+      // Compartir: WhatsApp -> Facebook -> LinkedIn.
       var msg = encodeURIComponent(TXT + ' ' + URL);
       document.getElementById('sh-wa').href = 'https://wa.me/?text=' + msg;
       document.getElementById('sh-fb').href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(URL);
       document.getElementById('sh-li').href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(URL);
+
+      // La barra fija (móvil) se oculta al bajar y reaparece al subir.
+      var barra = document.getElementById('barra'), lastY = window.scrollY || 0;
+      window.addEventListener('scroll', function(){
+        var y = window.scrollY || 0;
+        if (y > lastY + 6 && y > 90) barra.classList.add('oculta');
+        else if (y < lastY - 6) barra.classList.remove('oculta');
+        lastY = y;
+      }, { passive: true });
     })();
   </script>
 </body>
