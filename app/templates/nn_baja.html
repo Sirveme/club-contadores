@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1512">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Baja de la lista · Perú Sistemas Pro</title>
+  <style>
+    body{ margin:0; background:#0b1512; color:#e8f0ec;
+      font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+    .wrap{ max-width:560px; margin:0 auto; padding:40px 18px; }
+    .card{ background:#11201b; border:1px solid #25453a; border-radius:14px; padding:22px; }
+    h1{ font-size:20px; margin:0 0 8px; }
+    p{ color:#9fb4ab; margin:.4rem 0; }
+    b{ color:#31c98a; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      {% if ok %}
+      <h1>Listo, te diste de <b>baja</b>.</h1>
+      <p>Ya no recibirás más correos ni mensajes de esta lista. Si fue un error, puedes volver a
+        registrarte cuando quieras.</p>
+      {% else %}
+      <h1>No encontramos ese enlace de baja</h1>
+      <p>El enlace puede ser inválido o haber expirado. Si sigues recibiendo mensajes, respóndenos y
+        te damos de baja manualmente.</p>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1512">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Nuevos Negocios de tu distrito · Perú Sistemas Pro</title>
+  <style>
+    :root{ --bg:#0b1512; --card:#11201b; --card2:#152a22; --line:#25453a;
+      --text:#e8f0ec; --muted:#9fb4ab; --green:#31c98a; --green-d:#1f7f58;
+      --amber:#e0a23b; --err:#e6795a; }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; }
+    body{ background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,
+      "Segoe UI",Roboto,Arial,sans-serif; -webkit-text-size-adjust:100%; }
+    .wrap{ max-width:640px; margin:0 auto; padding:14px 16px 48px; }
+    a{ color:var(--green); }
+    /* Sello ANPD (prioridad visual) */
+    .sello{ background:var(--card2); border:1px solid var(--line); border-left:4px solid var(--green);
+      border-radius:12px; padding:11px 13px; }
+    .sello b{ display:block; font-size:12.5px; letter-spacing:.3px; text-transform:uppercase;
+      color:var(--text); line-height:1.35; }
+    .sello a{ font-size:12.5px; font-weight:700; }
+    .publico{ font-size:12px; color:var(--muted); margin:9px 2px 0; }
+    h1{ font-size:22px; line-height:1.25; margin:22px 0 6px; }
+    h1 b{ color:var(--green); }
+    .lede{ color:var(--muted); margin:0 0 18px; }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:14px;
+      padding:16px; margin:14px 0; }
+    label{ display:block; font-size:13px; color:var(--muted); font-weight:600; margin-bottom:6px; }
+    input[type=text],input[type=email],input[type=tel]{ width:100%; font:inherit; padding:13px 13px;
+      border-radius:11px; border:1px solid var(--line); background:#0d1a15; color:var(--text); }
+    input:focus{ outline:none; border-color:var(--green); }
+    .btn{ width:100%; font:inherit; font-weight:700; padding:14px 16px; border:none; border-radius:12px;
+      background:var(--green); color:#062018; cursor:pointer; margin-top:12px; }
+    .btn:disabled{ opacity:.6; cursor:default; }
+    .btn.sec{ background:transparent; color:var(--green); border:1px solid var(--green-d); }
+    .msg{ font-size:13.5px; margin-top:10px; min-height:1.2em; }
+    .msg.err{ color:var(--err); }
+    .msg.ok{ color:var(--green); font-weight:600; }
+    .hp{ position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+    /* Adelanto por mes */
+    .mes{ border:1px solid var(--line); border-radius:12px; padding:12px 13px; margin:10px 0;
+      background:var(--card2); }
+    .mes h3{ margin:0 0 8px; font-size:15px; text-transform:capitalize; }
+    .mes.top{ border-color:var(--green-d); box-shadow:0 0 0 1px var(--green-d) inset; }
+    .mes.top h3{ font-size:19px; color:var(--green); }
+    .neg{ padding:7px 0; border-top:1px dashed var(--line); }
+    .neg:first-of-type{ border-top:none; }
+    .neg .rs{ font-weight:600; font-size:14px; }
+    .neg .fe{ font-size:12px; color:var(--muted); }
+    .conteo{ margin:9px 0 0; font-size:13px; color:var(--amber); font-weight:600; }
+    .venta{ font-size:14.5px; line-height:1.5; margin:16px 0 4px; }
+    .venta b{ color:var(--text); }
+    .consent{ display:flex; gap:10px; align-items:flex-start; margin:14px 0 2px;
+      font-size:13px; color:var(--muted); font-weight:400; }
+    .consent input{ margin-top:3px; flex:0 0 auto; width:18px; height:18px; accent-color:var(--green); }
+    .legal{ font-size:11.5px; color:var(--muted); margin:10px 0 0; }
+    .ruc-fijo{ font-weight:700; color:var(--text); background:#0d1a15; border:1px solid var(--line);
+      border-radius:10px; padding:10px 12px; display:inline-block; }
+    .oculto{ display:none; }
+    .spin{ color:var(--muted); font-size:14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="sello">
+        <b>Registrados ante la Autoridad Nacional de Protección de Datos Personales</b>
+        <a href="{{ anpd_url }}" target="_blank" rel="noopener">(ver Registro)</a>
+      </div>
+      <p class="publico">La siguiente información es de carácter público, procesada por Perú Sistemas Pro.</p>
+    </header>
+
+    <h1>Los <b>Nuevos Negocios</b> de tu distrito, cada mes</h1>
+    <p class="lede">Ingresa tu RUC para ver un adelanto y recibir el listado completo.</p>
+
+    {# PASO 1 — un solo campo: RUC. La pagina ya pinto; el RUC se consulta al enviar. #}
+    <section class="card" id="paso1">
+      <form id="form-ruc" autocomplete="on">
+        <label for="ruc">Tu RUC</label>
+        <input id="ruc" name="ruc" type="text" inputmode="numeric" maxlength="11"
+               placeholder="20XXXXXXXXX" required>
+        <button class="btn" type="submit">Ver nuevos negocios</button>
+        <div class="msg" id="msg-ruc" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    {# PASO 2 — se rellena segun el camino (A / B / C). #}
+    <section id="paso2" class="oculto"></section>
+  </div>
+
+  <script>
+  (function(){
+    var ORIGEN = {{ origen|tojson }};
+    var formRuc = document.getElementById('form-ruc');
+    var msgRuc = document.getElementById('msg-ruc');
+    var paso1 = document.getElementById('paso1');
+    var paso2 = document.getElementById('paso2');
+
+    function el(tag, cls, txt){ var e=document.createElement(tag); if(cls)e.className=cls;
+      if(txt!=null)e.textContent=txt; return e; }
+
+    formRuc.addEventListener('submit', function(e){
+      e.preventDefault();
+      var ruc = document.getElementById('ruc').value.replace(/\D/g,'');
+      if (ruc.length !== 11){ msgRuc.textContent='El RUC debe tener 11 dígitos.'; msgRuc.className='msg err'; return; }
+      msgRuc.textContent='Consultando…'; msgRuc.className='msg';
+      var btn = formRuc.querySelector('button'); btn.disabled=true;
+      fetch('/api/nn/ruc',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ruc:ruc})})
+        .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); })
+        .then(function(res){
+          btn.disabled=false;
+          if(!res.ok || !res.j.ok){ msgRuc.textContent=(res.j&&res.j.error)||'No pudimos validar el RUC.'; msgRuc.className='msg err'; return; }
+          msgRuc.textContent=''; paso1.classList.add('oculto');
+          render(res.j);
+        })
+        .catch(function(){ btn.disabled=false; msgRuc.textContent='Error de red. Intenta de nuevo.'; msgRuc.className='msg err'; });
+    });
+
+    function render(d){
+      paso2.innerHTML=''; paso2.classList.remove('oculto');
+      var card = el('section','card');
+
+      if (d.camino === 'A'){
+        var titulo = el('h2', null, 'Nuevos negocios en ' + (d.distrito||'tu distrito'));
+        titulo.style.margin='0 0 4px'; titulo.style.fontSize='18px';
+        card.appendChild(titulo);
+        card.appendChild(el('p','lede','Un adelanto de las empresas recién inscritas en tu distrito.'));
+        var ad = d.adelanto || [];
+        if (ad.length){
+          ad.forEach(function(m, i){
+            var box = el('div', 'mes' + (i===0?' top':''));
+            box.appendChild(el('h3', null, m.mes_label));
+            (m.negocios||[]).forEach(function(n){
+              var row = el('div','neg');
+              row.appendChild(el('div','rs', n.razon_social));
+              if(n.fecha) row.appendChild(el('div','fe','Inscrita el '+n.fecha));
+              box.appendChild(row);
+            });
+            box.appendChild(el('p','conteo','Mostramos '+(m.negocios||[]).length+' de '+m.total+
+              ' nuevos negocios de '+m.mes_label.split(' ')[0]+' en tu distrito.'));
+            card.appendChild(box);
+          });
+        } else {
+          card.appendChild(el('p','lede','Estamos preparando el detalle de tu distrito. Déjanos tus datos y te enviamos el listado completo.'));
+        }
+        // Texto de VENTA (fuera del checkbox).
+        var venta = el('p','venta');
+        venta.appendChild(document.createTextNode('Si estás de acuerdo en acceder a '));
+        venta.appendChild(el('b',null,'herramientas de productividad para la actividad contable realmente gratuitas'));
+        venta.appendChild(document.createTextNode(' y, ocasionalmente, reseñas y promociones de nuestros productos, adelante.'));
+        card.appendChild(venta);
+        card.appendChild(formulario(d, false,
+          'Recibir el link al 100% de los Nuevos Negocios de mi distrito, últimos meses.'));
+      }
+      else if (d.camino === 'B'){
+        card.appendChild(el('h2', null, 'Si no eres contador, regístrate en el Club de Empresarios.'));
+        card.querySelector('h2').style.fontSize='18px'; card.querySelector('h2').style.margin='0 0 8px';
+        card.appendChild(formulario(d, true, 'Registrarme y recibir el link'));
+      }
+      else {
+        card.appendChild(el('h2', null, 'Regístrate y te enviaremos el link con la información que buscas.'));
+        card.querySelector('h2').style.fontSize='18px'; card.querySelector('h2').style.margin='0 0 8px';
+        card.appendChild(formulario(d, true, 'Registrarme y recibir el link'));
+      }
+      paso2.appendChild(card);
+      paso2.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
+    function formulario(d, mostrarRuc, textoBoton){
+      var f = el('form'); f.autocomplete='on';
+      if (mostrarRuc){
+        var lb = el('label',null,'RUC'); f.appendChild(lb);
+        var fijo = el('div','ruc-fijo', d.ruc); fijo.style.marginBottom='12px'; f.appendChild(fijo);
+      }
+      var lw = el('label',null,'WhatsApp'); lw.setAttribute('for','wa'); f.appendChild(lw);
+      var wa = el('input'); wa.type='tel'; wa.id='wa'; wa.name='whatsapp'; wa.inputMode='numeric';
+      wa.maxLength=9; wa.placeholder='9XXXXXXXX'; wa.required=true; wa.autocomplete='tel'; f.appendChild(wa);
+      var lc = el('label',null,'Correo'); lc.setAttribute('for','co'); lc.style.marginTop='12px'; f.appendChild(lc);
+      var co = el('input'); co.type='email'; co.id='co'; co.name='correo'; co.placeholder='tucorreo@dominio.pe';
+      co.required=true; co.autocomplete='email'; f.appendChild(co);
+      // Honeypot
+      var hp = el('div','hp'); hp.setAttribute('aria-hidden','true');
+      var hpi = el('input'); hpi.type='text'; hpi.name='empresa_web'; hpi.tabIndex=-1; hpi.autocomplete='off';
+      hp.appendChild(hpi); f.appendChild(hp);
+      // Consentimiento (obligatorio)
+      var cons = el('label','consent');
+      var chk = el('input'); chk.type='checkbox'; chk.id='consent'; cons.appendChild(chk);
+      cons.appendChild(document.createTextNode('Acepto recibir por correo y/o WhatsApp los Nuevos '+
+        'Negocios de mi distrito e información de productos de Perú Sistemas Pro. Puedo darme de baja cuando quiera.'));
+      f.appendChild(cons);
+      var btn = el('button','btn', textoBoton); btn.type='submit'; f.appendChild(btn);
+      var msg = el('div','msg'); msg.setAttribute('role','status'); msg.setAttribute('aria-live','polite'); f.appendChild(msg);
+      var legal = el('p','legal','Tus datos se usan solo para enviarte esta información. Puedes darte de baja en cualquier momento.');
+      f.appendChild(legal);
+
+      f.addEventListener('submit', function(e){
+        e.preventDefault();
+        if(!chk.checked){ msg.textContent='Marca la casilla para continuar.'; msg.className='msg err'; return; }
+        var body = { ruc:d.ruc, whatsapp:wa.value, correo:co.value, empresa_web:hpi.value,
+          consentimiento:true, origen:ORIGEN };
+        btn.disabled=true; msg.textContent='Enviando…'; msg.className='msg';
+        fetch('/api/nn/suscribir',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(body)})
+          .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); })
+          .then(function(res){
+            if(res.ok && res.j.ok){
+              f.innerHTML='';
+              var okmsg = el('p','msg ok', res.j.mensaje || '¡Listo! Te enviaremos el link.');
+              okmsg.style.fontSize='15px'; f.appendChild(okmsg);
+            } else {
+              msg.textContent=(res.j&&res.j.error)||'No pudimos registrarte.'; msg.className='msg err';
+              btn.disabled=false;
+            }
+          })
+          .catch(function(){ msg.textContent='Error de red. Intenta más tarde.'; msg.className='msg err'; btn.disabled=false; });
+      });
+      return f;
+    }
+  })();
+  </script>
+</body>
+</html>
