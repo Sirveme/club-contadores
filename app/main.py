@@ -1,6 +1,6 @@
 """
 Club de Contadores — WebApp (PWA) de pre-inscripcion.
-contadores.perusistemas.pro
+Observatorio de Nuevos Negocios: observatorio.perusistemas.pro
 
 Stack: FastAPI + PostgreSQL (asyncpg) + Jinja2 + Vanilla JS. Deploy Railway.
 """
@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sys
 import json
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,7 +32,13 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 import estadisticas as est  # noqa: E402
 
-SITE_BASE = os.getenv("SITE_BASE", "https://contadores.perusistemas.pro").rstrip("/")
+SITE_BASE = os.getenv("SITE_BASE", "https://observatorio.perusistemas.pro").rstrip("/")
+# URL del registro ante la ANPD (placeholder editable hasta tener el archivo).
+ANPD_REGISTRO_URL = os.getenv("ANPD_REGISTRO_URL", "#registro-anpd").strip()
+_CORREO_RE = __import__("re").compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+SITE_HOST = SITE_BASE.split("//", 1)[-1]  # dominio sin esquema, para citas
+# Dominio anterior: se redirige con 301 permanente al nuevo (ver middleware abajo).
+DOMINIO_ANTERIOR = os.getenv("DOMINIO_ANTERIOR", "contadores.perusistemas.pro").strip().lower()
 MESES_ES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
             "agosto", "setiembre", "octubre", "noviembre", "diciembre"]
 
@@ -91,6 +98,25 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.filters["titulo"] = lambda s: titulo(s)  # Title Case peruano en plantillas
 templates.env.filters["miles"] = lambda n: f"{int(n):,}" if n is not None else ""   # 51,477
 templates.env.filters["pct"] = lambda v: f"{v:.2f}" if v is not None else ""         # 2 decimales
+
+
+# --- Redireccion 301 permanente del dominio anterior al nuevo ----------------
+# El Observatorio se movio de contadores.perusistemas.pro a observatorio.perusistemas.pro.
+# Cualquier peticion que llegue al host anterior (a /reportes*, /observatorio o
+# /sitemap.xml) se redirige de forma PERMANENTE al nuevo dominio conservando la
+# ruta y el query string, para no perder enlaces ya compartidos ni ranking SEO.
+_RUTAS_REDIR = ("/reportes", "/observatorio", "/sitemap.xml")
+
+
+@app.middleware("http")
+async def redirigir_dominio_anterior(request: Request, call_next):
+    host = (request.headers.get("host") or "").split(":")[0].lower()
+    if host == DOMINIO_ANTERIOR and request.url.path.startswith(_RUTAS_REDIR):
+        destino = f"{SITE_BASE}{request.url.path}"
+        if request.url.query:
+            destino += f"?{request.url.query}"
+        return Response(status_code=301, headers={"Location": destino})
+    return await call_next(request)
 
 
 # --- Pagina (embudo, una sola vista) ----------------------------------------
@@ -319,7 +345,7 @@ def _cita(r: dict, url: str) -> str:
     terr = titulo(r["territorio"]) + (f", {titulo(r['departamento'])}" if r["nivel"] == "provincia" else "")
     return (f"Perú Sistemas Pro E.I.R.L. ({anio}). Nuevos negocios en {terr}: "
             f"altas de RUC ({per}). Observatorio de Nuevos Negocios — "
-            f"contadores.perusistemas.pro. Fuente: SUNAT. {url} "
+            f"{SITE_HOST}. Fuente: SUNAT. {url} "
             f"(consultado el {r.get('actualizado')}).")
 
 
@@ -363,16 +389,16 @@ def _meta_publica(r: dict, url: str) -> dict:
     terr, dep = titulo(r["territorio"]), titulo(r.get("departamento") or "")
     if r["nivel"] == "nacional":
         title = f"Nuevos negocios en el Perú: {r['total']} altas de RUC ({per})"
-        desc = (f"En el Perú se registraron {r['total']} empresas nuevas ({per}). "
+        desc = (f"En el Perú se registraron {r['total']} altas de RUC ({per}). "
                 f"Ranking de departamentos, rubros (CIIU) y régimen tributario. Fuente: SUNAT.")
     elif r["nivel"] == "departamento":
         title = f"Nuevos negocios en {terr}: {r['total']} altas de RUC ({per})"
-        desc = (f"En {terr} se registraron {r['total']} empresas nuevas ({per}). "
+        desc = (f"En {terr} se registraron {r['total']} altas de RUC ({per}). "
                 f"Ranking de provincias, rubros (CIIU) y régimen tributario. Fuente: SUNAT.")
     else:
         title = f"Nuevos negocios en {terr} ({dep}): {r['total']} altas ({per})"
-        desc = (f"En {terr}, {dep}, se registraron {r['total']} empresas "
-                f"nuevas ({per}). Distritos, rubros (CIIU) y régimen tributario. Fuente: SUNAT.")
+        desc = (f"En {terr}, {dep}, se registraron {r['total']} altas de RUC "
+                f"({per}). Distritos, rubros (CIIU) y régimen tributario. Fuente: SUNAT.")
     return {"title": f"{title} | Observatorio de Nuevos Negocios", "description": desc,
             "url": url, "image": f"{SITE_BASE}/static/icons/icon-512.png"}
 
@@ -387,10 +413,25 @@ def _ctx_publico(request, r):
     mapa = _mapa(r)
     if mapa:  # si hay mapa, es la imagen de Open Graph de esa pagina
         meta["image"] = mapa["abs"]
+    clave = est.clave_territorio(r)
+    logos_ok = _logos_existentes(est.cargar_citas())
     return {"request": request, "r": r, "periodo_txt": per, "noindex": noindex,
             "meta": meta, "mapa": mapa, "cita": _cita(r, url),
             "cita_breve": _cita_breve(r, url), "cita_html": _cita_html(r, url),
-            "analisis": est.cargar_analisis(est.clave_territorio(r)), "analisis_foto": _foto_autor()}
+            "analisis": est.cargar_analisis(clave), "analisis_foto": _foto_autor(),
+            "historial": est.cargar_historial(clave),
+            "citas": est.citas_priorizadas(clave), "logos_ok": logos_ok,
+            "aviso_ambito": url}
+
+
+def _logos_existentes(citas: list) -> dict:
+    """{nombre_logo: True} solo para los archivos que existen en static/logos/."""
+    out = {}
+    for c in citas or []:
+        logo = (c.get("logo") or "").strip()
+        if logo and (STATIC_DIR / "logos" / logo).exists():
+            out[logo] = True
+    return out
 
 
 def _foto_autor():
@@ -533,8 +574,201 @@ async def reportes_nacional(request: Request):
 async def observatorio(request: Request):
     foto_rel = "img/duilio.webp"
     foto = f"/static/{foto_rel}" if (STATIC_DIR / foto_rel).exists() else None
+    citas = est.cargar_citas()
     return templates.TemplateResponse(request, "reportes/observatorio.html",
-                                      {"request": request, "foto": foto, "site_base": SITE_BASE})
+                                      {"request": request, "foto": foto, "site_base": SITE_BASE,
+                                       "equivalencias": est.tabla_equivalencias(),
+                                       "citas": citas, "logos_ok": _logos_existentes(citas),
+                                       "aviso_ambito": f"{SITE_BASE}/observatorio"})
+
+
+# --- Aviso de uso (formulario privado; NO publica nada) ---------------------
+AVISO_EMAIL_TO = os.getenv("AVISO_EMAIL_TO", "info@perusistemas.pro").strip()
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587") or "587")
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASS = os.getenv("SMTP_PASS", "").strip()
+SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER or "no-reply@perusistemas.pro").strip()
+
+
+def _client_ip(request: Request) -> str:
+    """IP del cliente como texto validado (IPv4/IPv6) o "" si no es una IP. Railway
+    va detras de proxy: se usa el primer X-Forwarded-For. Devolver solo IPs validas
+    evita romper los INSERT con columna `inet` (p.ej. host 'testclient' en tests o
+    un XFF malformado)."""
+    import ipaddress
+    xff = request.headers.get("x-forwarded-for", "")
+    cand = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "")
+    try:
+        return str(ipaddress.ip_address(cand)) if cand else ""
+    except ValueError:
+        return ""
+
+
+def _enviar_aviso_email(data: dict) -> None:
+    """Best-effort: si no hay SMTP configurado, no hace nada (el aviso ya quedo
+    guardado en BD y visible en /panel/avisos). Nunca rompe el flujo del usuario."""
+    if not SMTP_HOST:
+        return
+    import smtplib
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg["Subject"] = f"[Observatorio] Aviso de uso — {data.get('institucion') or 'sin institución'}"
+    msg["From"] = SMTP_FROM
+    msg["To"] = AVISO_EMAIL_TO
+    if data.get("correo"):
+        msg["Reply-To"] = data["correo"]
+    msg.set_content(
+        "Nuevo aviso de uso recibido en el Observatorio:\n\n"
+        f"Nombre: {data.get('nombre') or '-'}\n"
+        f"Institución: {data.get('institucion') or '-'}\n"
+        f"Correo: {data.get('correo') or '-'}\n"
+        f"Uso (enlace/descripción): {data.get('uso') or '-'}\n"
+        f"Página: {data.get('ambito') or '-'}\n")
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:
+        s.starttls()
+        if SMTP_USER:
+            s.login(SMTP_USER, SMTP_PASS)
+        s.send_message(msg)
+
+
+@app.post("/api/aviso-uso")
+async def api_aviso_uso(payload: dict, request: Request):
+    # Honeypot: campo oculto que un humano nunca llena. Si viene con algo, se
+    # descarta en silencio (respondemos ok para no darle pistas al bot).
+    if (payload.get("empresa_web") or "").strip():
+        return JSONResponse({"ok": True})
+    correo = (payload.get("correo") or "").strip()
+    uso = (payload.get("uso") or "").strip()
+    if not correo or "@" not in correo or not uso:
+        return JSONResponse({"ok": False, "error": "Indica un correo válido y el uso."},
+                            status_code=422)
+    data = {
+        "nombre": payload.get("nombre"),
+        "institucion": payload.get("institucion"),
+        "correo": correo,
+        "uso": uso,
+        "ambito": payload.get("ambito"),
+        "ip": _client_ip(request),
+        "user_agent": request.headers.get("user-agent", ""),
+    }
+    try:
+        res = await db.guardar_aviso(data)
+    except Exception:
+        log.exception("guardar_aviso fallo")
+        return JSONResponse({"ok": False, "error": "No pudimos registrar el aviso."},
+                            status_code=500)
+    if not res.get("ok") and res.get("motivo") == "limite":
+        return JSONResponse({"ok": False, "error": "Recibimos varios envíos desde tu red. "
+                             "Intenta más tarde."}, status_code=429)
+    try:
+        await asyncio.to_thread(_enviar_aviso_email, data)
+    except Exception:
+        log.warning("aviso guardado pero el correo no salio (SMTP)", exc_info=True)
+    return JSONResponse({"ok": True, "mensaje": "¡Gracias! Recibimos tu aviso; "
+                         "te escribiremos si hace falta."})
+
+
+@app.get("/panel/avisos", response_class=HTMLResponse)
+async def panel_avisos(request: Request):
+    try:
+        avisos = await db.listar_avisos()
+    except Exception:
+        log.exception("listar_avisos fallo")
+        avisos = []
+    return templates.TemplateResponse(request, "reportes/avisos.html",
+                                      {"request": request, "avisos": avisos,
+                                       "demo": db.demo_mode()})
+
+
+# ============================================================================
+# LANDING /nuevos-negocios — captacion. TODO se resuelve contra NUESTRAS tablas
+# (contadores_padron + nuevos_negocios). CERO llamadas a apis.net.pe / SUNAT.
+# ============================================================================
+@app.get("/nuevos-negocios", response_class=HTMLResponse)
+async def nuevos_negocios(request: Request, origen: str = ""):
+    # La pagina pinta PRIMERO (paso 1 = solo el campo RUC). El RUC se consulta
+    # al enviarlo (POST /api/nn/ruc); nada bloquea la carga inicial.
+    return templates.TemplateResponse(request, "nuevos_negocios.html", {
+        "request": request, "anpd_url": ANPD_REGISTRO_URL,
+        "origen": (origen or "nuevos-negocios")[:60]})
+
+
+@app.post("/api/nn/ruc")
+async def api_nn_ruc(payload: dict):
+    """Paso 2: valida el RUC contra nuestras tablas y devuelve el camino (A/B/C).
+    Para el CAMINO A, adjunta el adelanto pre-calculado del distrito del RUC."""
+    ruc = (payload.get("ruc") or "").strip()
+    if not ruc_mod.ruc_formato_valido(ruc):
+        return JSONResponse({"ok": False, "error": "El RUC debe tener 11 dígitos."},
+                            status_code=422)
+    info = await db.nn_validar_ruc(ruc)
+    resp = {"ok": True, "ruc": ruc, "camino": info["camino"],
+            "razon_social": info.get("razon_social"),
+            "distrito": titulo(info.get("distrito") or "") or None}
+    if info["camino"] == "A":
+        adelanto = await db.nn_adelanto(info.get("ubigeo") or "")
+        # Etiqueta legible del mes ("julio 2026") para cada bloque.
+        for m in adelanto:
+            y, mm = m["mes"].split("-")
+            m["mes_label"] = f"{MESES_ES[int(mm)]} {y}"
+        resp["adelanto"] = adelanto
+    return JSONResponse(resp)
+
+
+@app.post("/api/nn/suscribir")
+async def api_nn_suscribir(payload: dict, request: Request):
+    # Honeypot: campo oculto; si viene lleno, se descarta en silencio.
+    if (payload.get("empresa_web") or "").strip():
+        return JSONResponse({"ok": True})
+    ruc = (payload.get("ruc") or "").strip()
+    correo = (payload.get("correo") or "").strip()
+    whatsapp = (payload.get("whatsapp") or "").strip()
+    if not ruc_mod.ruc_formato_valido(ruc):
+        return JSONResponse({"ok": False, "error": "RUC inválido."}, status_code=422)
+    if not _CORREO_RE.match(correo):
+        return JSONResponse({"ok": False, "error": "Indica un correo válido."}, status_code=422)
+    if not db.norm_whatsapp(whatsapp):
+        return JSONResponse({"ok": False, "error": "El WhatsApp debe tener 9 dígitos y empezar en 9."},
+                            status_code=422)
+    if not payload.get("consentimiento"):
+        return JSONResponse({"ok": False, "error": "Debes aceptar recibir la información para continuar."},
+                            status_code=422)
+    # Identidad SIEMPRE derivada de nuestras tablas (no del usuario).
+    info = await db.nn_validar_ruc(ruc)
+    data = {
+        "ruc": ruc, "razon_social": info.get("razon_social"),
+        "es_contador": info["camino"] == "A", "distrito": info.get("distrito"),
+        "correo": correo, "whatsapp": whatsapp,
+        "origen": (payload.get("origen") or "nuevos-negocios")[:60],
+        "consentimiento": True,
+        "ip": _client_ip(request), "user_agent": request.headers.get("user-agent", ""),
+    }
+    try:
+        res = await db.nn_crear_suscriptor(data)
+    except Exception:
+        log.exception("nn_crear_suscriptor fallo")
+        return JSONResponse({"ok": False, "error": "No pudimos registrarte. Intenta más tarde."},
+                            status_code=500)
+    if not res.get("ok"):
+        motivo = res.get("motivo")
+        if motivo == "dup_ruc":
+            return JSONResponse({"ok": False, "error": "Este RUC ya está registrado."}, status_code=409)
+        if motivo == "dup_correo":
+            return JSONResponse({"ok": False, "error": "Este correo ya está registrado."}, status_code=409)
+        if motivo == "limite":
+            return JSONResponse({"ok": False, "error": "Recibimos varios registros desde tu red. "
+                                 "Intenta más tarde."}, status_code=429)
+        return JSONResponse({"ok": False, "error": "No pudimos registrarte."}, status_code=400)
+    return JSONResponse({"ok": True, "mensaje": "Te enviaremos el link y tendrás acceso a la "
+                         "información que buscas."})
+
+
+@app.get("/nuevos-negocios/baja", response_class=HTMLResponse)
+async def nuevos_negocios_baja(request: Request, token: str = ""):
+    ok = await db.nn_baja(token)
+    return templates.TemplateResponse(request, "nn_baja.html",
+                                      {"request": request, "ok": ok})
 
 
 @app.get("/reportes/{dep}", response_class=HTMLResponse)

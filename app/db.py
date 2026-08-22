@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import os
 import re
+import json
+import secrets
 import datetime as dt
 from typing import Optional
 
@@ -79,6 +81,70 @@ async def connect() -> None:
     if demo_mode():
         return
     _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
+    await _asegurar_esquema()
+
+
+async def _asegurar_esquema() -> None:
+    """Provisiona tablas que crea la app (idempotente). La BD de Railway es
+    persistente aunque el disco del contenedor sea efimero: aqui es seguro."""
+    assert _pool is not None
+    await _pool.execute(
+        """
+        CREATE TABLE IF NOT EXISTS avisos_uso (
+            id          bigserial PRIMARY KEY,
+            creado_en   timestamptz NOT NULL DEFAULT now(),
+            nombre      text,
+            institucion text,
+            correo      text,
+            uso         text,
+            ambito      text,
+            ip          inet,
+            user_agent  text
+        )
+        """
+    )
+    # Landing /nuevos-negocios: captacion de suscriptores.
+    await _pool.execute(
+        """
+        CREATE TABLE IF NOT EXISTS suscriptores (
+            id                bigserial PRIMARY KEY,
+            ruc               text NOT NULL,
+            razon_social      text,
+            es_contador       boolean NOT NULL DEFAULT false,
+            distrito          text,
+            correo            text NOT NULL,
+            whatsapp          text,
+            origen            text,
+            consentimiento    boolean NOT NULL DEFAULT false,
+            consentimiento_en timestamptz,
+            token_baja        text NOT NULL,
+            baja_en           timestamptz,
+            ip                inet,
+            user_agent        text,
+            created_at        timestamptz NOT NULL DEFAULT now()
+        )
+        """
+    )
+    # Dedup: un RUC = una suscripcion; un correo = una suscripcion.
+    await _pool.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_susc_ruc ON suscriptores (ruc)")
+    await _pool.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_susc_correo ON suscriptores (lower(correo))")
+    # Adelanto PRE-CALCULADO (una fila por distrito+mes): lectura instantanea,
+    # sin JOIN contra nuevos_negocios en cada request. La puebla poblar_adelanto.py.
+    await _pool.execute(
+        """
+        CREATE TABLE IF NOT EXISTS adelanto_nuevos_negocios (
+            ubigeo          text NOT NULL,
+            mes             text NOT NULL,
+            distrito        text,
+            total_juridicas integer NOT NULL DEFAULT 0,
+            muestra         jsonb NOT NULL DEFAULT '[]'::jsonb,
+            actualizado_en  timestamptz NOT NULL DEFAULT now(),
+            PRIMARY KEY (ubigeo, mes)
+        )
+        """
+    )
 
 
 async def disconnect() -> None:
@@ -357,6 +423,165 @@ async def guardar_push(sub: dict, ruc: str | None, distrito: str | None) -> None
         """,
         sub.get("endpoint"), keys.get("p256dh"), keys.get("auth"), ruc, distrito,
     )
+
+
+# --- Avisos de uso (formulario privado; NO publica nada) --------------------
+AVISO_LIMITE_IP = 5   # maximo de avisos por IP en la ventana
+AVISO_VENTANA_H = 1   # ventana en horas
+
+
+async def guardar_aviso(data: dict) -> dict:
+    """Guarda un aviso de uso. Devuelve {ok, motivo}. Antispam por IP: no acepta
+    mas de AVISO_LIMITE_IP en AVISO_VENTANA_H horas desde la misma IP. El honeypot
+    se filtra en la ruta, antes de llegar aqui."""
+    if demo_mode():
+        return {"ok": True, "demo": True}
+    assert _pool is not None
+    ip = (data.get("ip") or "").strip() or None
+    if ip:
+        recientes = await _pool.fetchval(
+            "SELECT count(*) FROM avisos_uso "
+            "WHERE ip = $1::inet AND creado_en > now() - ($2 || ' hours')::interval",
+            ip, str(AVISO_VENTANA_H))
+        if recientes and recientes >= AVISO_LIMITE_IP:
+            return {"ok": False, "motivo": "limite"}
+    await _pool.execute(
+        """
+        INSERT INTO avisos_uso (nombre, institucion, correo, uso, ambito, ip, user_agent)
+        VALUES ($1,$2,$3,$4,$5,$6::inet,$7)
+        """,
+        (data.get("nombre") or "").strip()[:200] or None,
+        (data.get("institucion") or "").strip()[:200] or None,
+        (data.get("correo") or "").strip().lower()[:200] or None,
+        (data.get("uso") or "").strip()[:2000] or None,
+        (data.get("ambito") or "").strip()[:200] or None,
+        ip,
+        (data.get("user_agent") or "")[:400] or None,
+    )
+    return {"ok": True}
+
+
+async def listar_avisos(limite: int = 200) -> list[dict]:
+    if demo_mode():
+        return []
+    assert _pool is not None
+    rows = await _pool.fetch(
+        "SELECT id, creado_en, nombre, institucion, correo, uso, ambito, "
+        "host(ip) AS ip FROM avisos_uso ORDER BY creado_en DESC LIMIT $1",
+        int(limite))
+    return [dict(r) for r in rows]
+
+
+# --- Landing /nuevos-negocios (captacion; TODO local, cero llamadas externas) ---
+SUSC_LIMITE_IP = 15   # maximo de suscripciones por IP en la ventana
+SUSC_VENTANA_H = 1
+
+
+async def nn_validar_ruc(ruc: str) -> dict:
+    """Valida el RUC SOLO contra nuestras tablas (padron + nuevos_negocios).
+    Devuelve el camino y los datos derivados (nunca los pide al usuario):
+      A -> es contador (esta en contadores_padron): trae ubigeo/distrito.
+      B -> existe en nuevos_negocios pero no es contador.
+      C -> no esta en ninguna tabla."""
+    ruc = (ruc or "").strip()
+    if demo_mode():
+        d = _DEMO_PADRON.get(ruc)
+        if d:
+            return {"camino": "A", "es_contador": True, "razon_social": d["razon_social"],
+                    "distrito": d["distrito"], "ubigeo": d["ubigeo"]}
+        return {"camino": "C", "es_contador": False, "razon_social": None,
+                "distrito": None, "ubigeo": None}
+    assert _pool is not None
+    pad = await padron_lookup(ruc)
+    if pad:
+        return {"camino": "A", "es_contador": True,
+                "razon_social": pad.get("razon_social"),
+                "distrito": pad.get("distrito"), "ubigeo": pad.get("ubigeo")}
+    row = await _pool.fetchrow(
+        "SELECT razon_social, distrito, ubigeo FROM nuevos_negocios WHERE ruc = $1 LIMIT 1",
+        ruc)
+    if row:
+        return {"camino": "B", "es_contador": False, "razon_social": row["razon_social"],
+                "distrito": row["distrito"], "ubigeo": row["ubigeo"]}
+    return {"camino": "C", "es_contador": False, "razon_social": None,
+            "distrito": None, "ubigeo": None}
+
+
+async def nn_adelanto(ubigeo: str) -> list[dict]:
+    """Adelanto pre-calculado del distrito (por ubigeo de 6 digitos), del mes MAS
+    reciente al mas antiguo. Lee de adelanto_nuevos_negocios: cero JOINs."""
+    ubigeo = (ubigeo or "").strip()
+    if not ubigeo or demo_mode():
+        return []
+    assert _pool is not None
+    rows = await _pool.fetch(
+        "SELECT mes, distrito, total_juridicas, muestra FROM adelanto_nuevos_negocios "
+        "WHERE ubigeo = $1 ORDER BY mes DESC", ubigeo)
+    out = []
+    for r in rows:
+        m = r["muestra"]
+        if isinstance(m, str):
+            try:
+                m = json.loads(m)
+            except Exception:
+                m = []
+        out.append({"mes": r["mes"], "distrito": r["distrito"],
+                    "total": r["total_juridicas"], "negocios": m or []})
+    return out
+
+
+async def nn_crear_suscriptor(data: dict) -> dict:
+    """Alta de suscriptor. Dedup por RUC y por lower(correo) (indices unicos).
+    Los campos de identidad (razon_social, es_contador, distrito) vienen de
+    NUESTRAS tablas, no del usuario. Devuelve {ok, motivo, token_baja}."""
+    if demo_mode():
+        return {"ok": True, "demo": True, "token_baja": secrets.token_urlsafe(24)}
+    assert _pool is not None
+    ip = (data.get("ip") or "").strip() or None
+    if ip:
+        recientes = await _pool.fetchval(
+            "SELECT count(*) FROM suscriptores "
+            "WHERE ip = $1::inet AND created_at > now() - ($2 || ' hours')::interval",
+            ip, str(SUSC_VENTANA_H))
+        if recientes and recientes >= SUSC_LIMITE_IP:
+            return {"ok": False, "motivo": "limite"}
+    token = secrets.token_urlsafe(24)
+    try:
+        await _pool.execute(
+            """
+            INSERT INTO suscriptores
+                (ruc, razon_social, es_contador, distrito, correo, whatsapp, origen,
+                 consentimiento, consentimiento_en, token_baja, ip, user_agent)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now(), $9, $10::inet, $11)
+            """,
+            (data.get("ruc") or "").strip(),
+            (data.get("razon_social") or None),
+            bool(data.get("es_contador")),
+            (data.get("distrito") or None),
+            (data.get("correo") or "").strip().lower(),
+            norm_whatsapp(data.get("whatsapp")),
+            (data.get("origen") or None),
+            bool(data.get("consentimiento")),
+            token, ip, (data.get("user_agent") or "")[:400] or None)
+    except asyncpg.UniqueViolationError as e:
+        cn = (getattr(e, "constraint_name", "") or "").lower()
+        return {"ok": False, "motivo": "dup_correo" if "correo" in cn else "dup_ruc"}
+    return {"ok": True, "token_baja": token}
+
+
+async def nn_baja(token: str) -> bool:
+    """Marca la baja por token. True si el token existe (aunque ya estuviera de baja)."""
+    token = (token or "").strip()
+    if not token or demo_mode():
+        return False
+    assert _pool is not None
+    row = await _pool.fetchrow(
+        "UPDATE suscriptores SET baja_en = now() "
+        "WHERE token_baja = $1 AND baja_en IS NULL RETURNING id", token)
+    if row:
+        return True
+    return bool(await _pool.fetchval(
+        "SELECT 1 FROM suscriptores WHERE token_baja = $1", token))
 
 
 # --- Helpers ----------------------------------------------------------------
