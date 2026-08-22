@@ -130,21 +130,14 @@ async def _asegurar_esquema() -> None:
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_susc_ruc ON suscriptores (ruc)")
     await _pool.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_susc_correo ON suscriptores (lower(correo))")
-    # Adelanto PRE-CALCULADO (una fila por distrito+mes): lectura instantanea,
-    # sin JOIN contra nuevos_negocios en cada request. La puebla poblar_adelanto.py.
+    # Adelanto EN VIVO (sin tabla pre-calculada): la landing consulta
+    # nuevos_negocios por UBIGEO. Indices para que sea instantaneo con 100k+ filas
+    # y muchas consultas simultaneas el domingo (QR, señal movil pobre).
     await _pool.execute(
-        """
-        CREATE TABLE IF NOT EXISTS adelanto_nuevos_negocios (
-            ubigeo          text NOT NULL,
-            mes             text NOT NULL,
-            distrito        text,
-            total_juridicas integer NOT NULL DEFAULT 0,
-            muestra         jsonb NOT NULL DEFAULT '[]'::jsonb,
-            actualizado_en  timestamptz NOT NULL DEFAULT now(),
-            PRIMARY KEY (ubigeo, mes)
-        )
-        """
-    )
+        "CREATE INDEX IF NOT EXISTS ix_nn_ubigeo_mes_tipo "
+        "ON nuevos_negocios (ubigeo, mes_inscripcion, tipo)")
+    await _pool.execute(
+        "CREATE INDEX IF NOT EXISTS ix_nn_ubigeo ON nuevos_negocios (ubigeo)")
 
 
 async def disconnect() -> None:
@@ -477,57 +470,40 @@ SUSC_LIMITE_IP = 15   # maximo de suscripciones por IP en la ventana
 SUSC_VENTANA_H = 1
 
 
-async def nn_validar_ruc(ruc: str) -> dict:
-    """Valida el RUC SOLO contra nuestras tablas (padron + nuevos_negocios).
-    Devuelve el camino y los datos derivados (nunca los pide al usuario):
-      A -> es contador (esta en contadores_padron): trae ubigeo/distrito.
-      B -> existe en nuevos_negocios pero no es contador.
-      C -> no esta en ninguna tabla."""
-    ruc = (ruc or "").strip()
-    if demo_mode():
-        d = _DEMO_PADRON.get(ruc)
-        if d:
-            return {"camino": "A", "es_contador": True, "razon_social": d["razon_social"],
-                    "distrito": d["distrito"], "ubigeo": d["ubigeo"]}
-        return {"camino": "C", "es_contador": False, "razon_social": None,
-                "distrito": None, "ubigeo": None}
-    assert _pool is not None
-    pad = await padron_lookup(ruc)
-    if pad:
-        return {"camino": "A", "es_contador": True,
-                "razon_social": pad.get("razon_social"),
-                "distrito": pad.get("distrito"), "ubigeo": pad.get("ubigeo")}
-    row = await _pool.fetchrow(
-        "SELECT razon_social, distrito, ubigeo FROM nuevos_negocios WHERE ruc = $1 LIMIT 1",
-        ruc)
-    if row:
-        return {"camino": "B", "es_contador": False, "razon_social": row["razon_social"],
-                "distrito": row["distrito"], "ubigeo": row["ubigeo"]}
-    return {"camino": "C", "es_contador": False, "razon_social": None,
-            "distrito": None, "ubigeo": None}
-
-
 async def nn_adelanto(ubigeo: str) -> list[dict]:
-    """Adelanto pre-calculado del distrito (por ubigeo de 6 digitos), del mes MAS
-    reciente al mas antiguo. Lee de adelanto_nuevos_negocios: cero JOINs."""
+    """Adelanto EN VIVO del distrito (por UBIGEO de 6 digitos, nunca por texto):
+    las 5 juridicas mas recientes por mes + el COUNT total de juridicas por
+    distrito-mes (para "5 de 47"). Mes mas reciente primero. Solo juridicas.
+    Agrupa SIEMPRE por ubigeo (la data trae el mismo distrito con capitalizaciones
+    distintas; el ubigeo si es consistente)."""
     ubigeo = (ubigeo or "").strip()
     if not ubigeo or demo_mode():
         return []
     assert _pool is not None
-    rows = await _pool.fetch(
-        "SELECT mes, distrito, total_juridicas, muestra FROM adelanto_nuevos_negocios "
-        "WHERE ubigeo = $1 ORDER BY mes DESC", ubigeo)
-    out = []
-    for r in rows:
-        m = r["muestra"]
-        if isinstance(m, str):
-            try:
-                m = json.loads(m)
-            except Exception:
-                m = []
-        out.append({"mes": r["mes"], "distrito": r["distrito"],
-                    "total": r["total_juridicas"], "negocios": m or []})
-    return out
+    totales = await _pool.fetch(
+        "SELECT mes_inscripcion mes, count(*) tot FROM nuevos_negocios "
+        "WHERE ubigeo = $1 AND tipo = 'juridica' AND mes_inscripcion IS NOT NULL "
+        "GROUP BY 1 ORDER BY 1 DESC", ubigeo)
+    if not totales:
+        return []
+    muestras = await _pool.fetch(
+        """
+        SELECT mes, razon_social, ruc, fecha FROM (
+          SELECT mes_inscripcion mes, razon_social, ruc,
+                 to_char(fecha_inscripcion, 'DD/MM/YYYY') fecha,
+                 row_number() OVER (PARTITION BY mes_inscripcion
+                     ORDER BY fecha_inscripcion DESC NULLS LAST, ruc) rn
+          FROM nuevos_negocios
+          WHERE ubigeo = $1 AND tipo = 'juridica' AND mes_inscripcion IS NOT NULL
+                AND razon_social IS NOT NULL AND razon_social <> ''
+        ) s WHERE rn <= 5
+        """, ubigeo)
+    by_mes: dict[str, list] = {}
+    for m in muestras:
+        by_mes.setdefault(m["mes"], []).append(
+            {"razon_social": m["razon_social"], "ruc": m["ruc"], "fecha": m["fecha"]})
+    return [{"mes": t["mes"], "total": t["tot"], "negocios": by_mes.get(t["mes"], [])}
+            for t in totales]
 
 
 async def nn_crear_suscriptor(data: dict) -> dict:

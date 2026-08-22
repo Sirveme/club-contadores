@@ -120,8 +120,11 @@ async def redirigir_dominio_anterior(request: Request, call_next):
 
 
 # --- Pagina (embudo, una sola vista) ----------------------------------------
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+# EMBUDO VIEJO (generacion anterior): RESPALDO no publico en /club-legacy.
+# La raiz ahora sirve la landing de captacion (mas abajo). Nadie llega aqui por
+# navegacion normal (no esta enlazado en ningun lado) y va con noindex.
+@app.get("/club-legacy", response_class=HTMLResponse)
+async def club_legacy(request: Request):
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -682,34 +685,74 @@ async def panel_avisos(request: Request):
 
 
 # ============================================================================
-# LANDING /nuevos-negocios — captacion. TODO se resuelve contra NUESTRAS tablas
-# (contadores_padron + nuevos_negocios). CERO llamadas a apis.net.pe / SUNAT.
+# LANDING /nuevos-negocios — captacion. Reconocimiento de RUC en DOS NIVELES:
+#   1) contadores_padron (local, instantaneo).
+#   2) si no esta -> apis.net.pe por CIIU 6920 (el padron SUNAT esta incompleto).
+# La API SOLO se llama para RUCs no locales (minoria). Un fallo de API NUNCA
+# rechaza: se deja continuar (fallback con distrito manual). El adelanto se
+# consulta EN VIVO por UBIGEO (sin tabla pre-calculada).
 # ============================================================================
+# La landing de captacion es la HOME. Se sirve en la raiz (URL corta para el QR)
+# y en /nuevos-negocios (alias, para no romper enlaces ya compartidos). Ambas
+# capturan ?ref= (o ?origen=) para medir que volante convirtio.
+@app.get("/", response_class=HTMLResponse)
 @app.get("/nuevos-negocios", response_class=HTMLResponse)
-async def nuevos_negocios(request: Request, origen: str = ""):
+async def nuevos_negocios(request: Request, ref: str = "", origen: str = ""):
     # La pagina pinta PRIMERO (paso 1 = solo el campo RUC). El RUC se consulta
     # al enviarlo (POST /api/nn/ruc); nada bloquea la carga inicial.
+    # `ref` (del volante, ej. ?ref=asamblea) tiene prioridad sobre `origen`.
+    campana = (ref or origen or "nuevos-negocios").strip()[:60] or "nuevos-negocios"
     return templates.TemplateResponse(request, "nuevos_negocios.html", {
-        "request": request, "anpd_url": ANPD_REGISTRO_URL,
-        "origen": (origen or "nuevos-negocios")[:60]})
+        "request": request, "anpd_url": ANPD_REGISTRO_URL, "origen": campana})
+
+
+async def _clasificar_ruc(ruc: str) -> dict:
+    """Reconocimiento en dos niveles. Devuelve identidad derivada de fuentes
+    OFICIALES (padron o API), nunca del usuario. camino: A=contador, B=empresario
+    (no contador), C=general/fallback (no verificable -> distrito manual)."""
+    pad = await db.padron_lookup(ruc)
+    if pad:
+        ubigeo = (pad.get("ubigeo") or "") or None
+        return {"camino": "A", "es_contador": True, "verificado": True,
+                "razon_social": pad.get("razon_social"), "ubigeo": ubigeo,
+                "distrito": est.nombre_distrito(ubigeo) or titulo(pad.get("distrito") or "") or None,
+                "necesita_distrito": not ubigeo, "fuente": "padron"}
+    api = await ruc_mod.consultar_ruc_contador(ruc)
+    estado = api.get("estado")
+    if estado == "contador":
+        ubigeo = api.get("ubigeo") or est.ubigeo_por_nombre(
+            api.get("departamento"), api.get("provincia"), api.get("distrito"))
+        return {"camino": "A", "es_contador": True, "verificado": True,
+                "razon_social": api.get("razon_social"), "ubigeo": ubigeo,
+                "distrito": est.nombre_distrito(ubigeo) or titulo(api.get("distrito") or "") or None,
+                "necesita_distrito": not ubigeo, "fuente": "api"}
+    if estado == "no_contador":
+        return {"camino": "B", "es_contador": False, "verificado": True,
+                "razon_social": api.get("razon_social"), "ubigeo": None,
+                "distrito": None, "necesita_distrito": False, "fuente": "api"}
+    # no_verificable (sin token / API caida / timeout / sin CIIU): NO rechazar.
+    return {"camino": "C", "es_contador": False, "verificado": False,
+            "razon_social": api.get("razon_social"), "ubigeo": None,
+            "distrito": None, "necesita_distrito": True, "fuente": "fallback"}
 
 
 @app.post("/api/nn/ruc")
 async def api_nn_ruc(payload: dict):
-    """Paso 2: valida el RUC contra nuestras tablas y devuelve el camino (A/B/C).
-    Para el CAMINO A, adjunta el adelanto pre-calculado del distrito del RUC."""
+    """Paso 2: reconoce el RUC (padron -> API) y devuelve el camino. Con UBIGEO
+    conocido adjunta el adelanto EN VIVO del distrito."""
     ruc = (payload.get("ruc") or "").strip()
     if not ruc_mod.ruc_formato_valido(ruc):
         return JSONResponse({"ok": False, "error": "El RUC debe tener 11 dígitos."},
                             status_code=422)
-    info = await db.nn_validar_ruc(ruc)
+    info = await _clasificar_ruc(ruc)
     resp = {"ok": True, "ruc": ruc, "camino": info["camino"],
+            "es_contador": info["es_contador"], "verificado": info["verificado"],
+            "necesita_distrito": info["necesita_distrito"],
             "razon_social": info.get("razon_social"),
-            "distrito": titulo(info.get("distrito") or "") or None}
-    if info["camino"] == "A":
-        adelanto = await db.nn_adelanto(info.get("ubigeo") or "")
-        # Etiqueta legible del mes ("julio 2026") para cada bloque.
-        for m in adelanto:
+            "distrito": info.get("distrito")}
+    if info.get("ubigeo"):
+        adelanto = await db.nn_adelanto(info["ubigeo"])
+        for m in adelanto:  # etiqueta legible del mes ("julio 2026")
             y, mm = m["mes"].split("-")
             m["mes_label"] = f"{MESES_ES[int(mm)]} {y}"
         resp["adelanto"] = adelanto
@@ -734,11 +777,17 @@ async def api_nn_suscribir(payload: dict, request: Request):
     if not payload.get("consentimiento"):
         return JSONResponse({"ok": False, "error": "Debes aceptar recibir la información para continuar."},
                             status_code=422)
-    # Identidad SIEMPRE derivada de nuestras tablas (no del usuario).
-    info = await db.nn_validar_ruc(ruc)
+    # Identidad SIEMPRE derivada de fuentes oficiales (padron/API), no del usuario.
+    # Se INSERTA SIEMPRE el RUC, sea o no contador (documenta faltantes del padron).
+    info = await _clasificar_ruc(ruc)
+    distrito = info.get("distrito")
+    # Unica excepcion: fallback por API no verificable -> el usuario confirma su
+    # distrito (no tenemos el dato oficial).
+    if info.get("necesita_distrito") and not distrito:
+        distrito = (payload.get("distrito") or "").strip()[:120] or None
     data = {
         "ruc": ruc, "razon_social": info.get("razon_social"),
-        "es_contador": info["camino"] == "A", "distrito": info.get("distrito"),
+        "es_contador": info["es_contador"], "distrito": distrito,
         "correo": correo, "whatsapp": whatsapp,
         "origen": (payload.get("origen") or "nuevos-negocios")[:60],
         "consentimiento": True,

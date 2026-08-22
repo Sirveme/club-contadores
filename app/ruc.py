@@ -132,3 +132,84 @@ async def validar_ruc(ruc: str) -> dict:
     if RUC_VALIDACION_ESTRICTA:
         return _bloquear("no_verificable", MSG_NO_VERIFICABLE)
     return _permisivo(ruc, tipo)
+
+
+# ============================================================================
+# CONSULTA para la landing /nuevos-negocios: NO bloquea; clasifica contador por
+# CIIU (6920 principal o secundario). Un fallo de API NUNCA rechaza (fallback).
+# ============================================================================
+CIIU_CONTADOR = "6920"  # Actividades de contabilidad, teneduria y auditoria
+
+
+async def _fetch_ruc_api(ruc: str) -> dict:
+    """Golpea apis.net.pe y devuelve el JSON (dict) crudo. Lanza en fallo/no-200.
+    Aislada a proposito: en pruebas se reemplaza para simular la API."""
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        r = await client.get(
+            APIS_NET_PE_URL, params={"numero": ruc},
+            headers={"Authorization": f"Bearer {APIS_NET_PE_TOKEN}",
+                     "Accept": "application/json"})
+    if r.status_code != 200:
+        raise RuntimeError(f"status {r.status_code}")
+    return r.json() or {}
+
+
+def _extraer_ciiu(d: dict) -> list[str]:
+    """Extrae codigos CIIU del JSON (tolerante a las varias formas de apis.net.pe)."""
+    out: list[str] = []
+
+    def add(v):
+        s = "".join(c for c in str(v or "") if c.isdigit())
+        if s:
+            out.append(s)
+
+    for k in ("ciiu", "CIIU", "actividadEconomica", "codigoCiiu"):
+        if d.get(k):
+            add(d[k])
+    for k in ("actividadesEconomicas", "ciiuList", "ciius"):
+        val = d.get(k)
+        if isinstance(val, list):
+            for it in val:
+                if isinstance(it, dict):
+                    add(it.get("ciiu") or it.get("codigo") or it.get("cod"))
+                else:
+                    add(it)
+    return out
+
+
+async def consultar_ruc_contador(ruc: str) -> dict:
+    """Para la landing. Devuelve estado:
+       'contador'      -> API confirma CIIU 6920 (principal o secundario)
+       'no_contador'   -> API trae CIIU y ninguno es 6920
+       'no_verificable'-> sin token / API caida / timeout / 404 / sin CIIU util
+                          (NUNCA rechaza: el llamador deja continuar con fallback)
+    """
+    ruc = (ruc or "").strip()
+    base = {"estado": "no_verificable", "razon_social": None, "distrito": None,
+            "provincia": None, "departamento": None, "ubigeo": None, "ciiu": []}
+    if not APIS_NET_PE_TOKEN:
+        return base
+    try:
+        d = await _fetch_ruc_api(ruc)
+    except Exception as e:
+        log.warning("nn: RUC %s no verificable via API (%s)", ruc, type(e).__name__)
+        return base
+
+    razon = (d.get("razonSocial") or d.get("nombre") or "").strip()
+    if not razon:
+        return base
+    ciius = _extraer_ciiu(d)
+    ubigeo = "".join(c for c in str(d.get("ubigeo") or "") if c.isdigit()) or None
+    if ubigeo:
+        ubigeo = ubigeo.zfill(6)[-6:]
+    info = {"razon_social": razon,
+            "distrito": (d.get("distrito") or "").strip() or None,
+            "provincia": (d.get("provincia") or "").strip() or None,
+            "departamento": (d.get("departamento") or "").strip() or None,
+            "ubigeo": ubigeo, "ciiu": ciius}
+    if any(c.startswith(CIIU_CONTADOR) for c in ciius):
+        return {"estado": "contador", **info}
+    if ciius:
+        return {"estado": "no_contador", **info}
+    # 200 con razon social pero sin CIIU util -> no podemos clasificar: fallback.
+    return {"estado": "no_verificable", **info}
