@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-estadisticas.py — Motor de estadisticas de creacion de empresas (altas de RUC /
+estadisticas.py — Motor de estadisticas de altas de RUC (creacion de negocios /
 Nuevos Negocios de SUNAT), parametrizado por NIVEL (departamento | provincia).
 
 SOLO PRODUCE DATOS: no imprime HTML ni renderiza nada. Devuelve un dict y (opcional)
@@ -52,6 +52,71 @@ REGIMENES = {
     "3611": "Frontera",
 }
 CODIGOS_EMPRESARIALES = tuple(REGIMENES.keys())
+
+# --- Secciones CIIU Rev.4 (clasificacion OFICIAL) ---------------------------
+# La seccion (letra) se deriva de la DIVISION (2 primeros digitos del CIIU).
+SECCION_NOMBRE = {
+    "A": "Agricultura, ganadería, silvicultura y pesca",
+    "B": "Explotación de minas y canteras",
+    "C": "Industrias manufactureras",
+    "D": "Suministro de electricidad, gas y aire acondicionado",
+    "E": "Suministro de agua; alcantarillado y gestión de desechos",
+    "F": "Construcción",
+    "G": "Comercio al por mayor y menor; reparación de vehículos",
+    "H": "Transporte y almacenamiento",
+    "I": "Alojamiento y servicios de comida",
+    "J": "Información y comunicaciones",
+    "K": "Actividades financieras y de seguros",
+    "L": "Actividades inmobiliarias",
+    "M": "Actividades profesionales, científicas y técnicas",
+    "N": "Actividades de servicios administrativos y de apoyo",
+    "O": "Administración pública y defensa",
+    "P": "Enseñanza",
+    "Q": "Salud humana y asistencia social",
+    "R": "Artes, entretenimiento y recreación",
+    "S": "Otras actividades de servicios",
+    "T": "Actividades de los hogares como empleadores",
+    "U": "Organizaciones y órganos extraterritoriales",
+}
+
+# Macrogrupos: ELABORACION PROPIA del Observatorio a partir de las secciones.
+MACRO_COMERCIO = {"G"}
+MACRO_SERVICIOS = {"H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"}
+MACRO_PRODUCCION = {"A", "B", "C", "D", "E", "F"}
+
+
+def seccion_ciiu(ciiu: str) -> str | None:
+    """CIIU de 4 digitos -> letra de seccion CIIU Rev.4 (o None)."""
+    d = (ciiu or "")[:2]
+    if not d.isdigit():
+        return None
+    n = int(d)
+    rangos = [((1, 3), "A"), ((5, 9), "B"), ((10, 33), "C"), ((35, 35), "D"),
+              ((36, 39), "E"), ((41, 43), "F"), ((45, 47), "G"), ((49, 53), "H"),
+              ((55, 56), "I"), ((58, 63), "J"), ((64, 66), "K"), ((68, 68), "L"),
+              ((69, 75), "M"), ((77, 82), "N"), ((84, 84), "O"), ((85, 85), "P"),
+              ((86, 88), "Q"), ((90, 93), "R"), ((94, 96), "S"), ((97, 98), "T"),
+              ((99, 99), "U")]
+    for (lo, hi), letra in rangos:
+        if lo <= n <= hi:
+            return letra
+    return None
+
+
+def macrogrupo(seccion: str | None) -> str:
+    if seccion in MACRO_COMERCIO:
+        return "Comercio"
+    if seccion in MACRO_SERVICIOS:
+        return "Servicios"
+    if seccion in MACRO_PRODUCCION:
+        return "Producción"
+    return "Otros"
+
+
+def tabla_equivalencias() -> list[dict]:
+    """Seccion -> macrogrupo (para publicar en /observatorio; auditable)."""
+    return [{"seccion": s, "nombre": SECCION_NOMBRE[s], "macrogrupo": macrogrupo(s)}
+            for s in SECCION_NOMBRE]
 
 # Transformacion 5->4 en SQL (quita el 4to digito). Fuente: tributo_codigo_raw
 # o, si viene vacio, tributo. Devuelve el codigo de 4 digitos o NULL.
@@ -114,6 +179,51 @@ def geo():
     slug_prov = {(v["dep_slug"], v["slug"]): k for k, v in provs.items()}
     return {"departamentos": deps, "provincias": provs, "distritos": dist,
             "slug_dep": slug_dep, "slug_prov": slug_prov}
+
+
+def nombre_distrito(ubigeo: str | None) -> str | None:
+    """Nombre OFICIAL del distrito por ubigeo (catalogo), NO del texto de la data.
+    Se usa para MOSTRAR siempre una forma consistente (la data trae el mismo
+    distrito con capitalizaciones distintas; el ubigeo si es consistente)."""
+    if not ubigeo:
+        return None
+    return geo()["distritos"].get(str(ubigeo).zfill(6)[-6:])
+
+
+@lru_cache(maxsize=1)
+def _idx_nombre():
+    """Indices normalizados para resolver ubigeo por nombre (triple / prov+dist /
+    dist unico)."""
+    ref = json.loads(DISTRITOS_JSON.read_text(encoding="utf-8"))
+    triple, provdist, distonly = {}, {}, {}
+    for x in ref:
+        u = str(x["u"])
+        if not re.fullmatch(r"\d{6}", u):
+            continue
+        dep, prov, di = _norm(x["dep"]), _norm(x["p"]), _norm(x["d"])
+        triple[(dep, prov, di)] = u
+        provdist.setdefault((prov, di), set()).add(u)
+        distonly.setdefault(di, set()).add(u)
+    return triple, provdist, distonly
+
+
+def ubigeo_por_nombre(dep: str | None, prov: str | None, dist: str | None) -> str | None:
+    """(departamento, provincia, distrito) -> ubigeo de 6 digitos, o None.
+    Cascada: triple exacto -> (prov,dist) unico -> distrito unico en el pais."""
+    triple, provdist, distonly = _idx_nombre()
+    de, pr, di = _norm(dep or ""), _norm(prov or ""), _norm(dist or "")
+    if not di:
+        return None
+    u = triple.get((de, pr, di))
+    if u:
+        return u
+    s = provdist.get((pr, di))
+    if s and len(s) == 1:
+        return next(iter(s))
+    s = distonly.get(di)
+    if s and len(s) == 1:
+        return next(iter(s))
+    return None
 
 
 def resolver_prefijo(departamento: str, provincia: str | None = None) -> str:
@@ -187,11 +297,36 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
         ({"regimen": k, "n": v, "pct": _pct(v, total), "muestra_insuficiente": v < MIN_MUESTRA}
          for k, v in agg.items()), key=lambda x: x["n"], reverse=True)
 
+    # Distribucion COMPLETA de CIIU (para secciones/macrogrupos y para saber
+    # cuantas actividades distintas hay).
+    ciiu_all = await conn.fetch(
+        f"SELECT ciiu, count(*) n FROM nuevos_negocios WHERE {W} "
+        f"AND ciiu IS NOT NULL AND ciiu <> '' GROUP BY ciiu", *args)
+    n_rubros = len(ciiu_all)
+    sec_agg: dict[str, int] = {}
+    for row in ciiu_all:
+        s = seccion_ciiu(row["ciiu"]) or "?"
+        sec_agg[s] = sec_agg.get(s, 0) + row["n"]
+    secciones = sorted(
+        ({"seccion": s, "nombre": SECCION_NOMBRE.get(s, "Sin clasificar"),
+          "n": v, "pct": _pct(v, total), "muestra_insuficiente": v < MIN_MUESTRA}
+         for s, v in sec_agg.items()), key=lambda x: x["n"], reverse=True)
+    macro_agg: dict[str, int] = {}
+    for s, v in sec_agg.items():
+        g = macrogrupo(s if s != "?" else None)
+        macro_agg[g] = macro_agg.get(g, 0) + v
+    macrogrupos = sorted(
+        ({"grupo": g, "n": v, "pct": _pct(v, total)} for g, v in macro_agg.items()),
+        key=lambda x: x["n"], reverse=True)
+
     resultado = {
         "total": total, "por_mes": meses, "variacion": variacion, "por_tipo": tipos,
         "top_rubros": top_rubros, "regimenes": regimenes,
+        "secciones": secciones, "macrogrupos": macrogrupos,
         # Concentracion del top 10 de actividades (suma de sus %).
         "top_rubros_concentracion": round(sum(r["pct"] for r in top_rubros[:10]), 2),
+        # La frase de concentracion solo tiene sentido con MAS DE 10 categorias.
+        "mostrar_conc_rubros": n_rubros > 10,
     }
 
     # --- Metricas por nivel ---
@@ -208,6 +343,7 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
         } for r in dep_rows]
         resultado["ranking_concentracion"] = round(
             sum(x["pct"] for x in resultado["ranking_departamentos"][:10]), 2)
+        resultado["mostrar_conc_ranking"] = len(resultado["ranking_departamentos"]) > 10
 
     elif nivel == "provincia":
         # 3) top 10 distritos (nombre limpio de distritos.json)
@@ -221,6 +357,9 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
         } for r in dist_rows]
         resultado["ranking_concentracion"] = round(
             sum(x["pct"] for x in resultado["top_distritos"][:10]), 2)
+        n_distritos = await conn.fetchval(
+            f"SELECT count(distinct ubigeo) FROM nuevos_negocios WHERE {W} AND ubigeo IS NOT NULL", *args)
+        resultado["mostrar_conc_ranking"] = (n_distritos or 0) > 10
 
         # NUEVO: peso de la provincia dentro de su departamento
         dep_pref = prefijo[:2]
@@ -250,6 +389,7 @@ async def _stats(conn, nivel, prefijo, desde, hasta, comparables):
         } for r in prov_rows]
         resultado["ranking_concentracion"] = round(
             sum(x["pct"] for x in resultado["ranking_provincias"][:10]), 2)
+        resultado["mostrar_conc_ranking"] = len(resultado["ranking_provincias"]) > 10
 
         # Ranking nacional de departamentos (puesto de ~25)
         resultado["ranking_nacional"] = await _ranking_nacional(
@@ -384,6 +524,55 @@ def cargar_analisis(clave: str) -> dict | None:
     return ent if (ent and ent.get("texto")) else None
 
 
+def cargar_historial(clave: str) -> list:
+    """Lista de {fecha, descripcion} del territorio (registro de correcciones).
+    Vive dentro de analisis.json bajo la clave 'historial'; independiente del
+    'texto', de modo que un territorio puede tener historial sin analisis."""
+    if not ANALISIS.exists():
+        return []
+    m = ANALISIS.stat().st_mtime
+    if _CACHE_AN["mtime"] != m:
+        try:
+            _CACHE_AN["data"] = json.loads(ANALISIS.read_text(encoding="utf-8"))
+        except Exception:
+            _CACHE_AN["data"] = {}
+        _CACHE_AN["mtime"] = m
+    ent = (_CACHE_AN["data"] or {}).get(clave) or {}
+    hist = ent.get("historial") or []
+    # Mas reciente primero.
+    return sorted(hist, key=lambda x: x.get("fecha", ""), reverse=True)
+
+
+# --- Muro "Nos citan" (MANUAL; NUNCA lo toca --regen) ------------------------
+# reportes/data/citas.json: LISTA de entradas. El bloque se muestra solo con >=2.
+CITAS = OUT_DATA / "citas.json"
+_CACHE_CI = {"mtime": None, "data": None}
+
+
+def cargar_citas() -> list:
+    """Lista completa de citas registradas (o [] si no hay archivo/es invalido)."""
+    if not CITAS.exists():
+        return []
+    m = CITAS.stat().st_mtime
+    if _CACHE_CI["mtime"] != m:
+        try:
+            data = json.loads(CITAS.read_text(encoding="utf-8"))
+            _CACHE_CI["data"] = data if isinstance(data, list) else []
+        except Exception:
+            _CACHE_CI["data"] = []
+        _CACHE_CI["mtime"] = m
+    return _CACHE_CI["data"] or []
+
+
+def citas_priorizadas(clave: str) -> list:
+    """Todas las citas, con las del territorio (por 'ambito') primero."""
+    citas = cargar_citas()
+    def _rank(c):
+        amb = (c.get("ambito") or "").strip()
+        return 0 if amb == clave else 1
+    return sorted(citas, key=_rank)
+
+
 def clave_territorio(r: dict) -> str:
     if r["nivel"] == "nacional":
         return "nacional"
@@ -506,8 +695,8 @@ def _hallazgos(r):
     # Regla 3: regimen predominante > 30%
     if reg and reg["pct"] > UMBRAL_REGIMEN:
         destacan.append(f"El {reg['regimen']} es el régimen más frecuente ({reg['pct']:.2f}% de los casos).")
-    # Regla 4: concentracion del top 10 de actividades > 50%
-    if r.get("top_rubros_concentracion", 0) > UMBRAL_TOP10_ACT:
+    # Regla 4: concentracion del top 10 de actividades > 50% (solo si hay >10 actividades)
+    if r.get("mostrar_conc_rubros") and (r.get("top_rubros_concentracion") or 0) > UMBRAL_TOP10_ACT:
         destacan.append(f"Las 10 principales actividades concentran el "
                         f"{r['top_rubros_concentracion']:.2f}% de los nuevos negocios.")
 
