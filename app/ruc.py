@@ -179,13 +179,17 @@ def _extraer_ciiu(d: dict) -> list[str]:
 
 async def consultar_ruc_contador(ruc: str) -> dict:
     """Para la landing. Devuelve estado:
-       'contador'      -> API confirma CIIU 6920 (principal o secundario)
-       'no_contador'   -> API trae CIIU y ninguno es 6920
-       'no_verificable'-> sin token / API caida / timeout / 404 / sin CIIU util
-                          (NUNCA rechaza: el llamador deja continuar con fallback)
-    """
+       'contador'    -> API confirma CIIU 6920 (principal o secundario)
+       'no_contador' -> API trae CIIU y ninguno es 6920
+       'general'     -> API respondio con razonSocial pero SIN CIIU util (caso
+                        tipico: persona natural sin negocio; SUNAT no publica su
+                        domicilio -> distrito/ubigeo vienen vacios). Se saluda por
+                        nombre y se pide el distrito (desplegable).
+       'error'       -> sin token / API caida / timeout / 404 / sin razonSocial.
+                        (SOLO aqui se muestra "no pudimos verificar")
+    NUNCA rechaza: el llamador siempre deja continuar."""
     ruc = (ruc or "").strip()
-    base = {"estado": "no_verificable", "razon_social": None, "distrito": None,
+    base = {"estado": "error", "razon_social": None, "distrito": None,
             "provincia": None, "departamento": None, "ubigeo": None, "ciiu": []}
     if not APIS_NET_PE_TOKEN:
         return base
@@ -197,7 +201,7 @@ async def consultar_ruc_contador(ruc: str) -> dict:
 
     razon = (d.get("razonSocial") or d.get("nombre") or "").strip()
     if not razon:
-        return base
+        return base  # 200 sin nombre / 404 -> tratamos como error (sin nombre que saludar)
     ciius = _extraer_ciiu(d)
     ubigeo = "".join(c for c in str(d.get("ubigeo") or "") if c.isdigit()) or None
     if ubigeo:
@@ -211,5 +215,5 @@ async def consultar_ruc_contador(ruc: str) -> dict:
         return {"estado": "contador", **info}
     if ciius:
         return {"estado": "no_contador", **info}
-    # 200 con razon social pero sin CIIU util -> no podemos clasificar: fallback.
-    return {"estado": "no_verificable", **info}
+    # Respondio con nombre pero sin CIIU util -> saludar por nombre + pedir distrito.
+    return {"estado": "general", **info}

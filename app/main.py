@@ -730,9 +730,19 @@ async def _clasificar_ruc(ruc: str) -> dict:
         return {"camino": "B", "es_contador": False, "verificado": True,
                 "razon_social": api.get("razon_social"), "ubigeo": None,
                 "distrito": None, "necesita_distrito": False, "fuente": "api"}
-    # no_verificable (sin token / API caida / timeout / sin CIIU): NO rechazar.
+    if estado == "general":
+        # API respondio con NOMBRE pero sin domicilio (natural sin negocio):
+        # saludar por nombre y pedir distrito (desplegable). NO es un fallo.
+        ubigeo = api.get("ubigeo") or est.ubigeo_por_nombre(
+            api.get("departamento"), api.get("provincia"), api.get("distrito"))
+        return {"camino": "C", "es_contador": False, "verificado": True,
+                "razon_social": api.get("razon_social"), "ubigeo": ubigeo,
+                "distrito": est.nombre_distrito(ubigeo) if ubigeo else None,
+                "necesita_distrito": not ubigeo, "fuente": "api"}
+    # 'error': sin token / API caida / timeout / sin nombre -> NO rechazar, pero
+    # SI mostrar "no pudimos verificar" (no obtuvimos el nombre).
     return {"camino": "C", "es_contador": False, "verificado": False,
-            "razon_social": api.get("razon_social"), "ubigeo": None,
+            "razon_social": None, "ubigeo": None,
             "distrito": None, "necesita_distrito": True, "fuente": "fallback"}
 
 
@@ -759,6 +769,23 @@ async def api_nn_ruc(payload: dict):
     return JSONResponse(resp)
 
 
+@app.post("/api/nn/adelanto")
+async def api_nn_adelanto(payload: dict):
+    """Adelanto EN VIVO por UBIGEO (para el desplegable del Camino C): apenas el
+    usuario elige su distrito, ve las 5 juridicas recientes + "5 de N", igual que
+    un contador del padron. El ubigeo viene del catalogo (sin ambiguedad)."""
+    ubigeo = "".join(c for c in str(payload.get("ubigeo") or "") if c.isdigit())
+    ubigeo = ubigeo.zfill(6)[-6:] if ubigeo else ""
+    if not est.nombre_distrito(ubigeo):
+        return JSONResponse({"ok": False, "error": "Distrito no válido."}, status_code=422)
+    adelanto = await db.nn_adelanto(ubigeo)
+    for m in adelanto:
+        y, mm = m["mes"].split("-")
+        m["mes_label"] = f"{MESES_ES[int(mm)]} {y}"
+    return JSONResponse({"ok": True, "ubigeo": ubigeo,
+                         "distrito": est.nombre_distrito(ubigeo), "adelanto": adelanto})
+
+
 @app.post("/api/nn/suscribir")
 async def api_nn_suscribir(payload: dict, request: Request):
     # Honeypot: campo oculto; si viene lleno, se descarta en silencio.
@@ -781,10 +808,13 @@ async def api_nn_suscribir(payload: dict, request: Request):
     # Se INSERTA SIEMPRE el RUC, sea o no contador (documenta faltantes del padron).
     info = await _clasificar_ruc(ruc)
     distrito = info.get("distrito")
-    # Unica excepcion: fallback por API no verificable -> el usuario confirma su
-    # distrito (no tenemos el dato oficial).
+    # Unica excepcion a solo-lectura: cuando no tenemos el distrito oficial, el
+    # usuario lo eligio en el DESPLEGABLE -> llega su UBIGEO exacto (sin ambiguedad
+    # de nombres repetidos); el nombre se deriva del catalogo por ubigeo.
     if info.get("necesita_distrito") and not distrito:
-        distrito = (payload.get("distrito") or "").strip()[:120] or None
+        ub = "".join(c for c in str(payload.get("ubigeo") or "") if c.isdigit())
+        ub = ub.zfill(6)[-6:] if ub else ""
+        distrito = est.nombre_distrito(ub) or (payload.get("distrito") or "").strip()[:120] or None
     data = {
         "ruc": ruc, "razon_social": info.get("razon_social"),
         "es_contador": info["es_contador"], "distrito": distrito,
