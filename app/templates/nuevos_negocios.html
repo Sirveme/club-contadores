@@ -120,16 +120,20 @@
         .catch(function(){ btn.disabled=false; msgRuc.textContent='Error de red. Intenta de nuevo.'; msgRuc.className='msg err'; });
     });
 
+    function h2(card, txt){ var e=el('h2',null,txt); e.style.fontSize='18px'; e.style.margin='0 0 8px'; card.appendChild(e); }
+
     function render(d){
       paso2.innerHTML=''; paso2.classList.remove('oculto');
       var card = el('section','card');
+      var necesita = !!d.necesita_distrito;
 
       if (d.camino === 'A'){
+        // Contador (padron o API con CIIU 6920). Distrito de solo lectura.
         var titulo = el('h2', null, 'Nuevos negocios en ' + (d.distrito||'tu distrito'));
         titulo.style.margin='0 0 4px'; titulo.style.fontSize='18px';
         card.appendChild(titulo);
         card.appendChild(el('p','lede','Un adelanto de las empresas recién inscritas en tu distrito.'));
-        var ad = d.adelanto || [];
+        var ad = (d.adelanto||[]).filter(function(m){ return m.total>0; });
         if (ad.length){
           ad.forEach(function(m, i){
             var box = el('div', 'mes' + (i===0?' top':''));
@@ -145,7 +149,9 @@
             card.appendChild(box);
           });
         } else {
-          card.appendChild(el('p','lede','Estamos preparando el detalle de tu distrito. Déjanos tus datos y te enviamos el listado completo.'));
+          // Distrito sin negocios cargados: mensaje digno, NUNCA lista vacia.
+          card.appendChild(el('p','lede','Aún no tenemos negocios nuevos en '+(d.distrito||'tu distrito')+
+            ' para este periodo. Suscríbete y te avisamos apenas los publiquemos.'));
         }
         // Texto de VENTA (fuera del checkbox).
         var venta = el('p','venta');
@@ -154,27 +160,38 @@
         venta.appendChild(document.createTextNode(' y, ocasionalmente, reseñas y promociones de nuestros productos, adelante.'));
         card.appendChild(venta);
         card.appendChild(formulario(d, false,
-          'Recibir el link al 100% de los Nuevos Negocios de mi distrito, últimos meses.'));
+          'Recibir el link al 100% de los Nuevos Negocios de mi distrito, últimos meses.', necesita));
       }
       else if (d.camino === 'B'){
-        card.appendChild(el('h2', null, 'Si no eres contador, regístrate en el Club de Empresarios.'));
-        card.querySelector('h2').style.fontSize='18px'; card.querySelector('h2').style.margin='0 0 8px';
-        card.appendChild(formulario(d, true, 'Registrarme y recibir el link'));
+        h2(card, 'Si no eres contador, regístrate en el Club de Empresarios.');
+        card.appendChild(formulario(d, true, 'Registrarme y recibir el link', false));
       }
       else {
-        card.appendChild(el('h2', null, 'Regístrate y te enviaremos el link con la información que buscas.'));
-        card.querySelector('h2').style.fontSize='18px'; card.querySelector('h2').style.margin='0 0 8px';
-        card.appendChild(formulario(d, true, 'Registrarme y recibir el link'));
+        // C / fallback: NO se adelanta la frase verde de confirmacion.
+        h2(card, 'Regístrate y déjanos tus datos.');
+        if (d.verificado === false){
+          card.appendChild(el('p','lede','No pudimos verificar tu RUC en este momento. Puedes continuar: '+
+            'confirma tu distrito y te enviaremos la información apenas la tengamos.'));
+        }
+        card.appendChild(formulario(d, true, 'Registrarme', necesita));
       }
       paso2.appendChild(card);
       paso2.scrollIntoView({behavior:'smooth', block:'start'});
     }
 
-    function formulario(d, mostrarRuc, textoBoton){
+    function formulario(d, mostrarRuc, textoBoton, necesitaDistrito){
       var f = el('form'); f.autocomplete='on';
       if (mostrarRuc){
         var lb = el('label',null,'RUC'); f.appendChild(lb);
         var fijo = el('div','ruc-fijo', d.ruc); fijo.style.marginBottom='12px'; f.appendChild(fijo);
+      }
+      var distInput = null;
+      if (necesitaDistrito){
+        // Unica vez que el usuario ELIGE distrito: no tenemos el dato oficial.
+        var ld = el('label',null,'Tu distrito'); ld.setAttribute('for','di'); f.appendChild(ld);
+        distInput = el('input'); distInput.type='text'; distInput.id='di'; distInput.name='distrito';
+        distInput.placeholder='Ej. Iquitos'; distInput.required=true; distInput.style.marginBottom='12px';
+        f.appendChild(distInput);
       }
       var lw = el('label',null,'WhatsApp'); lw.setAttribute('for','wa'); f.appendChild(lw);
       var wa = el('input'); wa.type='tel'; wa.id='wa'; wa.name='whatsapp'; wa.inputMode='numeric';
@@ -200,8 +217,9 @@
       f.addEventListener('submit', function(e){
         e.preventDefault();
         if(!chk.checked){ msg.textContent='Marca la casilla para continuar.'; msg.className='msg err'; return; }
+        if(distInput && !distInput.value.trim()){ msg.textContent='Indica tu distrito para continuar.'; msg.className='msg err'; return; }
         var body = { ruc:d.ruc, whatsapp:wa.value, correo:co.value, empresa_web:hpi.value,
-          consentimiento:true, origen:ORIGEN };
+          consentimiento:true, origen:ORIGEN, distrito: distInput ? distInput.value.trim() : null };
         btn.disabled=true; msg.textContent='Enviando…'; msg.className='msg';
         fetch('/api/nn/suscribir',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify(body)})
