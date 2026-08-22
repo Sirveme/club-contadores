@@ -29,9 +29,11 @@
     .card{ background:var(--card); border:1px solid var(--line); border-radius:14px;
       padding:16px; margin:14px 0; }
     label{ display:block; font-size:13px; color:var(--muted); font-weight:600; margin-bottom:6px; }
-    input[type=text],input[type=email],input[type=tel]{ width:100%; font:inherit; padding:13px 13px;
+    input[type=text],input[type=email],input[type=tel],select.sel{ width:100%; font:inherit; padding:13px 13px;
       border-radius:11px; border:1px solid var(--line); background:#0d1a15; color:var(--text); }
-    input:focus{ outline:none; border-color:var(--green); }
+    input:focus,select.sel:focus{ outline:none; border-color:var(--green); }
+    select.sel{ margin-bottom:12px; -webkit-appearance:none; appearance:none; }
+    select.sel:disabled{ opacity:.6; }
     .btn{ width:100%; font:inherit; font-weight:700; padding:14px 16px; border:none; border-radius:12px;
       background:var(--green); color:#062018; cursor:pointer; margin-top:12px; }
     .btn:disabled{ opacity:.6; cursor:default; }
@@ -57,8 +59,6 @@
       font-size:13px; color:var(--muted); font-weight:400; }
     .consent input{ margin-top:3px; flex:0 0 auto; width:18px; height:18px; accent-color:var(--green); }
     .legal{ font-size:11.5px; color:var(--muted); margin:10px 0 0; }
-    .ruc-fijo{ font-weight:700; color:var(--text); background:#0d1a15; border:1px solid var(--line);
-      border-radius:10px; padding:10px 12px; display:inline-block; }
     .oculto{ display:none; }
     .spin{ color:var(--muted); font-size:14px; }
   </style>
@@ -122,10 +122,64 @@
 
     function h2(card, txt){ var e=el('h2',null,txt); e.style.fontSize='18px'; e.style.margin='0 0 8px'; card.appendChild(e); }
 
+    // Renderiza los bloques de meses del adelanto en `container`.
+    function renderMeses(container, adelanto, distrito){
+      container.innerHTML='';
+      var ad = (adelanto||[]).filter(function(m){ return m.total>0; });
+      if (!ad.length){
+        container.appendChild(el('p','lede','Aún no tenemos negocios nuevos en '+(distrito||'tu distrito')+
+          ' para este periodo. Suscríbete y te avisamos apenas los publiquemos.'));
+        return;
+      }
+      ad.forEach(function(m, i){
+        var box = el('div', 'mes' + (i===0?' top':''));
+        box.appendChild(el('h3', null, m.mes_label));
+        (m.negocios||[]).forEach(function(n){
+          var row = el('div','neg');
+          row.appendChild(el('div','rs', n.razon_social));
+          if(n.fecha) row.appendChild(el('div','fe','Inscrita el '+n.fecha));
+          box.appendChild(row);
+        });
+        box.appendChild(el('p','conteo','Mostramos '+(m.negocios||[]).length+' de '+m.total+
+          ' nuevos negocios de '+m.mes_label.split(' ')[0]+' en tu distrito.'));
+        container.appendChild(box);
+      });
+    }
+
+    // Desplegable de distritos (carga perezosa de /distritos.json; SOLO Camino C,
+    // que es minoria -> no infla la carga inicial del QR). value = UBIGEO exacto.
+    var _distritos = null;
+    function buildSelect(onPick){
+      var sel = el('select','sel'); sel.disabled = true;
+      sel.appendChild(el('option', null, 'Cargando distritos…'));
+      function fill(data){
+        sel.innerHTML=''; sel.disabled=false;
+        var ph = el('option', null, 'Elige tu distrito'); ph.value=''; sel.appendChild(ph);
+        var groups = {};
+        data.forEach(function(x){ (groups[x.dep]=groups[x.dep]||[]).push(x); });
+        Object.keys(groups).sort().forEach(function(dep){
+          var og = document.createElement('optgroup'); og.label = dep;
+          groups[dep].sort(function(a,b){ return a.d<b.d?-1:1; }).forEach(function(x){
+            var o = el('option', null, x.d + ' (' + x.p + ')'); o.value = x.u; og.appendChild(o);
+          });
+          sel.appendChild(og);
+        });
+      }
+      if (_distritos){ fill(_distritos); }
+      else {
+        fetch('/distritos.json').then(function(r){return r.json();}).then(function(data){
+          _distritos = data; fill(data);
+        }).catch(function(){ sel.innerHTML=''; sel.disabled=false;
+          var o=el('option',null,'No se pudo cargar la lista'); o.value=''; sel.appendChild(o); });
+      }
+      sel.addEventListener('change', function(){ onPick(sel.value); });
+      return sel;
+    }
+
     function render(d){
       paso2.innerHTML=''; paso2.classList.remove('oculto');
       var card = el('section','card');
-      var necesita = !!d.necesita_distrito;
+      var state = { ubigeo: d.ubigeo || null };  // ubigeo con el que se captura el lead
 
       if (d.camino === 'A'){
         // Contador (padron o API con CIIU 6920). Distrito de solo lectura.
@@ -133,66 +187,60 @@
         titulo.style.margin='0 0 4px'; titulo.style.fontSize='18px';
         card.appendChild(titulo);
         card.appendChild(el('p','lede','Un adelanto de las empresas recién inscritas en tu distrito.'));
-        var ad = (d.adelanto||[]).filter(function(m){ return m.total>0; });
-        if (ad.length){
-          ad.forEach(function(m, i){
-            var box = el('div', 'mes' + (i===0?' top':''));
-            box.appendChild(el('h3', null, m.mes_label));
-            (m.negocios||[]).forEach(function(n){
-              var row = el('div','neg');
-              row.appendChild(el('div','rs', n.razon_social));
-              if(n.fecha) row.appendChild(el('div','fe','Inscrita el '+n.fecha));
-              box.appendChild(row);
-            });
-            box.appendChild(el('p','conteo','Mostramos '+(m.negocios||[]).length+' de '+m.total+
-              ' nuevos negocios de '+m.mes_label.split(' ')[0]+' en tu distrito.'));
-            card.appendChild(box);
-          });
-        } else {
-          // Distrito sin negocios cargados: mensaje digno, NUNCA lista vacia.
-          card.appendChild(el('p','lede','Aún no tenemos negocios nuevos en '+(d.distrito||'tu distrito')+
-            ' para este periodo. Suscríbete y te avisamos apenas los publiquemos.'));
-        }
-        // Texto de VENTA (fuera del checkbox).
+        var adA = el('div'); card.appendChild(adA); renderMeses(adA, d.adelanto, d.distrito);
         var venta = el('p','venta');
         venta.appendChild(document.createTextNode('Si estás de acuerdo en acceder a '));
         venta.appendChild(el('b',null,'herramientas de productividad para la actividad contable realmente gratuitas'));
         venta.appendChild(document.createTextNode(' y, ocasionalmente, reseñas y promociones de nuestros productos, adelante.'));
         card.appendChild(venta);
-        card.appendChild(formulario(d, false,
-          'Recibir el link al 100% de los Nuevos Negocios de mi distrito, últimos meses.', necesita));
+        card.appendChild(formulario(d, state,
+          'Recibir el link al 100% de los Nuevos Negocios de mi distrito, últimos meses.'));
       }
       else if (d.camino === 'B'){
         h2(card, 'Si no eres contador, regístrate en el Club de Empresarios.');
-        card.appendChild(formulario(d, true, 'Registrarme y recibir el link', false));
+        card.appendChild(formulario(d, state, 'Registrarme y recibir el link'));
       }
       else {
-        // C / fallback: NO se adelanta la frase verde de confirmacion.
-        h2(card, 'Regístrate y déjanos tus datos.');
-        if (d.verificado === false){
+        // Camino C. Si la API dio el NOMBRE, saludamos por nombre (NO "no verificamos").
+        if (d.razon_social){
+          h2(card, 'Hola, ' + d.razon_social + '.');
+          card.appendChild(el('p','lede','Elige tu distrito y te mostramos los nuevos negocios de tu zona.'));
+        } else if (d.verificado === false){
+          h2(card, 'Regístrate y déjanos tus datos.');
           card.appendChild(el('p','lede','No pudimos verificar tu RUC en este momento. Puedes continuar: '+
-            'confirma tu distrito y te enviaremos la información apenas la tengamos.'));
+            'elige tu distrito y te mostramos los nuevos negocios de tu zona.'));
+        } else {
+          h2(card, 'Regístrate y déjanos tus datos.');
+          card.appendChild(el('p','lede','Elige tu distrito y te mostramos los nuevos negocios de tu zona.'));
         }
-        card.appendChild(formulario(d, true, 'Registrarme', necesita));
+        var adC = el('div');
+        if (d.necesita_distrito){
+          // Distrito EDITABLE (unica excepcion) pero por DESPLEGABLE -> ubigeo exacto.
+          card.appendChild(el('label',null,'Tu distrito'));
+          card.appendChild(buildSelect(function(ub){
+            state.ubigeo = ub || null; adC.innerHTML='';
+            if (!ub) return;
+            // Apenas elige -> adelanto EN VIVO de ese ubigeo, igual que a un contador.
+            fetch('/api/nn/adelanto',{method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({ubigeo:ub})})
+              .then(function(r){return r.json();})
+              .then(function(j){ if(j.ok) renderMeses(adC, j.adelanto, j.distrito); })
+              .catch(function(){});
+          }));
+          card.appendChild(adC);
+        } else {
+          card.appendChild(adC); renderMeses(adC, d.adelanto, d.distrito);
+        }
+        card.appendChild(formulario(d, state, 'Registrarme'));
       }
       paso2.appendChild(card);
       paso2.scrollIntoView({behavior:'smooth', block:'start'});
     }
 
-    function formulario(d, mostrarRuc, textoBoton, necesitaDistrito){
+    // El RUC NO se vuelve a pedir (se ingreso en el paso 1; en Camino C saludamos
+    // por nombre). El lead se captura con el ubigeo elegido (state.ubigeo).
+    function formulario(d, state, textoBoton){
       var f = el('form'); f.autocomplete='on';
-      if (mostrarRuc){
-        var lb = el('label',null,'RUC'); f.appendChild(lb);
-        var fijo = el('div','ruc-fijo', d.ruc); fijo.style.marginBottom='12px'; f.appendChild(fijo);
-      }
-      var distInput = null;
-      if (necesitaDistrito){
-        // Unica vez que el usuario ELIGE distrito: no tenemos el dato oficial.
-        var ld = el('label',null,'Tu distrito'); ld.setAttribute('for','di'); f.appendChild(ld);
-        distInput = el('input'); distInput.type='text'; distInput.id='di'; distInput.name='distrito';
-        distInput.placeholder='Ej. Iquitos'; distInput.required=true; distInput.style.marginBottom='12px';
-        f.appendChild(distInput);
-      }
       var lw = el('label',null,'WhatsApp'); lw.setAttribute('for','wa'); f.appendChild(lw);
       var wa = el('input'); wa.type='tel'; wa.id='wa'; wa.name='whatsapp'; wa.inputMode='numeric';
       wa.maxLength=9; wa.placeholder='9XXXXXXXX'; wa.required=true; wa.autocomplete='tel'; f.appendChild(wa);
@@ -217,9 +265,9 @@
       f.addEventListener('submit', function(e){
         e.preventDefault();
         if(!chk.checked){ msg.textContent='Marca la casilla para continuar.'; msg.className='msg err'; return; }
-        if(distInput && !distInput.value.trim()){ msg.textContent='Indica tu distrito para continuar.'; msg.className='msg err'; return; }
+        if(d.necesita_distrito && !state.ubigeo){ msg.textContent='Elige tu distrito para continuar.'; msg.className='msg err'; return; }
         var body = { ruc:d.ruc, whatsapp:wa.value, correo:co.value, empresa_web:hpi.value,
-          consentimiento:true, origen:ORIGEN, distrito: distInput ? distInput.value.trim() : null };
+          consentimiento:true, origen:ORIGEN, ubigeo: state.ubigeo || null };
         btn.disabled=true; msg.textContent='Enviando…'; msg.className='msg';
         fetch('/api/nn/suscribir',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify(body)})
