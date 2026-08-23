@@ -35,6 +35,8 @@ import estadisticas as est  # noqa: E402
 SITE_BASE = os.getenv("SITE_BASE", "https://observatorio.perusistemas.pro").rstrip("/")
 # URL del registro ante la ANPD (placeholder editable hasta tener el archivo).
 ANPD_REGISTRO_URL = os.getenv("ANPD_REGISTRO_URL", "#registro-anpd").strip()
+# WhatsApp de Peru Sistemas Pro (para pedir otro distrito y sugerir herramientas).
+PSP_WHATSAPP = "".join(c for c in os.getenv("PSP_WHATSAPP", "938246208") if c.isdigit())
 _CORREO_RE = __import__("re").compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 SITE_HOST = SITE_BASE.split("//", 1)[-1]  # dominio sin esquema, para citas
 # Dominio anterior: se redirige con 301 permanente al nuevo (ver middleware abajo).
@@ -714,7 +716,8 @@ async def _clasificar_ruc(ruc: str) -> dict:
     if pad:
         ubigeo = (pad.get("ubigeo") or "") or None
         return {"camino": "A", "es_contador": True, "verificado": True,
-                "razon_social": pad.get("razon_social"), "ubigeo": ubigeo,
+                "razon_social": pad.get("razon_social"),
+                "nombre_comercial": pad.get("nombre_comercial"), "ubigeo": ubigeo,
                 "distrito": est.nombre_distrito(ubigeo) or titulo(pad.get("distrito") or "") or None,
                 "necesita_distrito": not ubigeo, "fuente": "padron"}
     api = await ruc_mod.consultar_ruc_contador(ruc)
@@ -723,12 +726,14 @@ async def _clasificar_ruc(ruc: str) -> dict:
         ubigeo = api.get("ubigeo") or est.ubigeo_por_nombre(
             api.get("departamento"), api.get("provincia"), api.get("distrito"))
         return {"camino": "A", "es_contador": True, "verificado": True,
-                "razon_social": api.get("razon_social"), "ubigeo": ubigeo,
+                "razon_social": api.get("razon_social"),
+                "nombre_comercial": api.get("nombre_comercial"), "ubigeo": ubigeo,
                 "distrito": est.nombre_distrito(ubigeo) or titulo(api.get("distrito") or "") or None,
                 "necesita_distrito": not ubigeo, "fuente": "api"}
     if estado == "no_contador":
         return {"camino": "B", "es_contador": False, "verificado": True,
-                "razon_social": api.get("razon_social"), "ubigeo": None,
+                "razon_social": api.get("razon_social"),
+                "nombre_comercial": api.get("nombre_comercial"), "ubigeo": None,
                 "distrito": None, "necesita_distrito": False, "fuente": "api"}
     if estado == "general":
         # API respondio con NOMBRE pero sin domicilio (natural sin negocio):
@@ -736,7 +741,8 @@ async def _clasificar_ruc(ruc: str) -> dict:
         ubigeo = api.get("ubigeo") or est.ubigeo_por_nombre(
             api.get("departamento"), api.get("provincia"), api.get("distrito"))
         return {"camino": "C", "es_contador": False, "verificado": True,
-                "razon_social": api.get("razon_social"), "ubigeo": ubigeo,
+                "razon_social": api.get("razon_social"),
+                "nombre_comercial": api.get("nombre_comercial"), "ubigeo": ubigeo,
                 "distrito": est.nombre_distrito(ubigeo) if ubigeo else None,
                 "necesita_distrito": not ubigeo, "fuente": "api"}
     # 'error': sin token / API caida / timeout / sin nombre -> NO rechazar, pero
@@ -811,13 +817,18 @@ async def api_nn_suscribir(payload: dict, request: Request):
     # Unica excepcion a solo-lectura: cuando no tenemos el distrito oficial, el
     # usuario lo eligio en el DESPLEGABLE -> llega su UBIGEO exacto (sin ambiguedad
     # de nombres repetidos); el nombre se deriva del catalogo por ubigeo.
+    ubigeo_final = info.get("ubigeo")
     if info.get("necesita_distrito") and not distrito:
         ub = "".join(c for c in str(payload.get("ubigeo") or "") if c.isdigit())
         ub = ub.zfill(6)[-6:] if ub else ""
-        distrito = est.nombre_distrito(ub) or (payload.get("distrito") or "").strip()[:120] or None
+        if est.nombre_distrito(ub):
+            ubigeo_final, distrito = ub, est.nombre_distrito(ub)
+        else:
+            distrito = (payload.get("distrito") or "").strip()[:120] or None
     data = {
         "ruc": ruc, "razon_social": info.get("razon_social"),
-        "es_contador": info["es_contador"], "distrito": distrito,
+        "nombre_comercial": info.get("nombre_comercial"),
+        "es_contador": info["es_contador"], "distrito": distrito, "ubigeo": ubigeo_final,
         "correo": correo, "whatsapp": whatsapp,
         "origen": (payload.get("origen") or "nuevos-negocios")[:60],
         "consentimiento": True,
@@ -832,15 +843,22 @@ async def api_nn_suscribir(payload: dict, request: Request):
     if not res.get("ok"):
         motivo = res.get("motivo")
         if motivo == "dup_ruc":
+            # Ya registrado: en vez de un 409 muerto, REVELA su pagina de datos.
+            tok = await db.nn_token_por_ruc(ruc)
+            if tok:
+                return JSONResponse({"ok": True, "ya": True, "link": f"/mi-distrito?t={tok}",
+                                     "mensaje": "Ya estabas registrado. Entra a tu página:"})
             return JSONResponse({"ok": False, "error": "Este RUC ya está registrado."}, status_code=409)
         if motivo == "dup_correo":
-            return JSONResponse({"ok": False, "error": "Este correo ya está registrado."}, status_code=409)
+            return JSONResponse({"ok": False, "error": "Ese correo ya está registrado con otro RUC."},
+                                status_code=409)
         if motivo == "limite":
             return JSONResponse({"ok": False, "error": "Recibimos varios registros desde tu red. "
                                  "Intenta más tarde."}, status_code=429)
         return JSONResponse({"ok": False, "error": "No pudimos registrarte."}, status_code=400)
-    return JSONResponse({"ok": True, "mensaje": "Te enviaremos el link y tendrás acceso a la "
-                         "información que buscas."})
+    # REVELAR el link a su pagina de datos ahi mismo (sin motor de correo por ahora).
+    return JSONResponse({"ok": True, "link": f"/mi-distrito?t={res.get('token_baja')}",
+                         "mensaje": "¡Listo! Ya puedes ver los negocios nuevos de tu distrito:"})
 
 
 @app.get("/nuevos-negocios/baja", response_class=HTMLResponse)
@@ -848,6 +866,75 @@ async def nuevos_negocios_baja(request: Request, token: str = ""):
     ok = await db.nn_baja(token)
     return templates.TemplateResponse(request, "nn_baja.html",
                                       {"request": request, "ok": ok})
+
+
+def _wa_url(numero: str, mensaje: str) -> str:
+    from urllib.parse import quote
+    return f"https://wa.me/51{numero}?text={quote(mensaje)}"
+
+
+def _negocios_por_mes(negocios: list) -> list:
+    """Agrupa el listado plano por mes (mas reciente primero) con etiqueta legible."""
+    grupos: dict[str, list] = {}
+    for n in negocios:
+        grupos.setdefault(n["mes"], []).append(n)
+    out = []
+    for mes in sorted(grupos, reverse=True):
+        y, mm = mes.split("-")
+        out.append({"mes": mes, "mes_label": f"{MESES_ES[int(mm)]} {y}",
+                    "total": len(grupos[mes]), "negocios": grupos[mes]})
+    return out
+
+
+@app.get("/mi-distrito", response_class=HTMLResponse)
+async def mi_distrito(request: Request, t: str = ""):
+    """Pagina de datos del distrito (se revela tras registrarse). Listado COMPLETO
+    de juridicas del distrito + confirmar correo + WhatsApp + ofertas del Club."""
+    s = await db.nn_suscriptor_por_token(t)
+    if not s:
+        return templates.TemplateResponse(request, "mi_distrito.html",
+                                          {"request": request, "sub": None}, status_code=404)
+    negocios = await db.nn_negocios_distrito(s.get("ubigeo") or "")
+    distrito_disp = titulo(est.nombre_distrito(s.get("ubigeo")) or s.get("distrito") or "") or "tu distrito"
+    nombre = s.get("razon_social") or s.get("nombre_comercial") or "contador"
+    wa_otro = _wa_url(PSP_WHATSAPP,
+        f"Hola, soy {nombre}, RUC {s.get('ruc')}, distrito {distrito_disp}. "
+        f"Quiero los nuevos negocios de otro distrito.")
+    wa_sugerencia = _wa_url(PSP_WHATSAPP,
+        "Hola, quiero sugerir una herramienta para el Club de Contadores.")
+    return templates.TemplateResponse(request, "mi_distrito.html", {
+        "request": request, "sub": s, "token": t,
+        "distrito": distrito_disp, "nombre_comercial": s.get("nombre_comercial"),
+        "meses": _negocios_por_mes(negocios), "total_neg": len(negocios),
+        "wa_otro": wa_otro, "wa_sugerencia": wa_sugerencia})
+
+
+@app.get("/mi-distrito/descargar")
+async def mi_distrito_descargar(t: str = ""):
+    s = await db.nn_suscriptor_por_token(t)
+    if not s or not s.get("ubigeo"):
+        return JSONResponse({"error": "no encontrado"}, status_code=404)
+    negocios = await db.nn_negocios_distrito(s["ubigeo"])
+    cols = [("mes", "Mes"), ("fecha", "FechaInscripcion"), ("ruc", "RUC"),
+            ("razon_social", "RazonSocial"), ("ciiu", "CIIU"), ("descripcion", "Actividad")]
+    slug = est.slug(est.nombre_distrito(s["ubigeo"]) or "distrito")
+    return _csv_response(cols, negocios, f"nuevos-negocios-{slug}.csv")
+
+
+@app.post("/api/nn/confirmar-correo")
+async def api_nn_confirmar_correo(payload: dict):
+    token = (payload.get("token") or "").strip()
+    nuevo = (payload.get("correo") or "").strip()
+    if nuevo and not _CORREO_RE.match(nuevo):
+        return JSONResponse({"ok": False, "error": "Indica un correo válido."}, status_code=422)
+    res = await db.nn_confirmar_correo(token, nuevo or None)
+    if not res.get("ok"):
+        if res.get("motivo") == "dup_correo":
+            return JSONResponse({"ok": False, "error": "Ese correo ya está registrado con otro RUC."},
+                                status_code=409)
+        return JSONResponse({"ok": False, "error": "No pudimos guardar el correo."}, status_code=400)
+    return JSONResponse({"ok": True, "correo": res.get("correo"),
+                         "mensaje": "¡Gracias! Correo confirmado."})
 
 
 @app.get("/reportes/{dep}", response_class=HTMLResponse)

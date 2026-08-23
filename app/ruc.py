@@ -206,7 +206,9 @@ async def consultar_ruc_contador(ruc: str) -> dict:
     ubigeo = "".join(c for c in str(d.get("ubigeo") or "") if c.isdigit()) or None
     if ubigeo:
         ubigeo = ubigeo.zfill(6)[-6:]
+    nom_com = (d.get("nombreComercial") or d.get("nombre_comercial") or "").strip()
     info = {"razon_social": razon,
+            "nombre_comercial": nom_com or None,
             "distrito": (d.get("distrito") or "").strip() or None,
             "provincia": (d.get("provincia") or "").strip() or None,
             "departamento": (d.get("departamento") or "").strip() or None,

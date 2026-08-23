@@ -130,6 +130,12 @@ async def _asegurar_esquema() -> None:
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_susc_ruc ON suscriptores (ruc)")
     await _pool.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_susc_correo ON suscriptores (lower(correo))")
+    # Campos que se agregaron despues (ubigeo para la pagina de datos; nombre
+    # comercial para el WhatsApp; confirmacion de correo).
+    for col, tipo in (("ubigeo", "text"), ("nombre_comercial", "text"),
+                      ("correo_confirmado_en", "timestamptz")):
+        await _pool.execute(
+            f"ALTER TABLE suscriptores ADD COLUMN IF NOT EXISTS {col} {tipo}")
     # Adelanto EN VIVO (sin tabla pre-calculada): la landing consulta
     # nuevos_negocios por UBIGEO. Indices para que sea instantaneo con 100k+ filas
     # y muchas consultas simultaneas el domingo (QR, señal movil pobre).
@@ -159,8 +165,8 @@ async def padron_lookup(ruc: str) -> dict | None:
         return {"ruc": ruc, **d} if d else None
     assert _pool is not None
     row = await _pool.fetchrow(
-        "SELECT ruc, razon_social, tipo, ubigeo, distrito, provincia, departamento "
-        "FROM contadores_padron WHERE ruc = $1",
+        "SELECT ruc, razon_social, tipo, ubigeo, distrito, provincia, departamento, "
+        "nombre_comercial FROM contadores_padron WHERE ruc = $1",
         ruc,
     )
     return dict(row) if row else None
@@ -526,14 +532,17 @@ async def nn_crear_suscriptor(data: dict) -> dict:
         await _pool.execute(
             """
             INSERT INTO suscriptores
-                (ruc, razon_social, es_contador, distrito, correo, whatsapp, origen,
-                 consentimiento, consentimiento_en, token_baja, ip, user_agent)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now(), $9, $10::inet, $11)
+                (ruc, razon_social, nombre_comercial, es_contador, distrito, ubigeo,
+                 correo, whatsapp, origen, consentimiento, consentimiento_en,
+                 token_baja, ip, user_agent)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now(), $11, $12::inet, $13)
             """,
             (data.get("ruc") or "").strip(),
             (data.get("razon_social") or None),
+            (data.get("nombre_comercial") or None),
             bool(data.get("es_contador")),
             (data.get("distrito") or None),
+            (data.get("ubigeo") or None),
             (data.get("correo") or "").strip().lower(),
             norm_whatsapp(data.get("whatsapp")),
             (data.get("origen") or None),
@@ -543,6 +552,69 @@ async def nn_crear_suscriptor(data: dict) -> dict:
         cn = (getattr(e, "constraint_name", "") or "").lower()
         return {"ok": False, "motivo": "dup_correo" if "correo" in cn else "dup_ruc"}
     return {"ok": True, "token_baja": token}
+
+
+async def nn_token_por_ruc(ruc: str) -> str | None:
+    """Token del suscriptor ya registrado (para revelarle su pagina aunque re-entre)."""
+    if demo_mode() or not ruc:
+        return None
+    assert _pool is not None
+    return await _pool.fetchval(
+        "SELECT token_baja FROM suscriptores WHERE ruc = $1", (ruc or "").strip())
+
+
+async def nn_suscriptor_por_token(token: str) -> dict | None:
+    """Datos del suscriptor por token (para la pagina de datos de su distrito)."""
+    token = (token or "").strip()
+    if not token or demo_mode():
+        return None
+    assert _pool is not None
+    row = await _pool.fetchrow(
+        "SELECT ruc, razon_social, nombre_comercial, es_contador, distrito, ubigeo, "
+        "correo, correo_confirmado_en FROM suscriptores WHERE token_baja = $1", token)
+    return dict(row) if row else None
+
+
+async def nn_confirmar_correo(token: str, nuevo_correo: str | None) -> dict:
+    """Marca el correo como confirmado; si viene uno nuevo, lo actualiza (con dedup
+    por lower(correo)). Devuelve {ok, correo, motivo}."""
+    token = (token or "").strip()
+    if not token or demo_mode():
+        return {"ok": bool(demo_mode())}
+    assert _pool is not None
+    if nuevo_correo:
+        try:
+            row = await _pool.fetchrow(
+                "UPDATE suscriptores SET correo = $2, correo_confirmado_en = now() "
+                "WHERE token_baja = $1 RETURNING correo", token, nuevo_correo.strip().lower())
+        except asyncpg.UniqueViolationError:
+            return {"ok": False, "motivo": "dup_correo"}
+    else:
+        row = await _pool.fetchrow(
+            "UPDATE suscriptores SET correo_confirmado_en = now() "
+            "WHERE token_baja = $1 RETURNING correo", token)
+    if not row:
+        return {"ok": False, "motivo": "no_encontrado"}
+    return {"ok": True, "correo": row["correo"]}
+
+
+async def nn_negocios_distrito(ubigeo: str) -> list[dict]:
+    """Listado COMPLETO de nuevos negocios JURIDICOS del distrito (por UBIGEO),
+    todos los meses (mas reciente primero). Para la pagina de datos del contador."""
+    ubigeo = (ubigeo or "").strip()
+    if not ubigeo or demo_mode():
+        return []
+    assert _pool is not None
+    rows = await _pool.fetch(
+        """
+        SELECT mes_inscripcion mes, razon_social, ruc, ciiu, descripcion,
+               to_char(fecha_inscripcion, 'DD/MM/YYYY') fecha
+        FROM nuevos_negocios
+        WHERE ubigeo = $1 AND tipo = 'juridica'
+              AND razon_social IS NOT NULL AND razon_social <> ''
+        ORDER BY mes_inscripcion DESC, fecha_inscripcion DESC NULLS LAST, ruc
+        """, ubigeo)
+    return [dict(r) for r in rows]
 
 
 async def nn_baja(token: str) -> bool:
