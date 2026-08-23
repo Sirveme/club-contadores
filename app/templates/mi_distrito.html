@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1512">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Nuevos negocios de tu distrito · Perú Sistemas Pro</title>
+  <style>
+    :root{ --bg:#0b1512; --card:#11201b; --card2:#152a22; --line:#25453a;
+      --text:#e8f0ec; --muted:#9fb4ab; --green:#31c98a; --green-d:#1f7f58; --amber:#e0a23b; --err:#e6795a; }
+    *{ box-sizing:border-box; } html,body{ margin:0; }
+    body{ background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+    .wrap{ max-width:680px; margin:0 auto; padding:16px 16px 56px; }
+    a{ color:var(--green); }
+    h1{ font-size:21px; margin:6px 0 2px; } h1 b{ color:var(--green); }
+    .sub{ color:var(--muted); margin:0 0 14px; }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin:14px 0; }
+    .btn{ display:inline-block; width:100%; text-align:center; font:inherit; font-weight:700; padding:14px 16px;
+      border:none; border-radius:12px; background:var(--green); color:#062018; cursor:pointer; text-decoration:none; }
+    .btn.sec{ background:transparent; color:var(--green); border:1px solid var(--green-d); }
+    .btn.wa{ background:#25d366; color:#05240f; }
+    .row-btns{ display:grid; gap:10px; margin-top:8px; }
+    input[type=email]{ width:100%; font:inherit; padding:12px; border-radius:11px; border:1px solid var(--line);
+      background:#0d1a15; color:var(--text); }
+    .mes{ border:1px solid var(--line); border-radius:12px; padding:12px 13px; margin:10px 0; background:var(--card2); }
+    .mes.top{ border-color:var(--green-d); } .mes h3{ margin:0 0 8px; font-size:16px; text-transform:capitalize; }
+    .mes.top h3{ color:var(--green); }
+    .neg{ padding:7px 0; border-top:1px dashed var(--line); } .neg:first-of-type{ border-top:none; }
+    .neg .rs{ font-weight:600; font-size:14px; } .neg .fe{ font-size:12px; color:var(--muted); }
+    .conteo{ margin:8px 0 0; font-size:13px; color:var(--amber); font-weight:600; }
+    .msg{ font-size:13.5px; margin-top:10px; min-height:1.2em; } .msg.ok{ color:var(--green); font-weight:600; } .msg.err{ color:var(--err); }
+    .muted{ color:var(--muted); font-size:13px; }
+    /* Modal */
+    .modal{ position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
+    .modal[hidden]{ display:none; }
+    .modal-box{ background:var(--card); border:1px solid var(--line); border-radius:16px 16px 0 0; width:100%;
+      max-width:680px; max-height:88vh; overflow-y:auto; padding:18px 16px 28px; }
+    .modal-head{ display:flex; justify-content:space-between; align-items:center; }
+    .modal-x{ background:none; border:none; color:var(--muted); font-size:22px; cursor:pointer; }
+    .tool-h{ font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--green); font-weight:800; margin:16px 0 6px; }
+    .tool{ padding:8px 0; border-top:1px solid var(--line); font-size:13.5px; }
+    .tool:first-of-type{ border-top:none; }
+    .tool b{ color:var(--text); }
+    .chip{ display:inline-block; font-size:10.5px; font-weight:700; color:var(--amber); border:1px solid var(--amber);
+      border-radius:99px; padding:1px 7px; margin-left:6px; vertical-align:middle; }
+    .promo{ border:1px solid var(--green-d); background:var(--card2); border-radius:12px; padding:13px; margin:16px 0 4px; }
+    .promo b{ color:var(--green); }
+    @media(min-width:560px){ .modal{ align-items:center; } .modal-box{ border-radius:16px; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+  {% if not sub %}
+    <div class="card">
+      <h1>Enlace no válido</h1>
+      <p class="sub">Este enlace no corresponde a ningún registro. Vuelve a
+        <a href="/">registrarte con tu RUC</a>.</p>
+    </div>
+  {% else %}
+    <h1>Nuevos negocios en <b>{{ distrito }}</b></h1>
+    <p class="sub">
+      {% if sub.razon_social %}Hola, {{ sub.razon_social }}.{% endif %}
+      {{ total_neg }} negocio(s) jurídico(s) nuevo(s) registrado(s) en tu distrito.
+    </p>
+
+    {# Confirmar / corregir correo #}
+    <section class="card" id="correo-box">
+      <p style="margin:0 0 8px"><b>Tu correo:</b> <span id="correo-val">{{ sub.correo }}</span>
+        {% if sub.correo_confirmado_en %}<span class="chip" style="color:var(--green);border-color:var(--green)">confirmado</span>{% endif %}</p>
+      <p class="muted" style="margin:0 0 10px">Si este no es el correo que más usas, cámbialo para enviarte
+        todos los meses la data completa y más información útil. ¿Confirmas tu correo?</p>
+      <div class="row-btns" id="correo-acts">
+        <button class="btn" id="c-si">Sí, es correcto</button>
+        <button class="btn sec" id="c-cambiar">Cambiar correo</button>
+      </div>
+      <div id="correo-edit" hidden>
+        <input type="email" id="c-nuevo" placeholder="tucorreo@dominio.pe" autocomplete="email">
+        <div class="row-btns" style="margin-top:10px"><button class="btn" id="c-guardar">Guardar correo</button></div>
+      </div>
+      <div class="msg" id="c-msg" role="status" aria-live="polite"></div>
+    </section>
+
+    {# Acciones: descargar + pedir otro distrito + ofertas #}
+    <div class="row-btns">
+      <a class="btn sec" href="/mi-distrito/descargar?t={{ token }}">↓ Descargar la lista (CSV)</a>
+      <a class="btn wa" href="{{ wa_otro }}" target="_blank" rel="noopener">Pedir otro distrito por WhatsApp</a>
+      <button class="btn sec" id="ver-club">Ver lo que desbloqueas con el Club</button>
+    </div>
+
+    {# Listado COMPLETO por mes #}
+    {% if meses %}
+    <section style="margin-top:6px">
+      {% for m in meses %}
+      <div class="mes {{ 'top' if loop.first else '' }}">
+        <h3>{{ m.mes_label }}</h3>
+        {% for n in m.negocios %}
+        <div class="neg"><div class="rs">{{ n.razon_social }}</div>
+          <div class="fe">{% if n.fecha %}Inscrita el {{ n.fecha }} · {% endif %}RUC {{ n.ruc }}{% if n.descripcion %} · {{ n.descripcion }}{% endif %}</div></div>
+        {% endfor %}
+        <p class="conteo">{{ m.total }} negocio(s) jurídico(s) en {{ m.mes_label.split(' ')[0] }}.</p>
+      </div>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section class="card"><p class="sub" style="margin:0">Aún no tenemos negocios nuevos cargados en
+      {{ distrito }} para este periodo. Te avisaremos apenas los publiquemos.</p></section>
+    {% endif %}
+  {% endif %}
+  </div>
+
+  {# Modal de herramientas del Club #}
+  <div class="modal" id="modal-club" hidden>
+    <div class="modal-box">
+      <div class="modal-head"><h2 style="font-size:17px;margin:0">Estas herramientas tendrás muy pronto:</h2>
+        <button class="modal-x" data-cerrar aria-label="Cerrar">✕</button></div>
+
+      <div class="tool-h">Gratis para siempre, sin cuenta</div>
+      <div class="tool"><b>Calculadoras</b> <span class="chip">próximamente</span><br>IGV (con y sin), detracciones, percepciones, retenciones, actualización de deuda con TIM, tipo de cambio SUNAT del día</div>
+      <div class="tool"><b>Vencimientos</b> <span class="chip">próximamente</span><br>cronograma por último dígito de RUC y feriados</div>
+      <div class="tool"><b>Emitir</b> <span class="chip">próximamente</span><br>generador de QR y tickets de emergencia no oficiales</div>
+      <div class="tool"><b>Mini página de links</b> <span class="chip">próximamente</span><br>perfil con tus datos de contacto (el mismo del Directorio de Estudios)</div>
+      <div class="tool"><b>SSCO</b> <span class="chip">próximamente</span><br>listado público consultable y filtrable</div>
+
+      <div class="tool-h">Gratis con cuenta del Club</div>
+      <div class="tool"><b>Verificar</b> <span class="chip">próximamente</span><br>padrón RUC y validación de comprobantes, uno por uno</div>
+      <div class="tool"><b>Nuevos negocios</b> <span class="chip">próximamente</span><br>hasta 1 distrito por RUC (desde el segundo, con tarifa)</div>
+      <div class="tool"><b>Alertas por correo</b> <span class="chip">próximamente</span><br>las que SUNAT ya te envía por email</div>
+
+      <p class="muted" style="margin:16px 0 0">¿Se te ocurre una herramienta, gratuita o de pago?
+        <a href="{{ wa_sugerencia }}" target="_blank" rel="noopener">Escríbenos</a>.</p>
+
+      <div class="promo">
+        <b>alerta.pe</b> — vigila el Buzón SUNAT de tus clientes: <b>S/25 hasta 10 RUC, S/5 por cada RUC adicional.</b><br>
+        <a href="https://alerta.pe/contadores" target="_blank" rel="noopener">Conocer alerta.pe →</a>
+      </div>
+    </div>
+  </div>
+
+  {% if sub %}
+  <script>
+  (function(){
+    var TOKEN = {{ token|tojson }};
+    var box = document.getElementById('correo-box');
+    var acts = document.getElementById('correo-acts');
+    var edit = document.getElementById('correo-edit');
+    var msg = document.getElementById('c-msg');
+    function post(correo){
+      msg.textContent='Guardando…'; msg.className='msg';
+      return fetch('/api/nn/confirmar-correo',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({token:TOKEN, correo:correo||null})})
+        .then(function(r){ return r.json().then(function(j){return {ok:r.ok,j:j};}); });
+    }
+    document.getElementById('c-si').onclick = function(){
+      post(null).then(function(res){
+        if(res.ok&&res.j.ok){ acts.hidden=true; edit.hidden=true; msg.textContent='¡Gracias! Correo confirmado.'; msg.className='msg ok'; }
+        else { msg.textContent=(res.j&&res.j.error)||'No se pudo.'; msg.className='msg err'; }
+      });
+    };
+    document.getElementById('c-cambiar').onclick = function(){ acts.hidden=true; edit.hidden=false; };
+    document.getElementById('c-guardar').onclick = function(){
+      var v=document.getElementById('c-nuevo').value.trim();
+      if(!v){ msg.textContent='Escribe tu correo.'; msg.className='msg err'; return; }
+      post(v).then(function(res){
+        if(res.ok&&res.j.ok){ document.getElementById('correo-val').textContent=res.j.correo; edit.hidden=true;
+          msg.textContent='¡Gracias! Correo actualizado y confirmado.'; msg.className='msg ok'; }
+        else { msg.textContent=(res.j&&res.j.error)||'No se pudo.'; msg.className='msg err'; }
+      });
+    };
+    // Modal Club
+    var modal=document.getElementById('modal-club');
+    document.getElementById('ver-club').onclick=function(){ modal.hidden=false; };
+    document.addEventListener('click',function(e){ if(e.target.closest('[data-cerrar]')||e.target===modal) modal.hidden=true; });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape') modal.hidden=true; });
+  })();
+  </script>
+  {% endif %}
+</body>
+</html>

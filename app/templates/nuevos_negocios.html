@@ -275,8 +275,14 @@
           .then(function(res){
             if(res.ok && res.j.ok){
               f.innerHTML='';
-              var okmsg = el('p','msg ok', res.j.mensaje || '¡Listo! Te enviaremos el link.');
+              var okmsg = el('p','msg ok', res.j.mensaje || '¡Listo!');
               okmsg.style.fontSize='15px'; f.appendChild(okmsg);
+              if(res.j.link){
+                var a = el('a','btn'); a.href = res.j.link;
+                a.textContent = 'Entra aquí y mira todos los negocios nuevos de tu distrito';
+                a.style.display='block'; a.style.textAlign='center'; a.style.textDecoration='none';
+                a.style.marginTop='12px'; f.appendChild(a);
+              }
             } else {
               msg.textContent=(res.j&&res.j.error)||'No pudimos registrarte.'; msg.className='msg err';
               btn.disabled=false;
