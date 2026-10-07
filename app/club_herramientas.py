@@ -9,6 +9,8 @@ agregan, se activan o se cambian de nivel).
   frases : textos que ROTAN en la esquina de la tarjeta (CSS). Solo hechos
            verificables de la herramienta; nada de popularidad inventada.
   icono  : clave de ICONOS (trazos SVG 24x24)
+  efecto : opcional, como entra la frase: "escribe" | "sube" | "fade". Sin el
+           campo, la vitrina reparte los tres entre las tarjetas.
 
 La vitrina (/club/tablero) agrupa por nivel y pone las activas primero.
 `mejora` apunta al id de la version de pago.
@@ -27,7 +29,7 @@ NIVELES = [
 HERRAMIENTAS = [
     # --- Gratis -------------------------------------------------------------
     {"id": "igv", "nivel": "gratis", "estado": "activa", "icono": "calc", "url": "/club/igv",
-     "nombre": "Calculadora de IGV", "sub": "Separa o agrega el 18%, al céntimo",
+     "nombre": "Calculadora de IGV", "efecto": "escribe", "sub": "Separa o agrega el 18%, al céntimo",
      "ben": "Cuadra tus comprobantes en segundos.", "cta": "Usar ahora",
      "frases": ["Al céntimo, sin descuadres", "Con IGV o sin IGV", "Sin crear cuenta", "Tasa general 18%"]},
     {"id": "calc", "nivel": "gratis", "estado": "pronto", "icono": "pct",
@@ -56,7 +58,7 @@ HERRAMIENTAS = [
      "frases": ["Visible en tu distrito", "Tu estudio, con tu nombre"]},
     # --- Con tu cuenta ------------------------------------------------------
     {"id": "nn", "nivel": "cuenta", "estado": "activa", "icono": "chart", "url": "{nn_url}", "mejora": "nn2",
-     "nombre": "Nuevos Negocios", "sub": "Altas SUNAT de tu distrito, cada mes",
+     "nombre": "Nuevos Negocios", "sub": "Altas SUNAT de tu distrito, cada mes", "efecto": "sube",
      "ben": "Quiénes se inscribieron en SUNAT en tu distrito. Llega antes que nadie.", "cta": "Ver mi distrito",
      "frases": ["Datos SUNAT de {mes_dato}", "Con actividad y fecha de alta", "Solo tu distrito", "Descárgalo en CSV"]},
     {"id": "verif", "nivel": "cuenta", "estado": "pronto", "icono": "check",
@@ -81,7 +83,7 @@ HERRAMIENTAS = [
      "frases": ["Ubigeo {ubigeo}", "Exportable"]},
     # --- Premium ------------------------------------------------------------
     {"id": "alerta", "nivel": "premium", "estado": "activa", "icono": "inbox", "url": "https://alerta.pe/contadores",
-     "nombre": "alerta.pe", "sub": "Buzón SUNAT y SUNAFIL de tus clientes", "precio": "S/25",
+     "nombre": "alerta.pe", "efecto": "fade", "sub": "Buzón SUNAT y SUNAFIL de tus clientes", "precio": "S/25",
      "precio_det": "hasta 10 RUC · S/5 cada RUC adicional",
      "ben": "Entérate de cada notificación antes que tu cliente.", "cta": "Conocer alerta.pe",
      "frases": ["SUNAT y SUNAFIL juntos", "Aviso apenas llega", "No marca como leído", "Hasta 10 RUC por S/25"]},
@@ -159,8 +161,23 @@ def armar_tablero(valores: dict) -> list[dict]:
             por_id[h["id"]] = h
         secciones.append({**n, "herramientas": hs,
                           "activas": sum(1 for h in hs if h["estado"] == "activa")})
+    # Ritmo propio por tarjeta: duracion por frase, desfase y efecto distintos, para
+    # que nunca cambien todas a la vez. Desfase negativo = arranca ya a mitad de ciclo.
+    i = 0
     for s in secciones:
         for h in s["herramientas"]:
             if h.get("mejora") in por_id:
                 h["mejora_nombre"] = por_id[h["mejora"]]["nombre"]
+            n = max(1, len(h["frases"]))
+            # Las "Muy pronto" van mas lentas: el ojo encuentra primero las activas.
+            h["ritmo"] = round(RITMOS[i % len(RITMOS)] * (1 if h["estado"] == "activa" else LENTO_PRONTO), 2)
+            h["desfase"] = round(-((i * DESFASE) % (n * h["ritmo"])), 2)
+            h["efecto"] = h.get("efecto") or EFECTOS[i % len(EFECTOS)]
+            i += 1
     return secciones
+
+
+RITMOS = [3.4, 2.6, 4.2, 3.0, 3.8]      # segundos por frase
+DESFASE = 1.3                            # segundos entre una tarjeta y la siguiente
+LENTO_PRONTO = 1.6                       # multiplicador de ritmo para las "Muy pronto"
+EFECTOS = ["sube", "fade", "sube", "fade", "escribe"]   # escribir llama mucho: 1 de cada 5
