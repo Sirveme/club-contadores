@@ -3,7 +3,7 @@
 {% block titulo %}Tablero · Club de Contadores{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
-<link rel="stylesheet" href="/static/css/club-vitrina.css?v=2">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=6">
 {% endblock %}
 {% block contenido %}
 <div class="vitrina" id="hoja">
@@ -71,7 +71,9 @@
         <div class="pie">
           {% if activa %}<span class="cta">{{ h.cta or "Abrir" }} <i>{{ "↗" if h.externa else "→" }}</i></span>
           {% elif h.mejora_nombre %}<span class="sube">Versión de pago: {{ h.mejora_nombre }}</span>{% endif %}
-          {% if h.frases %}<span class="rota rota-{{ h.frases|length }}" aria-hidden="true">{% for f in h.frases %}<span>{{ f }}</span>{% endfor %}</span>{% endif %}
+          {% if h.frases %}<span class="rota rota-{{ h.frases|length }} ef-{{ h.efecto }}" aria-hidden="true"
+                style="--dur: {{ h.ritmo }}s; --d0: {{ h.desfase }}s; --n: {{ h.frases|length }}" data-ritmo="{{ h.ritmo }}" data-desfase="{{ h.desfase }}">
+            {% for f in h.frases %}<span class="medida">{{ f }}</span>{% endfor %}{% for f in h.frases %}<span class="f{% if loop.first %} primera{% endif %}" style="--i: {{ loop.index0 }}">{{ f }}</span>{% endfor %}</span>{% endif %}
         </div>
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">{{ h.svg|safe }}</svg>
       </{{ "a" if activa else "div" }}>
@@ -107,6 +109,7 @@
   <span>Activas: <b>{{ activas }}</b> de <b>{{ total }}</b></span>
 {% endblock %}
 {% block scripts %}
+<script src="/static/js/club-vitrina.js?v=1"></script>
 <script>
 document.getElementById("optDir").addEventListener("change", async e => {
   const msg = document.getElementById("optMsg"), cb = e.target;
