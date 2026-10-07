@@ -1,0 +1,18 @@
+{% extends "club/base.html" %}
+{% set hoja = "puerta" %}
+{% block titulo %}Empresarios · Club de Contadores{% endblock %}
+{% block contenido %}
+  {# Ruta de empresarios: por ahora confirma el registro. El diseño propio (más cálido) va después. #}
+  <section class="fx" aria-label="Saludo">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">="</span>Hola, {{ nombre }}<span class="q">"</span></div>
+  </section>
+  <div class="estrecho">
+    <div class="msg info"><b>Ya estás registrado como empresario</b> (RUC {{ s.ruc }}).
+      Estamos preparando las herramientas para tu negocio; te avisaremos a {{ s.correo }}.</div>
+    <div class="acciones"><a class="btn" href="/club/igv">Usar la Calculadora de IGV</a>
+      {% if s.ubigeo %}<a class="btn sec" href="/club/directorio/{{ s.ubigeo }}">Ver contadores de {{ s.distrito }}</a>{% endif %}
+      <a class="btn sec" href="/club/salir">Salir</a></div>
+  </div>
+{% endblock %}

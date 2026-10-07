@@ -1,0 +1,33 @@
+{% extends "club/base.html" %}
+{% set hoja = "igv" %}
+{% block titulo %}Calculadora de IGV · Club de Contadores{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Fórmula">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">=</span>IGV(monto; incluido)</div>
+  </section>
+  <div class="estrecho">
+    <section class="panel" aria-label="Calculadora de IGV" style="--lv: var(--lv-gratis)">
+      <header class="panel-cab"><b style="color:var(--lv-gratis)">Calculadora de IGV</b><span>Gratis · sin cuenta · tasa general 18% (IGV 16% + IPM 2%)</span></header>
+      <div class="panel-cuerpo">
+        <div class="modo" role="group" aria-label="El monto">
+          <button type="button" data-incluido="1" aria-pressed="true">Incluye IGV</button>
+          <button type="button" data-incluido="0" aria-pressed="false">No incluye IGV</button>
+        </div>
+        <div class="campo"><label for="monto" id="lblMonto">Monto con IGV (total)</label>
+          <input id="monto" inputmode="decimal" autocomplete="off" value="1180.00"></div>
+        <dl class="res-igv" aria-live="polite">
+          <div><dt>Valor de venta</dt><dd id="rBase">—</dd></div>
+          <div><dt>IGV 18%</dt><dd id="rIgv">—</dd></div>
+          <div class="tot"><dt>Precio de venta</dt><dd id="rTot">—</dd></div>
+        </dl>
+        <div class="nota" id="igvMsg" aria-live="polite"></div>
+        <p class="nota" style="margin:0">Redondeo al céntimo: el IGV es la diferencia, así valor de venta + IGV = precio, exacto.
+          Para restaurantes y hoteles MYPE con tasa reducida, usa la tasa vigente que corresponda.</p>
+      </div>
+    </section>
+    {% if not s %}<div class="msg info">¿Eres contador? <a href="/club">Entra al Club</a>: Nuevos Negocios de tu distrito y más herramientas, gratis con tu cuenta.</div>{% endif %}
+  </div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/club-igv.js?v=1"></script>{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "club/base.html" %}
+{% set hoja = "tablero" %}
+{% block titulo %}Tablero · Club de Contadores{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Saludo">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">="</span>Hola, {{ nombre }}{% if s.distrito %} · contador de {{ s.distrito }}{% endif %}<span class="q">"</span></div>
+  </section>
+
+  <dl class="socio">
+    <div><dt>RUC</dt><dd>{{ s.ruc }}</dd></div>
+    <div><dt>Titular</dt><dd title="{{ s.razon_social or '' }}">{{ (s.razon_social or "—")|titulo }}</dd></div>
+    <div><dt>Distrito</dt><dd>{{ ubic or "Sin distrito" }}</dd></div>
+    <div><dt>Actividad</dt><dd>{% if p %}CIIU 6920 · {{ "principal" if p.ciiu_tipo == "P" else "secundario" }}{% elif s.verificacion == "api" %}CIIU 6920 (SUNAT){% else %}—{% endif %}</dd></div>
+    <div><dt>Verificación</dt>
+      {% if s.verificacion == "padron" %}<dd class="ok">✓ en padrón SUNAT</dd>
+      {% elif s.verificacion == "api" %}<dd class="ok">✓ SUNAT · CIIU 6920</dd>
+      {% else %}<dd class="verif-pc" title="Marca informativa: tienes acceso completo">Por confirmar</dd>{% endif %}</div>
+    <div><dt>Contadores en tu distrito</dt><dd>{{ contadores_distrito|miles if contadores_distrito is not none else "—" }}</dd></div>
+  </dl>
+
+  <main class="hoja" id="hoja" aria-label="Herramientas">
+    {% for c in columnas %}
+    {% set activas_n = c.herramientas|selectattr("estado", "equalto", "activa")|map(attribute="nombre")|list %}
+    <section class="col lv-{{ c.id }}" id="col-{{ c.id }}" aria-label="{{ c.nombre }}">
+      <header class="col-cab"><span class="letra">{{ c.letra }}</span><b>{{ c.nombre }}</b>
+        <span class="cnt">{{ c.activas }}/{{ c.herramientas|length }} activas<span class="chev" aria-hidden="true">▾</span></span>
+        <small>{{ c.sub }}</small>
+        <small class="resumen">{{ (activas_n + [(c.herramientas|length - c.activas)|string + " muy pronto"])|join(" · ") }}</small>
+        <span class="flecha" aria-hidden="true">→</span>
+        {# En movil la seccion arranca colapsada; este boton (oculto en escritorio) la abre. #}
+        <button type="button" class="col-toggle" aria-expanded="false" aria-controls="col-{{ c.id }}"
+                aria-label="Mostrar herramientas {{ c.nombre }}"></button></header>
+      {% for h in c.herramientas %}
+        {% set activa = h.estado == "activa" %}
+        <{{ "a" if activa else "div" }} class="tool {{ h.estado }}" id="t-{{ h.id }}" data-nombre="{{ h.nombre }}" data-dir="{{ h.dir }}"
+          {% if activa %}href="{{ h.url }}"{% if h.externa %} target="_blank" rel="noopener"{% endif %}{% else %}aria-disabled="true"{% endif %}>
+          <div class="cab"><span class="dir">{{ h.dir }}</span><span class="fn">{{ h.fn }}</span>
+            {% if not activa %}<span class="badge">Muy pronto</span>{% endif %}</div>
+          <h3>{{ h.nombre }}</h3>
+          <p>{{ h.desc }}</p>
+          {% if h.id == "nn" and nn %}
+            <div class="mini">
+              {% for m in nn.meses %}<span class="k">{{ m.mes }}</span><span class="bar"><i style="width:{{ m.pct }}%"></i></span><span>{{ m.n }}</span>{% endfor %}
+            </div>
+            {% if nn.recientes %}<ul class="lista">
+              {% for r in nn.recientes %}<li><span>{{ r.razon_social }}</span><span>{{ r.mes }}</span></li>{% endfor %}
+            </ul>{% endif %}
+          {% elif h.id == "alerta" %}
+            <div class="precio">S/25 <small>hasta 10 RUC · S/5 cada RUC adicional</small></div>
+          {% endif %}
+          {% if h.id == "nn" %}
+            <div class="pie"><span>{{ s.distrito or "tu distrito" }} · altas SUNAT{% if h.mejora_dir %} · <span class="sube">más en {{ h.mejora_dir }}</span>{% endif %}</span><b>Abrir →</b></div>
+          {% elif h.id == "alerta" %}
+            <div class="pie"><span>alerta.pe</span><b>Abrir ↗</b></div>
+          {% elif activa %}
+            <div class="pie"><span>{{ c.nombre }}</span><b>Abrir →</b></div>
+          {% elif h.mejora_dir %}
+            <div class="pie"><span class="sube">versión de pago en {{ h.mejora_dir }}</span><span>—</span></div>
+          {% endif %}
+        </{{ "a" if activa else "div" }}>
+      {% endfor %}
+      <div class="col-relleno"></div>
+    </section>
+    {% endfor %}
+  </main>
+
+  <section class="gana" aria-label="Gana con nosotros">
+    <header class="gana-cab"><b>Gana con nosotros</b><span>Para ofrecer a tus clientes: recomiéndalos y cobra comisión.</span>
+      <span class="pct">% comisión</span></header>
+    <div class="gana-fila">
+      {% for g in gana %}
+      <div class="tool pronto {{ g.estado }}" id="t-{{ g.id }}" data-nombre="{{ g.nombre }}" data-dir="G{{ loop.index }}" aria-disabled="true">
+        <div class="cab"><span class="dir">G{{ loop.index }}</span><span class="fn">{{ g.fn }}</span>
+          <span class="badge">{{ "Más adelante" if g.estado == "despues" else "Muy pronto" }}</span></div>
+        <h3>{{ g.nombre }}</h3><p>{{ g.desc }}</p>
+        <div class="pie"><span class="com">Comisión por cada cliente</span><span>—</span></div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel" id="perfil" aria-label="Mi perfil">
+    <header class="panel-cab"><b>Mi perfil</b><span>{{ s.correo }}{% if s.whatsapp %} · WhatsApp {{ s.whatsapp }}{% endif %}</span></header>
+    <div class="panel-cuerpo">
+      <label class="check dir-opt" for="optDir">
+        <input type="checkbox" id="optDir" {% if s.directorio_optin %}checked{% endif %}>
+        <span>Quiero aparecer en el Directorio de Contadores de mi distrito.
+          <small>Es un permiso aparte de tu registro. Si lo quitas, desapareces del Directorio al instante.</small></span>
+      </label>
+      <div class="nota" id="optMsg" aria-live="polite">{% if s.directorio_optin %}Apareces en <a href="/club/directorio">Contadores de {{ s.distrito or "tu distrito" }}</a>.{% else %}No apareces en el Directorio.{% endif %}</div>
+    </div>
+  </section>
+{% endblock %}
+{% block estado %}
+  {% for c in columnas %}<span><i class="dot" style="background:var(--lv-{{ c.id }})"></i>{{ c.nombre }}: <b>{{ c.herramientas|length }}</b></span>{% endfor %}
+  <span>Activas: <b>{{ activas }}</b> de <b>{{ total }}</b></span>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById("optDir").addEventListener("change", async e => {
+  const msg = document.getElementById("optMsg"), cb = e.target;
+  cb.disabled = true;
+  try {
+    const r = await fetch("/api/club/perfil/directorio", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ optin: cb.checked }) });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || "No pudimos guardar el cambio.");
+    msg.innerHTML = d.optin ? 'Listo: apareces en <a href="/club/directorio">el Directorio de tu distrito</a>.' : "Listo: ya no apareces en el Directorio.";
+  } catch (err) { cb.checked = !cb.checked; msg.textContent = err.message; }
+  cb.disabled = false;
+});
+</script>
+{% endblock %}

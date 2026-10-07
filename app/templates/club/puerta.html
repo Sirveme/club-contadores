@@ -1,0 +1,155 @@
+{% extends "club/base.html" %}
+{% set hoja = "puerta" %}
+{% block titulo %}Club de Contadores{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Bienvenida">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val" id="fxVal"><span class="q">="</span>Bienvenido al Club de Contadores<span class="q">"</span></div>
+  </section>
+
+  <div class="estrecho">
+    <section class="panel" id="paso1" aria-label="Entrar">
+      <header class="panel-cab"><b>Entrar al Club</b><span>Elige quién eres y escribe tu RUC.</span></header>
+      <div class="panel-cuerpo">
+        <div class="roles" role="group" aria-label="¿Quién eres?">
+          <button type="button" class="rol" data-rol="contador" aria-pressed="{{ 'true' if rol != 'empresario' else 'false' }}">
+            <span class="dir">A</span><b>Soy Contador</b><span>Contador o estudio contable</span></button>
+          <button type="button" class="rol" data-rol="empresario" aria-pressed="{{ 'true' if rol == 'empresario' else 'false' }}">
+            <span class="dir">B</span><b>Soy Empresario</b><span>Tengo un negocio o empresa</span></button>
+        </div>
+        <form id="fRuc" class="campo" novalidate>
+          <label for="ruc">RUC</label>
+          <input id="ruc" name="ruc" inputmode="numeric" maxlength="11" autocomplete="off" placeholder="10XXXXXXXXX" required>
+          <small>Te reconocemos con el padrón SUNAT. No pedimos tu clave SOL.</small>
+          <div class="acciones" style="margin-top:6px"><button class="btn" type="submit" id="btnRuc">Continuar</button></div>
+        </form>
+        <div id="res1" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="paso2" hidden aria-label="Registro">
+      <header class="panel-cab"><b>Registro</b><span id="regSub"></span></header>
+      <form class="panel-cuerpo" id="fReg" novalidate>
+        <div class="saludo-reg" id="regSaludo"></div>
+        <div class="fila-campos">
+          <div class="campo"><label for="correo">Correo</label>
+            <input id="correo" type="email" autocomplete="email" required placeholder="tu@correo.com"></div>
+          <div class="campo"><label for="whatsapp">WhatsApp <span style="text-transform:none">(opcional)</span></label>
+            <input id="whatsapp" inputmode="numeric" maxlength="9" autocomplete="tel" placeholder="9XXXXXXXX"></div>
+        </div>
+        <div class="hp" aria-hidden="true"><label for="empresa_web">No llenar</label><input id="empresa_web" tabindex="-1" autocomplete="off"></div>
+        <label class="check" for="consent">
+          <input type="checkbox" id="consent">
+          <span>Autorizo a Perú Sistemas Pro a tratar mis datos para darme acceso al Club y enviarme información de sus herramientas por correo y/o WhatsApp (Ley 29733).
+            <small>Puedes darte de baja cuando quieras. <a href="{{ anpd_url }}" target="_blank" rel="noopener">Registro ante la ANPD</a>.</small></span>
+        </label>
+        <label class="check dir-opt" for="optDir" id="optDirBox">
+          <input type="checkbox" id="optDir">
+          <span>Quiero aparecer en el Directorio de Contadores de mi distrito.
+            <small>Opcional y aparte del registro: los empresarios de tu distrito verán tu nombre y tu mini-página. Puedes quitarte en Mi perfil.</small></span>
+        </label>
+        <div id="res2" aria-live="polite"></div>
+        <div class="acciones"><button class="btn" type="submit" id="btnReg">Entrar al Club</button>
+          <button class="btn sec" type="button" id="btnVolver">Cambiar RUC</button></div>
+      </form>
+    </section>
+  </div>
+{% endblock %}
+{% block estado %}<span>Padrón SUNAT: <b>157,357</b> contadores</span><span id="estadoTxt">Listo</span>{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const ORIGEN = {{ origen|tojson }}, WA = {{ psp_whatsapp|tojson }};
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let rol = document.querySelector('.rol[aria-pressed="true"]').dataset.rol, actual = null;
+
+  document.querySelectorAll(".rol").forEach(b => b.onclick = () => setRol(b.dataset.rol));
+  function setRol(r) {
+    rol = r;
+    document.querySelectorAll(".rol").forEach(b => b.setAttribute("aria-pressed", b.dataset.rol === r));
+    $("res1").innerHTML = "";
+  }
+  async function post(url, body) {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    let d = {}; try { d = await r.json(); } catch (e) {}
+    return { r, d };
+  }
+  function msg(html, tipo) { return `<div class="msg ${tipo || "info"}">${html}</div>`; }
+
+  $("fRuc").onsubmit = e => { e.preventDefault(); consultar(false); };
+  async function consultar(continuar) {
+    const ruc = $("ruc").value.replace(/\D/g, "");
+    if (ruc.length !== 11) { $("res1").innerHTML = msg("El RUC tiene 11 dígitos.", "err"); return; }
+    $("btnRuc").disabled = true; $("estadoTxt").textContent = "Consultando padrón…";
+    try {
+      const { r, d } = await post("/api/club/ruc", { rol, ruc, continuar });
+      if (!r.ok || !d.ok) throw new Error(d.error || "No pudimos consultar. Intenta de nuevo.");
+      mostrar(d, continuar);
+    } catch (err) { $("res1").innerHTML = msg(esc(err.message), "err"); }
+    $("btnRuc").disabled = false; $("estadoTxt").textContent = "Listo";
+  }
+
+  function mostrar(d, continuar) {
+    const res = $("res1");
+    if (d.accion === "registro") { actual = { ...d, continuar }; abrirRegistro(d); res.innerHTML = ""; return; }
+    if (d.accion === "orientar_empresario") {
+      res.innerHTML = msg(`<b>${esc(d.razon_social || "Este RUC")}</b> no figura como estudio contable en el padrón SUNAT. ¿Quizás eres empresario?`) +
+        `<div class="acciones" style="margin-top:8px"><button class="btn" type="button" id="aEmp">Registrarme como empresario</button>
+         <button class="btn sec" type="button" id="aSigue">Soy un estudio contable, continuar</button></div>`;
+      $("aEmp").onclick = () => { setRol("empresario"); consultar(false); };
+      $("aSigue").onclick = () => consultar(true);
+    } else if (d.accion === "orientar_contador") {
+      res.innerHTML = msg(`Tu RUC figura como <b>contador o estudio contable</b> en el padrón SUNAT${d.distrito ? " (" + esc(d.distrito) + ")" : ""}. Regístrate en el Club de Contadores: tiene herramientas hechas para ti.`) +
+        `<div class="acciones" style="margin-top:8px"><button class="btn" type="button" id="aCon">Ir al Club de Contadores</button>
+         <button class="btn sec" type="button" id="aSigue">Continuar como empresario</button></div>`;
+      $("aCon").onclick = () => { setRol("contador"); consultar(false); };
+      $("aSigue").onclick = () => consultar(true);
+    } else if (d.accion === "ya_registrado") {
+      res.innerHTML = msg("Este RUC ya está en el Club. Escribe el correo con que te registraste para entrar.") +
+        `<form class="campo" id="fRe" style="margin-top:8px" novalidate><label for="reCorreo">Correo registrado</label>
+         <input id="reCorreo" type="email" autocomplete="email" required>
+         <div class="acciones" style="margin-top:6px"><button class="btn" type="submit">Entrar</button></div><div id="reMsg"></div></form>`;
+      $("fRe").onsubmit = async e => {
+        e.preventDefault();
+        const { r, d: x } = await post("/api/club/reingresar", { ruc: d.ruc, correo: $("reCorreo").value });
+        if (r.ok && x.ok) location.href = x.link; else $("reMsg").innerHTML = msg(esc(x.error || "No pudimos entrar."), "err");
+      };
+    } else {   // escribenos: RUC invalido o inexistente en SUNAT
+      res.innerHTML = msg(`${esc(d.mensaje)}<br>WhatsApp: <b class="mono">${esc(WA)}</b> · <a href="https://wa.me/51${esc(WA)}" target="_blank" rel="noopener">Escríbenos</a>`, "err");
+    }
+  }
+
+  function abrirRegistro(d) {
+    $("paso1").hidden = true; $("paso2").hidden = false; $("res2").innerHTML = "";
+    const esContador = d.rol === "contador";
+    let saludo = d.nombre ? `Hola, ${esc(d.nombre)}` : "Hola";
+    if (esContador && d.distrito) saludo += ` · contador de ${esc(d.distrito)}`;
+    const nota = { padron: "Te reconocimos en el padrón SUNAT de contadores.", api: "SUNAT confirma tu actividad contable (CIIU 6920).",
+                   por_confirmar: "Tu RUC no figura en el padrón de contadores. Entras con acceso completo; confirmaremos tu actividad después.",
+                   no_aplica: "Entras como empresario." }[d.verificacion] || "";
+    $("regSaludo").innerHTML = `${saludo}<small>RUC ${esc(d.ruc)}${d.razon_social ? " · " + esc(d.razon_social) : ""} — ${nota}</small>`;
+    $("regSub").textContent = esContador ? "Club de Contadores" : "Empresarios";
+    $("optDirBox").hidden = !esContador; $("optDir").checked = false;
+    $("fxVal").innerHTML = `<span class="q">="</span>${saludo}<span class="q">"</span>`;
+    $("correo").focus();
+  }
+  $("btnVolver").onclick = () => { $("paso2").hidden = true; $("paso1").hidden = false;
+    $("fxVal").innerHTML = '<span class="q">="</span>Bienvenido al Club de Contadores<span class="q">"</span>'; };
+
+  $("fReg").onsubmit = async e => {
+    e.preventDefault();
+    if (!$("consent").checked) { $("res2").innerHTML = msg("Marca la autorización para entrar al Club.", "err"); return; }
+    $("btnReg").disabled = true;
+    const { r, d } = await post("/api/club/registro", {
+      rol: actual.rol, ruc: actual.ruc, continuar: actual.continuar, correo: $("correo").value, whatsapp: $("whatsapp").value,
+      consentimiento: true, directorio_optin: actual.rol === "contador" && $("optDir").checked,
+      empresa_web: $("empresa_web").value, origen: ORIGEN });
+    if (r.ok && d.ok) { location.href = d.link || "/club/tablero"; return; }
+    $("btnReg").disabled = false;
+    $("res2").innerHTML = msg(esc(d.error || d.mensaje || "No pudimos registrarte."), "err");
+  };
+})();
+</script>
+{% endblock %}

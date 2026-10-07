@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{% block titulo %}Club de Contadores{% endblock %}</title>
+<meta name="description" content="Club de Contadores: herramientas para contadores del Perú, con el padrón SUNAT.">
+<meta name="theme-color" content="#101412">
+<script>try{var t=localStorage.getItem("club.tema");if(t==="tinta"||t==="papel")document.documentElement.dataset.tema=t;}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/static/css/club.css?v=3">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <a class="marca" href="/club" style="text-decoration:none"><b>Club de Contadores</b><span>contadores.perusistemas.pro</span></a>
+    <span class="chip"><i></i>Padrón SUNAT · corte 17.09.2026</span>
+    <span class="sp"></span>
+    {% if s and s.rol == "contador" %}
+      <a class="btn-dir{% if not s.ubigeo %} sin{% endif %}" href="/club/directorio" {% block dir_actual %}{% endblock %}>
+        Contadores de tu distrito{% if s.distrito %} <span>{{ s.distrito }} →</span>{% endif %}</a>
+      <a class="salir" href="/club/salir">Salir</a>
+    {% endif %}
+  </header>
+
+  {% block contenido %}{% endblock %}
+
+  <footer class="pie-hoja">
+    <nav class="tabs" aria-label="Hojas">
+      {% block tabs %}
+      {% if s and s.rol == "contador" %}
+        <a href="/club/tablero" {% if hoja == "tablero" %}aria-current="page"{% endif %}>Tablero</a>
+        <a href="/club/directorio" {% if hoja == "directorio" %}aria-current="page"{% endif %}>Contadores de {{ s.distrito or "tu distrito" }}</a>
+        <a href="/club/tablero#perfil">Mi perfil</a>
+      {% else %}
+        <a href="/club" {% if hoja == "puerta" %}aria-current="page"{% endif %}>Entrar al Club</a>
+        <a href="/club/igv" {% if hoja == "igv" %}aria-current="page"{% endif %}>Calculadora de IGV</a>
+      {% endif %}
+      {% endblock %}
+    </nav>
+    <div class="estado">{% block estado %}<span>Listo</span>{% endblock %}</div>
+  </footer>
+</div>
+
+<nav class="rail" aria-label="Ajustes de vista">
+  <button type="button" id="fMenos" data-tip="Letra más chica" aria-label="Letra más chica">A−</button>
+  <button type="button" id="fMas" data-tip="Letra más grande" aria-label="Letra más grande">A+</button>
+  <div class="sep"></div>
+  <button type="button" data-tema="grafito" data-tip="Tema Grafito" aria-label="Tema Grafito"><span class="sw" style="background:#151a17"></span></button>
+  <button type="button" data-tema="tinta" data-tip="Tema Tinta" aria-label="Tema Tinta"><span class="sw" style="background:#182032"></span></button>
+  <button type="button" data-tema="papel" data-tip="Tema Papel" aria-label="Tema Papel"><span class="sw" style="background:#e4e2da"></span></button>
+  <div class="sep"></div>
+  <button type="button" id="btnIr" data-tip="Buscar / ir a  (Ctrl+G)" aria-label="Buscar o ir a">
+    <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+  </button>
+</nav>
+
+<div class="irA" id="irA" hidden role="dialog" aria-label="Ir a herramienta">
+  <header><span>Ir a</span><kbd>Esc</kbd></header>
+  <input id="irInput" type="text" placeholder="Herramienta o celda (ej. ssco, B1)" autocomplete="off">
+  <ul id="irLista"></ul>
+</div>
+<script src="/static/js/club.js?v=2"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,24 @@
+{% extends "club/base.html" %}
+{% set hoja = "directorio" %}
+{% block titulo %}{{ nombre }} · Club de Contadores{% endblock %}
+{% block contenido %}
+  {# ESQUELETO de la mini-pagina individual: se completa despues (servicios, contacto, horario). #}
+  <section class="fx" aria-label="Estudio">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">="</span>{{ nombre }}<span class="q">"</span></div>
+  </section>
+  <div class="estrecho">
+    <section class="panel">
+      <header class="panel-cab"><b>Mini-página</b><span>{{ (c.distrito or "")|titulo }}</span></header>
+      <div class="panel-cuerpo">
+        <dl class="dir-stats" style="width:fit-content">
+          <div><dt>Distrito</dt><dd>{{ c.distrito or "—" }}</dd></div>
+          <div><dt>Especialidad</dt><dd>{{ [c.especialidad1, c.especialidad2]|select|join(" · ") or "—" }}</dd></div>
+        </dl>
+        <p class="nota" style="margin:0">Esta mini-página está en construcción: pronto tendrá servicios, contacto y horario del estudio.</p>
+        {% if c.ubigeo %}<div class="acciones"><a class="btn sec" href="/club/directorio/{{ c.ubigeo }}">← Contadores de {{ c.distrito }}</a></div>{% endif %}
+      </div>
+    </section>
+  </div>
+{% endblock %}
