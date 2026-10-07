@@ -51,6 +51,8 @@ LIMITE_IP_HORA = 5
 _CORREO_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _MINUS = {"DE", "DEL", "LA", "LAS", "LOS", "Y", "EL", "EN"}
 MESES_CORTOS = ["", "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"]
+MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+         "setiembre", "octubre", "noviembre", "diciembre"]
 
 # Mismas variables (y defaults) que usa la landing de Nuevos Negocios en main.py.
 ANPD_REGISTRO_URL = os.getenv("ANPD_REGISTRO_URL", "#registro-anpd").strip()
@@ -344,8 +346,8 @@ async def club_puerta(request: Request, rol: str = "", ref: str = ""):
 
 
 async def _nn_resumen(ubigeo: str | None) -> dict | None:
-    """Tarjeta Nuevos Negocios: altas SUNAT (personas y empresas) de los 3 ultimos
-    meses del distrito + 2 empresas recientes. Mismo dato que /mi-distrito."""
+    """Portada de la vitrina: altas SUNAT (personas y empresas) de los 3 ultimos
+    meses del distrito. La cifra grande es el mes mas reciente."""
     if not ubigeo:
         return None
     filas = await _pool().fetch(
@@ -356,11 +358,10 @@ async def _nn_resumen(ubigeo: str | None) -> dict | None:
     meses = [{"mes": MESES_CORTOS[int(f["mes"][5:7])], "n": f["n"]} for f in reversed(filas)]
     tope = max(m["n"] for m in meses) or 1
     for m in meses:
-        m["pct"] = round(100 * m["n"] / tope)
-    adel = await db.nn_adelanto(ubigeo)
-    recientes = [{"razon_social": titulo(n["razon_social"]), "mes": MESES_CORTOS[int(a["mes"][5:7])]}
-                 for a in adel for n in a["negocios"]][:2]
-    return {"meses": meses, "recientes": recientes}
+        m["pct"] = max(4, round(100 * m["n"] / tope))
+    ultimo = filas[0]["mes"]   # 'YYYY-MM' mas reciente
+    return {"meses": meses, "total": filas[0]["n"], "mes_largo": MESES[int(ultimo[5:7])],
+            "mes_dato": f"{MESES[int(ultimo[5:7])]} {ultimo[:4]}"}
 
 
 @router.get("/club/tablero", response_class=HTMLResponse)
@@ -378,15 +379,18 @@ async def club_tablero(request: Request, t: str = ""):
         "SELECT count(*) FROM contadores_padron WHERE ubigeo = $1 AND activo_corte_2026_09",
         s["ubigeo"]) if s["ubigeo"] else None
     nn_url = f"/mi-distrito?t={s['nn_token']}" if s.get("nn_token") else "/nuevos-negocios?ref=club"
-    columnas = armar_tablero({"digito": s["ruc"][-1], "ubigeo": s["ubigeo"] or "150101", "nn_url": nn_url})
-    total = sum(len(c["herramientas"]) for c in columnas)
+    nn = await _nn_resumen(s["ubigeo"])
+    secciones = armar_tablero({"digito": s["ruc"][-1], "ubigeo": s["ubigeo"] or "150101", "nn_url": nn_url,
+                               "distrito": s["distrito"] or "tu distrito",
+                               "mes_dato": nn["mes_dato"] if nn else "cada mes"})
+    total = sum(len(c["herramientas"]) for c in secciones)
     return templates.TemplateResponse(request, "club/tablero.html", {
         "s": s, "p": p, "nombre": nombre_saludo(s["ruc"], s["razon_social"], s["nombre_comercial"]),
         "ubic": " · ".join(titulo(x) for x in ((p or {}).get("distrito") or s["distrito"],
                                                (p or {}).get("provincia"), (p or {}).get("departamento")) if x),
-        "columnas": columnas, "gana": GANA, "nn": await _nn_resumen(s["ubigeo"]),
+        "secciones": secciones, "gana": GANA, "nn": nn, "nn_url": nn_url,
         "contadores_distrito": contadores_distrito, "total": total,
-        "activas": sum(c["activas"] for c in columnas)})
+        "activas": sum(c["activas"] for c in secciones)})
 
 
 @router.get("/club/empresario", response_class=HTMLResponse)
