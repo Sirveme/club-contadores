@@ -339,3 +339,5 @@ a { color: inherit; }
   .hoja.buscando .col > .tool { display: flex; }   /* "Ir a" busca en todas */
   .hoja.buscando .resumen { display: none; }
 }
+.irA li { grid-template-columns: minmax(34px, auto) 1fr auto; }
+.irA li .d { font-size: .85em; }
