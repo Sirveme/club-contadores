@@ -31,6 +31,7 @@ ROOT_DIR = BASE_DIR.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 import estadisticas as est  # noqa: E402
+from . import club  # noqa: E402  (Club de Contadores: /club, /club/tablero, ...)
 
 SITE_BASE = os.getenv("SITE_BASE", "https://observatorio.perusistemas.pro").rstrip("/")
 # URL del registro ante la ANPD (placeholder editable hasta tener el archivo).
@@ -90,6 +91,7 @@ VIDEO_URL = os.getenv("VIDEO_URL", "").strip()  # embed opcional (YouTube/otro)
 async def lifespan(app: FastAPI):
     ruc_mod.aviso_config()   # avisa si falta APIS_NET_PE_TOKEN (bloquea registros)
     await db.connect()
+    await club.asegurar_esquema()
     yield
     await db.disconnect()
 
@@ -97,6 +99,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Club de Contadores", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+app.include_router(club.router)
 templates.env.filters["titulo"] = lambda s: titulo(s)  # Title Case peruano en plantillas
 templates.env.filters["miles"] = lambda n: f"{int(n):,}" if n is not None else ""   # 51,477
 templates.env.filters["pct"] = lambda v: f"{v:.2f}" if v is not None else ""         # 2 decimales
