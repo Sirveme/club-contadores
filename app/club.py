@@ -57,7 +57,10 @@ MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "ag
 # Mismas variables (y defaults) que usa la landing de Nuevos Negocios en main.py.
 ANPD_REGISTRO_URL = os.getenv("ANPD_REGISTRO_URL", "#registro-anpd").strip()
 PSP_WHATSAPP = "".join(c for c in os.getenv("PSP_WHATSAPP", "938246208") if c.isdigit())
-MSG_ESCRIBENOS ="No encontramos ese RUC en SUNAT. Revísalo o escríbenos y te ayudamos."
+CLUB_HOST = os.getenv("CLUB_HOST", "club.perusistemas.pro").strip().lower()
+CONTADORES_HOST = os.getenv("CONTADORES_HOST", "contadores.perusistemas.pro").strip().lower()
+DOMINIO_RAIZ = "perusistemas.pro"
+MSG_ESCRIBENOS = "No encontramos ese RUC en SUNAT. Revísalo o escríbenos y te ayudamos."
 
 
 _SIGLAS = {"SAC", "SA", "SAA", "SRL", "EIRL", "SCRL", "SAS"}
@@ -219,11 +222,41 @@ def _destino(rol: str) -> str:
     return "/club/tablero" if rol == "contador" else "/club/empresario"
 
 
+def _host(request: Request) -> str:
+    return (request.headers.get("host") or "").split(":")[0].lower()
+
+
+def _dominio_cookie(request: Request) -> str | None:
+    """En *.perusistemas.pro la sesion vale para todos los subdominios (club. y
+    contadores.): quien entra por uno sigue dentro en el otro."""
+    return f".{DOMINIO_RAIZ}" if _host(request).endswith(f".{DOMINIO_RAIZ}") else None
+
+
 def _con_cookie(resp, request: Request, token: str):
     https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     resp.set_cookie(COOKIE, token, max_age=COOKIE_DIAS * 86400, httponly=True,
-                    samesite="lax", secure=https)
+                    samesite="lax", secure=https, domain=_dominio_cookie(request))
     return resp
+
+
+# --- Enrutamiento por dominio ------------------------------------------------
+#   club.perusistemas.pro/        -> sirve el Club (/club) en la MISMA URL
+#   club.perusistemas.pro/club    -> 301 a /  (una sola URL)
+#   contadores.perusistemas.pro/club[/...] (GET) -> 301 a club.perusistemas.pro
+#   Todo lo demas (/, /nuevos-negocios, /club-legacy, /reportes, APIs) sin cambios.
+async def enrutar_por_dominio(request: Request, call_next):
+    host, path = _host(request), request.url.path
+    query = f"?{request.url.query}" if request.url.query else ""
+    lectura = request.method in ("GET", "HEAD")
+    if host == CLUB_HOST:
+        if path == "/club" and lectura:
+            return RedirectResponse("/" + query, status_code=301)
+        if path == "/":
+            request.scope["path"] = "/club"
+    elif host == CONTADORES_HOST and lectura and (path == "/club" or path.startswith("/club/")):
+        destino = "/" if path == "/club" else path
+        return RedirectResponse(f"https://{CLUB_HOST}{destino}{query}", status_code=301)
+    return await call_next(request)
 
 
 # --- API: puerta y registro ---------------------------------------------------
@@ -452,7 +485,9 @@ async def club_mini_pagina(request: Request, slug: str):
 
 
 @router.get("/club/salir")
-async def club_salir():
+async def club_salir(request: Request):
     resp = RedirectResponse("/club", status_code=303)
-    resp.delete_cookie(COOKIE)
+    resp.delete_cookie(COOKIE)                       # cookie antigua (solo este host)
+    if _dominio_cookie(request):
+        resp.delete_cookie(COOKIE, domain=_dominio_cookie(request))
     return resp

@@ -100,6 +100,7 @@ app = FastAPI(title="Club de Contadores", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.include_router(club.router)
+app.middleware("http")(club.enrutar_por_dominio)  # club.perusistemas.pro -> Club
 templates.env.filters["titulo"] = lambda s: titulo(s)  # Title Case peruano en plantillas
 templates.env.filters["miles"] = lambda n: f"{int(n):,}" if n is not None else ""   # 51,477
 templates.env.filters["pct"] = lambda v: f"{v:.2f}" if v is not None else ""         # 2 decimales
