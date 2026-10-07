@@ -1,5 +1,5 @@
 /* Club de Contadores — menu vertical derecho (tamano de letra, 3 temas) e "Ir a".
-   "Ir a" busca entre las tarjetas de la pagina (.tool[data-nombre]); no tiene su
+   "Ir a" busca entre las tarjetas de la pagina ([data-nombre]); no tiene su
    propia lista: la fuente es app/club_herramientas.py, ya pintada por el servidor. */
 (function () {
   const root = document.documentElement;
@@ -37,14 +37,14 @@
     if (b) b.setAttribute("aria-expanded", abierta);
   }
   document.querySelectorAll(".col-toggle").forEach(b => b.onclick = () => {
-    const col = b.closest(".col");
+    const col = b.closest(".col, .seccion");
     abrirCol(col, !col.classList.contains("abierta"));
   });
 
   // Ir a (Ctrl+G o /)
   const irA = document.getElementById("irA"), inp = document.getElementById("irInput"), lst = document.getElementById("irLista");
   const btnIr = document.getElementById("btnIr");
-  const tarjetas = () => [...document.querySelectorAll(".tool[data-nombre]")];
+  const tarjetas = () => [...document.querySelectorAll("[data-nombre]")];
   const sinTilde = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   let sel = 0, res = [];
   const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -55,7 +55,7 @@
     res = todas.filter(el => !q || sinTilde(el.dataset.nombre + " " + el.textContent).includes(q) || sinTilde(el.dataset.dir) === q);
     sel = 0;
     lst.innerHTML = res.map((el, i) => `<li data-i="${i}" class="${i === 0 ? "on" : ""}"><span class="d">${esc(el.dataset.dir)}</span>` +
-      `<span>${esc(el.dataset.nombre)}</span><span class="e">${el.classList.contains("activa") ? "activa" : "pronto"}</span></li>`).join("")
+      `<span>${esc(el.dataset.nombre)}</span><span class="e">${el.classList.contains("activa") ? "disponible" : "pronto"}</span></li>`).join("")
       || `<li><span></span><span style="color:var(--muted)">Sin resultados</span><span></span></li>`;
     todas.forEach(el => el.classList.toggle("oculta", !!q && !res.includes(el)));
     const hoja = document.getElementById("hoja");
@@ -74,7 +74,7 @@
   function ir(el) {
     if (!el) return;
     cerrar();
-    const col = el.closest(".col");
+    const col = el.closest(".col, .seccion");
     if (col) abrirCol(col, true);
     el.scrollIntoView({ block: "center", behavior: "smooth" });
     el.classList.add("match"); setTimeout(() => el.classList.remove("match"), 1400);
