@@ -1,88 +1,96 @@
 {% extends "club/base.html" %}
 {% set hoja = "tablero" %}
 {% block titulo %}Tablero · Club de Contadores{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=2">
+{% endblock %}
 {% block contenido %}
-  <section class="fx" aria-label="Saludo">
-    <div class="ref">A1</div>
-    <div class="f">fx</div>
-    <div class="val"><span class="q">="</span>Hola, {{ nombre }}{% if s.distrito %} · contador de {{ s.distrito }}{% endif %}<span class="q">"</span></div>
+<div class="vitrina" id="hoja">
+  {# --- Saludo (sin codigos de celda: esto es la vitrina, no la zona operativa) --- #}
+  <section class="hola" aria-label="Saludo">
+    <div>
+      <h1>Hola, {{ nombre }}</h1>
+      <p>{% if s.distrito %}Contador de {{ ubic or s.distrito }} · {% endif %}
+        {% if s.verificacion == "padron" %}<span class="ok">verificado en el padrón SUNAT</span>
+        {% elif s.verificacion == "api" %}<span class="ok">SUNAT confirma CIIU 6920</span>
+        {% else %}<span class="pc" title="Marca informativa: tienes acceso completo">actividad por confirmar</span>{% endif %}</p>
+    </div>
+    {% if contadores_distrito %}<div class="chips"><span class="chip"><b>{{ contadores_distrito|miles }}</b> contadores en tu distrito</span></div>{% endif %}
   </section>
 
-  <dl class="socio">
-    <div><dt>RUC</dt><dd>{{ s.ruc }}</dd></div>
-    <div><dt>Titular</dt><dd title="{{ s.razon_social or '' }}">{{ (s.razon_social or "—")|titulo }}</dd></div>
-    <div><dt>Distrito</dt><dd>{{ ubic or "Sin distrito" }}</dd></div>
-    <div><dt>Actividad</dt><dd>{% if p %}CIIU 6920 · {{ "principal" if p.ciiu_tipo == "P" else "secundario" }}{% elif s.verificacion == "api" %}CIIU 6920 (SUNAT){% else %}—{% endif %}</dd></div>
-    <div><dt>Verificación</dt>
-      {% if s.verificacion == "padron" %}<dd class="ok">✓ en padrón SUNAT</dd>
-      {% elif s.verificacion == "api" %}<dd class="ok">✓ SUNAT · CIIU 6920</dd>
-      {% else %}<dd class="verif-pc" title="Marca informativa: tienes acceso completo">Por confirmar</dd>{% endif %}</div>
-    <div><dt>Contadores en tu distrito</dt><dd>{{ contadores_distrito|miles if contadores_distrito is not none else "—" }}</dd></div>
-  </dl>
+  {# --- Portada: el dato de su distrito (solo nosotros lo tenemos) --- #}
+  {% if nn %}
+  <section class="portada lv-cuenta" aria-label="Nuevos Negocios de tu distrito">
+    <div>
+      <span class="k">Tu distrito · Nuevos Negocios</span>
+      <div class="cifra">{{ nn.total|miles }}</div>
+      <h2>negocios nuevos se inscribieron en {{ s.distrito }} en {{ nn.mes_largo }}</h2>
+      <p>Cada uno puede necesitar contador. Ve quiénes son, con su actividad y fecha de inscripción, antes que la competencia.</p>
+      <a class="boton" href="{{ nn_url }}">Ver los negocios de {{ s.distrito }} →</a>
+    </div>
+    <div class="barras" role="img" aria-label="Altas SUNAT por mes: {% for m in nn.meses %}{{ m.mes }} {{ m.n }}{% if not loop.last %}, {% endif %}{% endfor %}">
+      {% for m in nn.meses %}<div style="height:{{ m.pct }}%"><em>{{ m.n|miles }}</em><span>{{ m.mes }}</span></div>{% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <section class="portada lv-cuenta" aria-label="Nuevos Negocios">
+    <div>
+      <span class="k">Nuevos Negocios · SUNAT</span>
+      <div class="cifra">157,357</div>
+      <h2>contadores en el padrón SUNAT. Llega primero a los negocios nuevos.</h2>
+      <p>Cada mes se inscriben miles de negocios en SUNAT. Elige tu distrito y ve quiénes son, con su actividad y fecha de inscripción.</p>
+      <a class="boton" href="{{ nn_url }}">Ver negocios nuevos →</a>
+    </div>
+  </section>
+  {% endif %}
 
-  <main class="hoja" id="hoja" aria-label="Herramientas">
-    {% for c in columnas %}
-    {% set activas_n = c.herramientas|selectattr("estado", "equalto", "activa")|map(attribute="nombre")|list %}
-    <section class="col lv-{{ c.id }}" id="col-{{ c.id }}" aria-label="{{ c.nombre }}">
-      <header class="col-cab"><span class="letra">{{ c.letra }}</span><b>{{ c.nombre }}</b>
-        <span class="cnt">{{ c.activas }}/{{ c.herramientas|length }} activas<span class="chev" aria-hidden="true">▾</span></span>
-        <small>{{ c.sub }}</small>
-        <small class="resumen">{{ (activas_n + [(c.herramientas|length - c.activas)|string + " muy pronto"])|join(" · ") }}</small>
-        <span class="flecha" aria-hidden="true">→</span>
-        {# En movil la seccion arranca colapsada; este boton (oculto en escritorio) la abre. #}
-        <button type="button" class="col-toggle" aria-expanded="false" aria-controls="col-{{ c.id }}"
-                aria-label="Mostrar herramientas {{ c.nombre }}"></button></header>
-      {% for h in c.herramientas %}
-        {% set activa = h.estado == "activa" %}
-        <{{ "a" if activa else "div" }} class="tool {{ h.estado }}" id="t-{{ h.id }}" data-nombre="{{ h.nombre }}" data-dir="{{ h.dir }}"
-          {% if activa %}href="{{ h.url }}"{% if h.externa %} target="_blank" rel="noopener"{% endif %}{% else %}aria-disabled="true"{% endif %}>
-          <div class="cab"><span class="dir">{{ h.dir }}</span><span class="fn">{{ h.fn }}</span>
-            {% if not activa %}<span class="badge">Muy pronto</span>{% endif %}</div>
-          <h3>{{ h.nombre }}</h3>
-          <p>{{ h.desc }}</p>
-          {% if h.id == "nn" and nn %}
-            <div class="mini">
-              {% for m in nn.meses %}<span class="k">{{ m.mes }}</span><span class="bar"><i style="width:{{ m.pct }}%"></i></span><span>{{ m.n }}</span>{% endfor %}
-            </div>
-            {% if nn.recientes %}<ul class="lista">
-              {% for r in nn.recientes %}<li><span>{{ r.razon_social }}</span><span>{{ r.mes }}</span></li>{% endfor %}
-            </ul>{% endif %}
-          {% elif h.id == "alerta" %}
-            <div class="precio">S/25 <small>hasta 10 RUC · S/5 cada RUC adicional</small></div>
-          {% endif %}
-          {% if h.id == "nn" %}
-            <div class="pie"><span>{{ s.distrito or "tu distrito" }} · altas SUNAT{% if h.mejora_dir %} · <span class="sube">más en {{ h.mejora_dir }}</span>{% endif %}</span><b>Abrir →</b></div>
-          {% elif h.id == "alerta" %}
-            <div class="pie"><span>alerta.pe</span><b>Abrir ↗</b></div>
-          {% elif activa %}
-            <div class="pie"><span>{{ c.nombre }}</span><b>Abrir →</b></div>
-          {% elif h.mejora_dir %}
-            <div class="pie"><span class="sube">versión de pago en {{ h.mejora_dir }}</span><span>—</span></div>
-          {% endif %}
-        </{{ "a" if activa else "div" }}>
-      {% endfor %}
-      <div class="col-relleno"></div>
-    </section>
-    {% endfor %}
-  </main>
-
-  <section class="gana" aria-label="Gana con nosotros">
-    <header class="gana-cab"><b>Gana con nosotros</b><span>Para ofrecer a tus clientes: recomiéndalos y cobra comisión.</span>
-      <span class="pct">% comisión</span></header>
-    <div class="gana-fila">
-      {% for g in gana %}
-      <div class="tool pronto {{ g.estado }}" id="t-{{ g.id }}" data-nombre="{{ g.nombre }}" data-dir="G{{ loop.index }}" aria-disabled="true">
-        <div class="cab"><span class="dir">G{{ loop.index }}</span><span class="fn">{{ g.fn }}</span>
-          <span class="badge">{{ "Más adelante" if g.estado == "despues" else "Muy pronto" }}</span></div>
-        <h3>{{ g.nombre }}</h3><p>{{ g.desc }}</p>
-        <div class="pie"><span class="com">Comisión por cada cliente</span><span>—</span></div>
-      </div>
+  {# --- Un nivel por seccion: Gratis -> Con tu cuenta -> Premium --- #}
+  {% for sec in secciones %}
+  <section class="seccion lv-{{ sec.id }}" id="sec-{{ sec.id }}" aria-label="{{ sec.kicker }}">
+    <header class="seccion-cab">
+      <span class="k">{{ sec.kicker }}</span>
+      <h2>{{ sec.t1 }}<br><i>{{ sec.t2 }}</i></h2>
+      <p>{{ sec.sub }}</p>
+      <span class="resumen">{{ (sec.herramientas|selectattr("estado", "equalto", "activa")|map(attribute="nombre")|list
+                               + [(sec.herramientas|length - sec.activas)|string + " muy pronto"])|join(" · ") }}</span>
+      <span class="chev" aria-hidden="true">▾</span>
+      {# En movil la seccion arranca colapsada; este boton (oculto en escritorio) la abre. #}
+      <button type="button" class="col-toggle" aria-expanded="false" aria-controls="rej-{{ sec.id }}"
+              aria-label="Mostrar herramientas: {{ sec.t1 }} {{ sec.t2 }}"></button>
+    </header>
+    <div class="rejilla" id="rej-{{ sec.id }}">
+      {% for h in sec.herramientas %}{% set activa = h.estado == "activa" %}
+      <{{ "a" if activa else "div" }} class="card {{ h.estado }}" id="t-{{ h.id }}" data-nombre="{{ h.nombre }}" data-dir="{{ sec.kicker.split(' · ')[0] }}"
+        {% if activa %}href="{{ h.url }}"{% if h.externa %} target="_blank" rel="noopener"{% endif %}{% else %}aria-disabled="true"{% endif %}>
+        <span class="k">{{ "Disponible" if activa else "Muy pronto" }}</span>
+        <h3>{{ h.nombre }}</h3>
+        <p class="sub">{{ h.sub }}</p>
+        {% if h.precio %}<div class="precio">{{ h.precio }} <small>al mes · {{ h.precio_det }}</small></div>{% endif %}
+        <p class="ben">{{ h.ben }}</p>
+        <div class="pie">
+          {% if activa %}<span class="cta">{{ h.cta or "Abrir" }} <i>{{ "↗" if h.externa else "→" }}</i></span>
+          {% elif h.mejora_nombre %}<span class="sube">Versión de pago: {{ h.mejora_nombre }}</span>{% endif %}
+          {% if h.frases %}<span class="rota rota-{{ h.frases|length }}" aria-hidden="true">{% for f in h.frases %}<span>{{ f }}</span>{% endfor %}</span>{% endif %}
+        </div>
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">{{ h.svg|safe }}</svg>
+      </{{ "a" if activa else "div" }}>
       {% endfor %}
     </div>
   </section>
+  {% endfor %}
 
-  <section class="panel" id="perfil" aria-label="Mi perfil">
-    <header class="panel-cab"><b>Mi perfil</b><span>{{ s.correo }}{% if s.whatsapp %} · WhatsApp {{ s.whatsapp }}{% endif %}</span></header>
+  <section class="gana" aria-label="Gana con nosotros">
+    <header><h2>Gana con nosotros</h2><span>Productos para ofrecer a tus clientes. Tú recomiendas y cobras comisión.</span></header>
+    <div class="g">
+      {% for g in gana %}<div class="it" data-nombre="{{ g.nombre }}" data-dir="Gana"><b>{{ g.nombre }}</b><p>{{ g.desc }}</p>
+        <span class="pill">{{ "Más adelante" if g.estado == "despues" else "Muy pronto" }}</span></div>{% endfor %}
+    </div>
+  </section>
+
+  {# Mi perfil es zona operativa: mantiene el estilo sobrio de hoja de calculo. #}
+  <section class="panel perfil" id="perfil" aria-label="Mi perfil">
+    <header class="panel-cab"><b>Mi perfil</b><span>{{ s.correo }}{% if s.whatsapp %} · WhatsApp {{ s.whatsapp }}{% endif %} · RUC {{ s.ruc }}</span></header>
     <div class="panel-cuerpo">
       <label class="check dir-opt" for="optDir">
         <input type="checkbox" id="optDir" {% if s.directorio_optin %}checked{% endif %}>
@@ -92,9 +100,10 @@
       <div class="nota" id="optMsg" aria-live="polite">{% if s.directorio_optin %}Apareces en <a href="/club/directorio">Contadores de {{ s.distrito or "tu distrito" }}</a>.{% else %}No apareces en el Directorio.{% endif %}</div>
     </div>
   </section>
+</div>
 {% endblock %}
 {% block estado %}
-  {% for c in columnas %}<span><i class="dot" style="background:var(--lv-{{ c.id }})"></i>{{ c.nombre }}: <b>{{ c.herramientas|length }}</b></span>{% endfor %}
+  {% for c in secciones %}<span><i class="dot" style="background:var(--lv-{{ c.id }})"></i>{{ c.kicker.split(" · ")[0] }}: <b>{{ c.herramientas|length }}</b></span>{% endfor %}
   <span>Activas: <b>{{ activas }}</b> de <b>{{ total }}</b></span>
 {% endblock %}
 {% block scripts %}

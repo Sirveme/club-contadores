@@ -10,7 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/static/css/club.css?v=3">
+<link rel="stylesheet" href="/static/css/club.css?v=4">
+{% block head %}{% endblock %}
 </head>
 <body>
 <div class="app" id="app">
@@ -62,7 +63,7 @@
   <input id="irInput" type="text" placeholder="Herramienta o celda (ej. ssco, B1)" autocomplete="off">
   <ul id="irLista"></ul>
 </div>
-<script src="/static/js/club.js?v=2"></script>
+<script src="/static/js/club.js?v=3"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
