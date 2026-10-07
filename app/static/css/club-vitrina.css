@@ -93,23 +93,42 @@
 .vitrina .card:hover .cta i { transform: translateX(4px); }
 .vitrina .sube { font-size: .86em; color: var(--v-premium); }
 
-/* --- Frases que rotan (CSS puro): cada frase 3s, entra desde abajo y sale hacia arriba --- */
-.vitrina .rota { position: relative; display: block; flex: 1; min-width: 11em; height: 1.7em; text-align: right; }
-.vitrina .rota span { position: absolute; right: 0; top: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  padding: .22em .7em; border-radius: 999px; font: 600 .8em/1.4 var(--sans); letter-spacing: .02em;
-  color: var(--lv); background: color-mix(in srgb, var(--lv) 14%, transparent); border: 1px solid color-mix(in srgb, var(--lv) 30%, transparent);
-  opacity: 0; transform: translateY(.6em); }
-.vitrina .card.pronto .rota span { color: var(--v-fg2); background: color-mix(in srgb, var(--v-fg) 7%, transparent); border-color: var(--v-line); }
-.vitrina .rota-1 span { opacity: 1; transform: none; }
-.vitrina .rota-2 span { animation: rota2 6s infinite; }
-.vitrina .rota-3 span { animation: rota3 9s infinite; }
-.vitrina .rota-4 span { animation: rota4 12s infinite; }
-.vitrina .rota span:nth-child(2) { animation-delay: 3s; }
-.vitrina .rota span:nth-child(3) { animation-delay: 6s; }
-.vitrina .rota span:nth-child(4) { animation-delay: 9s; }
-@keyframes rota2 { 0% { opacity: 0; transform: translateY(.6em); } 6%, 44% { opacity: 1; transform: none; } 50%, 100% { opacity: 0; transform: translateY(-.6em); } }
-@keyframes rota3 { 0% { opacity: 0; transform: translateY(.6em); } 4%, 29% { opacity: 1; transform: none; } 33.4%, 100% { opacity: 0; transform: translateY(-.6em); } }
-@keyframes rota4 { 0% { opacity: 0; transform: translateY(.6em); } 3%, 22% { opacity: 1; transform: none; } 25%, 100% { opacity: 0; transform: translateY(-.6em); } }
+/* --- Etiqueta viva: frases que rotan, cada tarjeta con ritmo propio ---
+   --dur = segundos por frase (varia por tarjeta) · --d0 = desfase (negativo: arranca
+   a mitad de ciclo, asi nunca cambian todas juntas) · --i = indice de la frase.
+   Efectos: ef-sube y ef-fade con CSS; ef-escribe con club-vitrina.js. */
+.vitrina .rota { position: relative; display: inline-grid; margin-left: auto; max-width: 100%; overflow: hidden;
+  padding: .4em .8em; border-radius: .6em; font: 700 .8em/1.35 var(--sans); letter-spacing: .01em; color: var(--v-bg);
+  background: linear-gradient(135deg, var(--lv) 0%, color-mix(in srgb, var(--lv) 62%, var(--v-fg)) 100%);
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--lv) 80%, transparent), inset 0 1px 0 color-mix(in srgb, var(--v-fg) 35%, transparent);
+  transition: box-shadow .25s, transform .25s; }
+.vitrina .card:hover .rota { transform: translateY(-1px); box-shadow: 0 10px 22px -8px var(--lv), inset 0 1px 0 color-mix(in srgb, var(--v-fg) 45%, transparent); }
+.vitrina .card.pronto .rota { filter: saturate(.7) brightness(.92); }
+.vitrina .rota .medida { grid-area: 1 / 1; visibility: hidden; white-space: nowrap; }   /* todas apiladas: el ancho es el de la mas ancha */
+.vitrina .rota .f, .vitrina .rota .esc { position: absolute; left: .8em; right: .8em; top: .4em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vitrina .rota .f { opacity: 0; animation-iteration-count: infinite; animation-timing-function: ease;
+  animation-delay: calc(var(--d0) + var(--dur) * (var(--i) - var(--n, 1))); }   /* siempre negativo: ya en marcha */
+.vitrina .rota-1 .f { opacity: 1; animation: none; }
+.vitrina .rota-2 .f { animation-duration: calc(var(--dur) * 2); }
+.vitrina .rota-3 .f { animation-duration: calc(var(--dur) * 3); }
+.vitrina .rota-4 .f { animation-duration: calc(var(--dur) * 4); }
+.vitrina .ef-sube.rota-2 .f { animation-name: sube2; } .vitrina .ef-sube.rota-3 .f { animation-name: sube3; } .vitrina .ef-sube.rota-4 .f { animation-name: sube4; }
+.vitrina .ef-fade.rota-2 .f { animation-name: fade2; } .vitrina .ef-fade.rota-3 .f { animation-name: fade3; } .vitrina .ef-fade.rota-4 .f { animation-name: fade4; }
+/* Deslizar: entra desde abajo mientras la anterior sale hacia arriba (sin hueco) */
+@keyframes sube2 { 0%, 44% { opacity: 1; transform: none; } 50% { opacity: 0; transform: translateY(-110%); } 50.01%, 94% { opacity: 0; transform: translateY(110%); } 100% { opacity: 1; transform: none; } }
+@keyframes sube3 { 0%, 29% { opacity: 1; transform: none; } 33.4% { opacity: 0; transform: translateY(-110%); } 33.41%, 96% { opacity: 0; transform: translateY(110%); } 100% { opacity: 1; transform: none; } }
+@keyframes sube4 { 0%, 21.5% { opacity: 1; transform: none; } 25% { opacity: 0; transform: translateY(-110%); } 25.01%, 96.5% { opacity: 0; transform: translateY(110%); } 100% { opacity: 1; transform: none; } }
+/* Fade: fundido cruzado, la siguiente aparece mientras la anterior se va */
+@keyframes fade2 { 0%, 40% { opacity: 1; } 50%, 90% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes fade3 { 0%, 26.7% { opacity: 1; } 33.4%, 93.3% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes fade4 { 0%, 20% { opacity: 1; } 25%, 95% { opacity: 0; } 100% { opacity: 1; } }
+/* Maquina de escribir: el JS escribe en .esc; las .f quedan ocultas */
+.vitrina .ef-escribe .f { display: none; }
+.vitrina .rota .esc { font-family: var(--mono); font-weight: 600; letter-spacing: 0; }
+.vitrina .rota .esc::after { content: ""; display: inline-block; width: .5em; height: 1.05em; margin-left: .12em; vertical-align: -.15em;
+  background: currentColor; animation: cursor 1s steps(2, start) infinite; }
+.vitrina .ef-escribe .medida { font-family: var(--mono); font-weight: 600; letter-spacing: 0; padding-right: .7em; }
+@keyframes cursor { to { visibility: hidden; } }
 
 /* --- Gana con nosotros (sobrio) --- */
 .vitrina .gana { border: 1px dashed var(--v-line); border-radius: 1.15em; padding: 1.3em; display: grid; gap: 1em; background: var(--v-s1); }
@@ -153,6 +172,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .vitrina *, .vitrina > * { animation: none !important; transition: none !important; }
-  .vitrina .rota span { opacity: 0; transform: none; }
-  .vitrina .rota span:first-child { opacity: 1; }
+  .vitrina .rota .f { opacity: 0; transform: none; }
+  .vitrina .rota .f.primera { opacity: 1; }
+  .vitrina .rota .esc::after { display: none; }
 }
