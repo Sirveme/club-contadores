@@ -60,7 +60,7 @@
 {% block scripts %}
 <script>
 (function () {
-  const ORIGEN = {{ origen|tojson }}, WA = {{ psp_whatsapp|tojson }};
+  const ORIGEN = {{ origen|tojson }}, WA = {{ psp_whatsapp|tojson }}, SIG = {{ sig|tojson }}, INICIO = {{ inicio|tojson }};
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   let rol = document.querySelector('.rol[aria-pressed="true"]').dataset.rol, actual = null;
@@ -113,7 +113,7 @@
          <div class="acciones" style="margin-top:6px"><button class="btn" type="submit">Entrar</button></div><div id="reMsg"></div></form>`;
       $("fRe").onsubmit = async e => {
         e.preventDefault();
-        const { r, d: x } = await post("/api/club/reingresar", { ruc: d.ruc, correo: $("reCorreo").value });
+        const { r, d: x } = await post("/api/club/reingresar", { ruc: d.ruc, correo: $("reCorreo").value, siguiente: SIG });
         if (r.ok && x.ok) location.href = x.link; else $("reMsg").innerHTML = msg(esc(x.error || "No pudimos entrar."), "err");
       };
     } else {   // escribenos: RUC invalido o inexistente en SUNAT
@@ -145,8 +145,8 @@
     const { r, d } = await post("/api/club/registro", {
       rol: actual.rol, ruc: actual.ruc, continuar: actual.continuar, correo: $("correo").value, whatsapp: $("whatsapp").value,
       consentimiento: true, directorio_optin: actual.rol === "contador" && $("optDir").checked,
-      empresa_web: $("empresa_web").value, origen: ORIGEN });
-    if (r.ok && d.ok) { location.href = d.link || "/club/tablero"; return; }
+      empresa_web: $("empresa_web").value, origen: ORIGEN, siguiente: SIG });
+    if (r.ok && d.ok) { location.href = d.link || INICIO; return; }
     $("btnReg").disabled = false;
     $("res2").innerHTML = msg(esc(d.error || d.mensaje || "No pudimos registrarte."), "err");
   };

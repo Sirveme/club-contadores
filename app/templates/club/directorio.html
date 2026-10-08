@@ -6,7 +6,7 @@
   {% if not ubigeo %}
     <div class="estrecho">
       <section class="panel"><header class="panel-cab"><b>Directorio de Contadores</b><span>Elige un distrito</span></header>
-        <form class="panel-cuerpo" method="get" action="/club/directorio">
+        <form class="panel-cuerpo" method="get" action="/directorio">
           <div class="campo"><label for="ubigeo">Distrito</label>
             <select id="ubigeo" name="ubigeo" required><option value="">Cargando distritos…</option></select></div>
           <div class="acciones"><button class="btn" type="submit">Ver contadores</button></div>
@@ -35,7 +35,7 @@
             <td>{{ f.nombre }}{% if f.yo %}<span class="tag-tu">tú</span>{% endif %}</td>
             <td>{{ [f.especialidad1, f.especialidad2]|select|join(" · ") or "—" }}</td>
             <td>{{ f.distrito or distrito }}</td>
-            <td><a href="/club/c/{{ f.slug }}">/club/c/{{ f.slug }} →</a></td></tr>
+            <td><a href="/c/{{ f.slug }}">/c/{{ f.slug }} →</a></td></tr>
           {% endfor %}
           {% for k in range(vacias) %}
           <tr class="vacio"><td class="n">{{ filas|length + loop.index }}</td>
@@ -47,14 +47,14 @@
     {% if s and s.rol == "contador" %}
       {% if s.directorio_optin %}
         <div class="optin"><span class="box">✓</span><div>Quiero aparecer en el Directorio de Contadores de mi distrito.
-          <small>Lo marcaste tú; es un permiso aparte del registro general. Puedes quitarte en <a href="/club/tablero#perfil">Mi perfil</a>.</small></div></div>
+          <small>Lo marcaste tú; es un permiso aparte del registro general. Puedes quitarte en <a href="/perfil">Mi perfil</a>.</small></div></div>
       {% else %}
         <div class="optin"><span class="box"></span><div>No apareces en este Directorio.
-          <small>Si quieres que los empresarios de tu distrito te encuentren, actívalo en <a href="/club/tablero#perfil">Mi perfil</a>.</small></div></div>
+          <small>Si quieres que los empresarios de tu distrito te encuentren, actívalo en <a href="/perfil">Mi perfil</a>.</small></div></div>
       {% endif %}
     {% endif %}
     <div class="invita"><span>El Directorio crece con cada contador que se inscribe y acepta aparecer.</span>
-      <a class="btn sec" href="/club">Inscribir a un colega</a></div>
+      <a class="btn sec" href="/entrar">Inscribir a un colega</a></div>
   </div>
   {% endif %}
 {% endblock %}

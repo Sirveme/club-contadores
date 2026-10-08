@@ -3,12 +3,13 @@
 {% block titulo %}Tablero · Club de Contadores{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
-<link rel="stylesheet" href="/static/css/club-vitrina.css?v=7">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=8">
 {% endblock %}
 {% block contenido %}
 <div class="vitrina" id="hoja">
   {# --- Saludo (sin codigos de celda: esto es la vitrina, no la zona operativa) --- #}
   <section class="hola" aria-label="Saludo">
+    {% if s %}
     <div>
       <h1>Hola, {{ nombre }}</h1>
       <p>{% if s.distrito %}Contador de {{ ubic or s.distrito }} · {% endif %}
@@ -17,18 +18,28 @@
         {% else %}<span class="pc" title="Marca informativa: tienes acceso completo">actividad por confirmar</span>{% endif %}</p>
     </div>
     {% if contadores_distrito %}<div class="chips"><span class="chip"><b>{{ contadores_distrito|miles }}</b> contadores en tu distrito</span></div>{% endif %}
+    {% else %}
+    <div>
+      <h1>Club de Contadores</h1>
+      <p>Herramientas para contadores del Perú, con el padrón SUNAT. <span class="ok">Las gratis se usan sin cuenta.</span></p>
+    </div>
+    <div class="chips"><span class="chip"><b>157,357</b> contadores en el padrón</span>
+      <a class="chip entrar" href="{{ entrar }}">Entrar con tu RUC →</a></div>
+    {% endif %}
   </section>
 
   {# --- Portada: el dato de su distrito (solo nosotros lo tenemos) --- #}
   {% if nn %}
-  <section class="portada lv-cuenta" aria-label="Nuevos Negocios de tu distrito">
+  {% set lugar = s.distrito if s else "el Perú" %}
+  <section class="portada lv-cuenta" aria-label="Nuevos Negocios">
     <div>
-      <span class="k">Tu distrito · Nuevos Negocios</span>
+      <span class="k">{{ "Tu distrito" if s else "Todo el Perú" }} · Nuevos Negocios</span>
       <div class="cifra">{{ nn.total|miles }}</div>
-      <h2>negocios nuevos se inscribieron en {{ s.distrito }} en {{ nn.mes_largo }}</h2>
+      <h2>negocios nuevos se inscribieron en {{ lugar }} en {{ nn.mes_largo }}</h2>
       <p class="desglose"><b>{{ nn.juridicas|miles }}</b> empresas · <b>{{ nn.naturales|miles }}</b> personas con negocio</p>
       <p>Cada uno puede necesitar contador. Ve quiénes son, con su actividad y fecha de inscripción, antes que la competencia.</p>
-      <a class="boton" href="{{ nn_url }}">Ver los negocios de {{ s.distrito }} →</a>
+      {% if s %}<a class="boton" href="{{ nn_url }}">Ver los negocios de {{ s.distrito }} →</a>
+      {% else %}<a class="boton" href="{{ entrar }}">Ve los de tu distrito: entra con tu RUC →</a>{% endif %}
     </div>
     <div class="barras" role="img" aria-label="Altas SUNAT por mes: {% for m in nn.meses %}{{ m.mes }} {{ m.n }}{% if not loop.last %}, {% endif %}{% endfor %}">
       {% for m in nn.meses %}<div style="height:{{ m.pct }}%"><em>{{ m.n|miles }}</em><span>{{ m.mes }}</span></div>{% endfor %}
@@ -65,13 +76,13 @@
       {% for h in sec.herramientas %}{% set activa = h.estado == "activa" %}
       <{{ "a" if activa else "div" }} class="card {{ h.estado }}" id="t-{{ h.id }}" data-nombre="{{ h.nombre }}" data-dir="{{ sec.kicker.split(' · ')[0] }}"
         {% if activa %}href="{{ h.url }}"{% if h.externa %} target="_blank" rel="noopener"{% endif %}{% else %}aria-disabled="true"{% endif %}>
-        <span class="k">{{ "Disponible" if activa else "Muy pronto" }}</span>
+        <span class="k">{% if not activa %}Muy pronto{% elif h.requiere == "cuenta" %}Disponible · gratis con tu cuenta{% elif h.requiere == "pago" %}Disponible · con suscripción{% else %}Disponible · sin cuenta{% endif %}</span>
         <h3>{{ h.nombre }}</h3>
         <p class="sub">{{ h.sub }}</p>
         {% if h.precio %}<div class="precio">{{ h.precio }} <small>al mes · {{ h.precio_det }}</small></div>{% endif %}
         <p class="ben">{{ h.ben }}</p>
         <div class="pie">
-          {% if activa %}<span class="cta">{{ h.cta or "Abrir" }} <i>{{ "↗" if h.externa else "→" }}</i></span>
+          {% if activa %}<span class="cta">{% if h.requiere == "cuenta" %}<svg class="candado" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>{% endif %}{{ h.cta or "Abrir" }} <i>{{ "↗" if h.externa else "→" }}</i></span>
           {% elif h.mejora_nombre %}<span class="sube">Versión de pago: {{ h.mejora_nombre }}</span>{% endif %}
           {% if h.frases %}<span class="rota rota-{{ h.frases|length }} ef-{{ h.efecto }}" aria-hidden="true"
                 style="--dur: {{ h.ritmo }}s; --d0: {{ h.desfase }}s; --n: {{ h.frases|length }}" data-ritmo="{{ h.ritmo }}" data-desfase="{{ h.desfase }}">
@@ -93,6 +104,7 @@
   </section>
 
   {# Mi perfil es zona operativa: mantiene el estilo sobrio de hoja de calculo. #}
+  {% if s %}
   <section class="panel perfil" id="perfil" aria-label="Mi perfil">
     <header class="panel-cab"><b>Mi perfil</b><span>{{ s.correo }}{% if s.whatsapp %} · WhatsApp {{ s.whatsapp }}{% endif %} · RUC {{ s.ruc }}</span></header>
     <div class="panel-cuerpo">
@@ -101,9 +113,10 @@
         <span>Quiero aparecer en el Directorio de Contadores de mi distrito.
           <small>Es un permiso aparte de tu registro. Si lo quitas, desapareces del Directorio al instante.</small></span>
       </label>
-      <div class="nota" id="optMsg" aria-live="polite">{% if s.directorio_optin %}Apareces en <a href="/club/directorio">Contadores de {{ s.distrito or "tu distrito" }}</a>.{% else %}No apareces en el Directorio.{% endif %}</div>
+      <div class="nota" id="optMsg" aria-live="polite">{% if s.directorio_optin %}Apareces en <a href="/directorio">Contadores de {{ s.distrito or "tu distrito" }}</a>.{% else %}No apareces en el Directorio.{% endif %}</div>
     </div>
   </section>
+  {% endif %}
 </div>
 {% endblock %}
 {% block estado %}
@@ -112,7 +125,7 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/club-vitrina.js?v=1"></script>
-<script>
+{% if s %}<script>
 document.getElementById("optDir").addEventListener("change", async e => {
   const msg = document.getElementById("optMsg"), cb = e.target;
   cb.disabled = true;
@@ -121,9 +134,9 @@ document.getElementById("optDir").addEventListener("change", async e => {
       body: JSON.stringify({ optin: cb.checked }) });
     const d = await r.json();
     if (!r.ok || !d.ok) throw new Error(d.error || "No pudimos guardar el cambio.");
-    msg.innerHTML = d.optin ? 'Listo: apareces en <a href="/club/directorio">el Directorio de tu distrito</a>.' : "Listo: ya no apareces en el Directorio.";
+    msg.innerHTML = d.optin ? 'Listo: apareces en <a href="/directorio">el Directorio de tu distrito</a>.' : "Listo: ya no apareces en el Directorio.";
   } catch (err) { cb.checked = !cb.checked; msg.textContent = err.message; }
   cb.disabled = false;
 });
-</script>
+</script>{% endif %}
 {% endblock %}

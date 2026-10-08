@@ -10,19 +10,23 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/static/css/club.css?v=4">
+<link rel="stylesheet" href="/static/css/club.css?v=5">
 {% block head %}{% endblock %}
 </head>
 <body>
 <div class="app" id="app">
   <header class="top">
-    <a class="marca" href="/club" style="text-decoration:none"><b>Club de Contadores</b><span>contadores.perusistemas.pro</span></a>
+    <a class="marca" href="{{ inicio or "/club" }}" style="text-decoration:none"><b>Club de Contadores</b><span>club.perusistemas.pro</span></a>
     <span class="chip"><i></i>Padrón SUNAT · corte 17.09.2026</span>
     <span class="sp"></span>
     {% if s and s.rol == "contador" %}
-      <a class="btn-dir{% if not s.ubigeo %} sin{% endif %}" href="/club/directorio" {% block dir_actual %}{% endblock %}>
+      <a class="btn-dir{% if not s.ubigeo %} sin{% endif %}" href="/directorio" {% block dir_actual %}{% endblock %}>
         Contadores de tu distrito{% if s.distrito %} <span>{{ s.distrito }} →</span>{% endif %}</a>
-      <a class="salir" href="/club/salir">Salir</a>
+      <a class="salir" href="/salir">Salir</a>
+    {% elif s %}
+      <a class="salir" href="/salir">Salir</a>
+    {% elif hoja != "puerta" %}
+      <a class="btn-dir" href="/entrar{% if entrar_sig %}?sig={{ entrar_sig }}{% endif %}">Entrar con tu RUC <span>→</span></a>
     {% endif %}
   </header>
 
@@ -32,12 +36,14 @@
     <nav class="tabs" aria-label="Hojas">
       {% block tabs %}
       {% if s and s.rol == "contador" %}
-        <a href="/club/tablero" {% if hoja == "tablero" %}aria-current="page"{% endif %}>Tablero</a>
-        <a href="/club/directorio" {% if hoja == "directorio" %}aria-current="page"{% endif %}>Contadores de {{ s.distrito or "tu distrito" }}</a>
-        <a href="/club/tablero#perfil">Mi perfil</a>
+        <a href="{{ inicio or "/club" }}" {% if hoja == "tablero" %}aria-current="page"{% endif %}>Tablero</a>
+        <a href="/directorio" {% if hoja == "directorio" %}aria-current="page"{% endif %}>Contadores de {{ s.distrito or "tu distrito" }}</a>
+        <a href="/perfil">Mi perfil</a>
       {% else %}
-        <a href="/club" {% if hoja == "puerta" %}aria-current="page"{% endif %}>Entrar al Club</a>
-        <a href="/club/igv" {% if hoja == "igv" %}aria-current="page"{% endif %}>Calculadora de IGV</a>
+        <a href="{{ inicio or "/club" }}" {% if hoja == "tablero" %}aria-current="page"{% endif %}>Tablero</a>
+        <a href="/igv" {% if hoja == "igv" %}aria-current="page"{% endif %}>Calculadora de IGV</a>
+        <a href="/directorio" {% if hoja == "directorio" %}aria-current="page"{% endif %}>Directorio</a>
+        {% if not s %}<a href="/entrar" {% if hoja == "puerta" %}aria-current="page"{% endif %}>Entrar</a>{% endif %}
       {% endif %}
       {% endblock %}
     </nav>
@@ -63,7 +69,7 @@
   <input id="irInput" type="text" placeholder="Herramienta o celda (ej. ssco, B1)" autocomplete="off">
   <ul id="irLista"></ul>
 </div>
-<script src="/static/js/club.js?v=3"></script>
+<script src="/static/js/club.js?v=4"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

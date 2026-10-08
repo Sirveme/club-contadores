@@ -17,7 +17,7 @@
           <div><dt>Especialidad</dt><dd>{{ [c.especialidad1, c.especialidad2]|select|join(" · ") or "—" }}</dd></div>
         </dl>
         <p class="nota" style="margin:0">Esta mini-página está en construcción: pronto tendrá servicios, contacto y horario del estudio.</p>
-        {% if c.ubigeo %}<div class="acciones"><a class="btn sec" href="/club/directorio/{{ c.ubigeo }}">← Contadores de {{ c.distrito }}</a></div>{% endif %}
+        {% if c.ubigeo %}<div class="acciones"><a class="btn sec" href="/directorio/{{ c.ubigeo }}">← Contadores de {{ c.distrito }}</a></div>{% endif %}
       </div>
     </section>
   </div>

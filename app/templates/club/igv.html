@@ -27,7 +27,7 @@
           Para restaurantes y hoteles MYPE con tasa reducida, usa la tasa vigente que corresponda.</p>
       </div>
     </section>
-    {% if not s %}<div class="msg info">¿Eres contador? <a href="/club">Entra al Club</a>: Nuevos Negocios de tu distrito y más herramientas, gratis con tu cuenta.</div>{% endif %}
+    {% if not s %}<div class="msg info">¿Eres contador? <a href="/entrar?sig=/igv">Entra con tu RUC</a>: Nuevos Negocios de tu distrito y más herramientas, gratis con tu cuenta. <a href="{{ inicio or "/club" }}">Ver todas las herramientas</a>.</div>{% endif %}
   </div>
 {% endblock %}
 {% block scripts %}<script src="/static/js/club-igv.js?v=1"></script>{% endblock %}
