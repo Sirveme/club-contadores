@@ -183,3 +183,8 @@
 .vitrina .barras { position: relative; }
 .vitrina .barras .nota-serie { position: absolute; left: 0; right: 0; bottom: -3.6em; text-align: center; color: var(--v-muted); font-size: .8em; }
 @media (max-width: 980px) { .vitrina .barras { margin-bottom: 2.6em; } }
+
+/* Tablero publico: boton Entrar y candado en las "con tu cuenta" */
+.vitrina .chip.entrar { color: var(--v-bg); background: var(--v-cuenta); border-color: var(--v-cuenta); font-weight: 700; }
+.vitrina .chip.entrar:hover { filter: brightness(1.08); }
+.vitrina .cta .candado { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; vertical-align: -.12em; margin-right: .1em; }
