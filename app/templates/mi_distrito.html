@@ -46,6 +46,11 @@
       border-radius:99px; padding:1px 7px; margin-left:6px; vertical-align:middle; }
     .promo{ border:1px solid var(--green-d); background:var(--card2); border-radius:12px; padding:13px; margin:16px 0 4px; }
     .promo b{ color:var(--green); }
+    .desg{ width:100%; border-collapse:collapse; font-size:14px; }
+    .desg th{ text-align:right; font-size:11.5px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.3px; padding:0 6px 8px; }
+    .desg td{ text-align:right; padding:7px 6px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; }
+    .desg th:first-child, .desg td.m{ text-align:left; text-transform:capitalize; }
+    .desg td.t{ color:var(--green); font-weight:800; } .desg td.nd{ color:var(--muted); font-size:12.5px; }
     @media(min-width:560px){ .modal{ align-items:center; } .modal-box{ border-radius:16px; } }
   </style>
 </head>
@@ -63,6 +68,24 @@
       {% if sub.razon_social %}Hola, {{ sub.razon_social }}.{% endif %}
       {{ total_neg }} negocio(s) jurídico(s) nuevo(s) registrado(s) en tu distrito.
     </p>
+
+    {# Desglose por mes: solo negocios reales (juridicas + personas con negocio). #}
+    {% if desglose %}
+    <section class="card" aria-label="Negocios nuevos por mes">
+      <table class="desg">
+        <thead><tr><th>Mes</th><th>Empresas</th><th>Personas con negocio</th><th>Total negocios</th></tr></thead>
+        <tbody>
+        {% for d in desglose %}
+          <tr><td class="m">{{ d.mes_label }}</td><td>{{ d.juridicas }}</td>
+            {% if d.comparable %}<td>{{ d.naturales_con_negocio }}</td><td class="t">{{ d.negocios }}</td>
+            {% else %}<td class="nd">sin separar*</td><td class="nd">—</td>{% endif %}</tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <p class="muted" style="margin:10px 0 0">Solo negocios: no cuenta a quien saca RUC sin empresa (independientes).
+        {% if desglose|rejectattr("comparable")|list %}* En mayo y junio SUNAT no indicó si la persona tiene negocio, así que esos meses muestran solo las empresas.{% endif %}</p>
+    </section>
+    {% endif %}
 
     {# Confirmar / corregir correo #}
     <section class="card" id="correo-box">
