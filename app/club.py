@@ -379,22 +379,22 @@ async def club_puerta(request: Request, rol: str = "", ref: str = ""):
 
 
 async def _nn_resumen(ubigeo: str | None) -> dict | None:
-    """Portada de la vitrina: altas SUNAT (personas y empresas) de los 3 ultimos
-    meses del distrito. La cifra grande es el mes mas reciente."""
+    """Portada de la vitrina: NEGOCIOS REALES del distrito (juridicas + personas con
+    negocio; sin independientes sin empresa). Solo meses comparables (desde julio
+    2026: mayo/junio no traen el tipo de contribuyente). Cifra grande = mes mas reciente."""
     if not ubigeo:
         return None
-    filas = await _pool().fetch(
-        "SELECT mes_inscripcion mes, count(*) n FROM nuevos_negocios "
-        "WHERE ubigeo = $1 AND mes_inscripcion IS NOT NULL GROUP BY 1 ORDER BY 1 DESC LIMIT 3", ubigeo)
+    filas = [d for d in await db.nn_desglose(ubigeo) if d["comparable"]][:3]
     if not filas:
         return None
-    meses = [{"mes": MESES_CORTOS[int(f["mes"][5:7])], "n": f["n"]} for f in reversed(filas)]
+    meses = [{"mes": MESES_CORTOS[int(f["mes"][5:7])], "n": f["negocios"]} for f in reversed(filas)]
     tope = max(m["n"] for m in meses) or 1
     for m in meses:
         m["pct"] = max(4, round(100 * m["n"] / tope))
-    ultimo = filas[0]["mes"]   # 'YYYY-MM' mas reciente
-    return {"meses": meses, "total": filas[0]["n"], "mes_largo": MESES[int(ultimo[5:7])],
-            "mes_dato": f"{MESES[int(ultimo[5:7])]} {ultimo[:4]}"}
+    u = filas[0]
+    return {"meses": meses, "total": u["negocios"], "juridicas": u["juridicas"],
+            "naturales": u["naturales_con_negocio"], "mes_largo": MESES[int(u["mes"][5:7])],
+            "mes_dato": f"{MESES[int(u['mes'][5:7])]} {u['mes'][:4]}"}
 
 
 @router.get("/club/tablero", response_class=HTMLResponse)

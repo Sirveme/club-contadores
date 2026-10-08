@@ -906,10 +906,14 @@ async def mi_distrito(request: Request, t: str = ""):
         f"Quiero los nuevos negocios de otro distrito.")
     wa_sugerencia = _wa_url(PSP_WHATSAPP,
         "Hola, quiero sugerir una herramienta para el Club de Contadores.")
+    desglose = await db.nn_desglose(s.get("ubigeo") or "")
+    for d in desglose:
+        y, mm = d["mes"].split("-")
+        d["mes_label"] = f"{MESES_ES[int(mm)]} {y}"
     return templates.TemplateResponse(request, "mi_distrito.html", {
         "request": request, "sub": s, "token": t,
         "distrito": distrito_disp, "nombre_comercial": s.get("nombre_comercial"),
-        "meses": _negocios_por_mes(negocios), "total_neg": len(negocios),
+        "meses": _negocios_por_mes(negocios), "total_neg": len(negocios), "desglose": desglose,
         "wa_otro": wa_otro, "wa_sugerencia": wa_sugerencia})
 
 

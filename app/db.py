@@ -617,6 +617,37 @@ async def nn_negocios_distrito(ubigeo: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+# "Negocio real" = juridica, o persona natural CON negocio/empresa. Se excluye a
+# quien saca RUC sin empresa (independientes, 4ta categoria): no es un negocio.
+# Mayo/junio no traen tipo_contribuyente -> sus naturales no se pueden separar
+# (nat_sin_dato > 0) y el mes se marca como NO comparable.
+NEGOCIO_REAL_DESGLOSE = """
+    SELECT mes_inscripcion mes,
+           count(*) FILTER (WHERE tipo = 'juridica') juridicas,
+           count(*) FILTER (WHERE tipo = 'natural' AND tipo_contribuyente IS NOT NULL
+                             AND tipo_contribuyente !~* 'SIN (EMP|NEGOCIO)') naturales_con_negocio,
+           count(*) FILTER (WHERE tipo = 'natural' AND tipo_contribuyente ~* 'SIN (EMP|NEGOCIO)') sin_negocio,
+           count(*) FILTER (WHERE tipo = 'natural' AND tipo_contribuyente IS NULL) nat_sin_dato
+    FROM nuevos_negocios WHERE ubigeo = $1 AND mes_inscripcion IS NOT NULL
+    GROUP BY 1 ORDER BY 1 DESC"""
+
+
+async def nn_desglose(ubigeo: str) -> list[dict]:
+    """Por mes (mas reciente primero): juridicas, naturales con negocio, total de
+    negocios reales y si el mes es comparable (todas sus naturales traen tipo)."""
+    ubigeo = (ubigeo or "").strip()
+    if not ubigeo or demo_mode():
+        return []
+    assert _pool is not None
+    out = []
+    for r in await _pool.fetch(NEGOCIO_REAL_DESGLOSE, ubigeo):
+        d = dict(r)
+        d["comparable"] = d["nat_sin_dato"] == 0
+        d["negocios"] = d["juridicas"] + d["naturales_con_negocio"]
+        out.append(d)
+    return out
+
+
 async def nn_baja(token: str) -> bool:
     """Marca la baja por token. True si el token existe (aunque ya estuviera de baja)."""
     token = (token or "").strip()
