@@ -68,7 +68,7 @@
     if (hoja) hoja.classList.remove("buscando");
   }
   function abrir() {
-    if (!tarjetas().length) { location.href = "/club/tablero"; return; }
+    if (!tarjetas().length) { location.href = "/"; return; }
     irA.hidden = false; btnIr.setAttribute("aria-pressed", "true"); inp.value = ""; filtrar(); inp.focus();
   }
   function ir(el) {
