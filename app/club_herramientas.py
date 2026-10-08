@@ -12,7 +12,9 @@ agregan, se activan o se cambian de nivel).
   efecto : opcional, como entra la frase: "escribe" | "sube" | "fade". Sin el
            campo, la vitrina reparte los tres entre las tarjetas.
 
-La vitrina (/club/tablero) agrupa por nivel y pone las activas primero.
+La vitrina (home del Club) agrupa por nivel y pone las activas primero. El tablero es
+PUBLICO: las 'gratis' se usan sin cuenta; las 'cuenta' llevan a /entrar si no hay sesion;
+las 'premium' piden suscripcion.
 `mejora` apunta al id de la version de pago.
 """
 from __future__ import annotations
@@ -28,7 +30,7 @@ NIVELES = [
 
 HERRAMIENTAS = [
     # --- Gratis -------------------------------------------------------------
-    {"id": "igv", "nivel": "gratis", "estado": "activa", "icono": "calc", "url": "/club/igv",
+    {"id": "igv", "nivel": "gratis", "estado": "activa", "icono": "calc", "url": "/igv",
      "nombre": "Calculadora de IGV", "efecto": "escribe", "sub": "Separa o agrega el 18%, al céntimo",
      "ben": "Cuadra tus comprobantes en segundos.", "cta": "Usar ahora",
      "frases": ["Al céntimo, sin descuadres", "Con IGV o sin IGV", "Sin crear cuenta", "Tasa general 18%"]},
@@ -38,7 +40,7 @@ HERRAMIENTAS = [
      "frases": ["Detracciones por anexo", "Intereses moratorios (TIM)"]},
     {"id": "venc", "nivel": "gratis", "estado": "pronto", "icono": "cal",
      "nombre": "Vencimientos", "sub": "Cronograma por último dígito, con feriados",
-     "ben": "Tu dígito es {digito}: mira qué vence y cuándo.",
+     "ben": "Mira qué vence y cuándo según el último dígito de tu RUC{digito_txt}.",
      "frases": ["Por último dígito del RUC", "Incluye feriados"]},
     {"id": "ssco", "nivel": "gratis", "estado": "pronto", "icono": "shield",
      "nombre": "SSCO", "sub": "Sujetos Sin Capacidad Operativa",
@@ -138,7 +140,7 @@ ICONOS = {
 }
 
 
-def armar_tablero(valores: dict) -> list[dict]:
+def armar_tablero(valores: dict, con_sesion: bool = True, entrar: str = "/entrar") -> list[dict]:
     """Secciones de la vitrina (una por nivel), activas primero, con los marcadores
     {digito}/{ubigeo}/{nn_url}/{distrito}/{mes_dato} rellenados con datos del socio."""
     def fmt(s: str) -> str:
@@ -156,6 +158,12 @@ def armar_tablero(valores: dict) -> list[dict]:
                 if h.get(k):
                     h[k] = fmt(h[k])
             h["frases"] = [fmt(f) for f in h.get("frases", [])][:4]
+            # Acceso segun nivel: gratis = libre; cuenta = pide RUC si no hay sesion;
+            # premium = pide suscripcion (alerta.pe la gestiona en su propio sitio).
+            if h["estado"] == "activa" and h["nivel"] == "cuenta" and not con_sesion:
+                h["url"], h["cta"], h["requiere"] = entrar, "Entrar con tu RUC", "cuenta"
+            elif h["estado"] == "activa" and h["nivel"] == "premium":
+                h["requiere"] = "pago"
             h["externa"] = (h.get("url") or "").startswith("http")
             h["svg"] = ICONOS.get(h.get("icono"), ICONOS["doc"])
             por_id[h["id"]] = h

@@ -628,15 +628,16 @@ NEGOCIO_REAL_DESGLOSE = """
                              AND tipo_contribuyente !~* 'SIN (EMP|NEGOCIO)') naturales_con_negocio,
            count(*) FILTER (WHERE tipo = 'natural' AND tipo_contribuyente ~* 'SIN (EMP|NEGOCIO)') sin_negocio,
            count(*) FILTER (WHERE tipo = 'natural' AND tipo_contribuyente IS NULL) nat_sin_dato
-    FROM nuevos_negocios WHERE ubigeo = $1 AND mes_inscripcion IS NOT NULL
+    FROM nuevos_negocios WHERE ($1::text IS NULL OR ubigeo = $1) AND mes_inscripcion IS NOT NULL
     GROUP BY 1 ORDER BY 1 DESC"""
 
 
-async def nn_desglose(ubigeo: str) -> list[dict]:
+async def nn_desglose(ubigeo: str | None) -> list[dict]:
     """Por mes (mas reciente primero): juridicas, naturales con negocio, total de
-    negocios reales y si el mes es comparable (todas sus naturales traen tipo)."""
-    ubigeo = (ubigeo or "").strip()
-    if not ubigeo or demo_mode():
+    negocios reales y si el mes es comparable (todas sus naturales traen tipo).
+    ubigeo None = todo el Peru (portada publica del Club)."""
+    ubigeo = (ubigeo or "").strip() or None
+    if demo_mode():
         return []
     assert _pool is not None
     out = []

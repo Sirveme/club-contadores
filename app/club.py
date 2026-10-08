@@ -218,12 +218,23 @@ async def _enlazar_suscriptor(ruc: str, info: dict, correo: str, whatsapp: str |
     return await _pool().fetchval("SELECT id FROM suscriptores WHERE ruc = $1", ruc)
 
 
-def _destino(rol: str) -> str:
-    return "/club/tablero" if rol == "contador" else "/club/empresario"
-
-
 def _host(request: Request) -> str:
     return (request.headers.get("host") or "").split(":")[0].lower()
+
+
+def inicio(request: Request) -> str:
+    """Home del Club: '/' en club.perusistemas.pro; '/club' en cualquier otro host
+    (contadores., Railway, localhost), donde '/' es la landing de Nuevos Negocios."""
+    return "/" if _host(request) == CLUB_HOST else "/club"
+
+
+def _ruta_segura(sig: str) -> str:
+    return sig if sig.startswith("/") and not sig.startswith("//") else ""
+
+
+def _destino(request: Request, rol: str, siguiente: str = "") -> str:
+    """A donde va el socio al entrar: la pagina que pidio (ruta interna segura) o su inicio."""
+    return _ruta_segura(siguiente) or (inicio(request) if rol == "contador" else "/empresario")
 
 
 def _dominio_cookie(request: Request) -> str | None:
@@ -239,23 +250,49 @@ def _con_cookie(resp, request: Request, token: str):
     return resp
 
 
-# --- Enrutamiento por dominio ------------------------------------------------
-#   club.perusistemas.pro/        -> sirve el Club (/club) en la MISMA URL
-#   club.perusistemas.pro/club    -> 301 a /  (una sola URL)
-#   contadores.perusistemas.pro/club[/...] (GET) -> 301 a club.perusistemas.pro
-#   Todo lo demas (/, /nuevos-negocios, /club-legacy, /reportes, APIs) sin cambios.
+# --- Rutas y dominios ---------------------------------------------------------
+# Rutas del Club SIN repetir "club": / (tablero) · /entrar · /igv · /directorio[/ubigeo]
+#   · /c/{slug} · /perfil · /empresario · /salir.  Internamente el tablero vive en
+#   /club; en club.perusistemas.pro se sirve en "/".
+# URLs viejas (/club/tablero, /club/igv, /club/directorio, ...) -> 301 a las nuevas.
+RUTAS_CLUB = ("/entrar", "/igv", "/directorio", "/c", "/perfil", "/empresario", "/salir")
+
+
+def ruta_nueva(path: str, home: str) -> str | None:
+    """URL vieja del Club -> nueva (None si no es una URL vieja)."""
+    if path in ("/club/", "/club/tablero"):
+        return home
+    if path.startswith("/club/"):
+        return path[len("/club"):]               # /club/igv -> /igv
+    return None
+
+
+def es_ruta_club(path: str) -> bool:
+    return path == "/club" or path.startswith("/club/") or any(path == r or path.startswith(r + "/") for r in RUTAS_CLUB)
+
+
 async def enrutar_por_dominio(request: Request, call_next):
+    """club.perusistemas.pro/ -> tablero en la misma URL; URLs viejas -> 301 a las nuevas;
+    contadores.perusistemas.pro/club* y rutas del Club -> 301 a club.perusistemas.pro.
+    contadores.perusistemas.pro/ (Nuevos Negocios), /club-legacy, /reportes y APIs: sin cambios."""
     host, path = _host(request), request.url.path
     query = f"?{request.url.query}" if request.url.query else ""
     lectura = request.method in ("GET", "HEAD")
     if host == CLUB_HOST:
-        if path == "/club" and lectura:
-            return RedirectResponse("/" + query, status_code=301)
+        if lectura:
+            nueva = "/" if path == "/club" else ruta_nueva(path, "/")
+            if nueva is not None:
+                return RedirectResponse(nueva + query, status_code=301)
         if path == "/":
             request.scope["path"] = "/club"
-    elif host == CONTADORES_HOST and lectura and (path == "/club" or path.startswith("/club/")):
-        destino = "/" if path == "/club" else path
-        return RedirectResponse(f"https://{CLUB_HOST}{destino}{query}", status_code=301)
+    elif host == CONTADORES_HOST:
+        if lectura and es_ruta_club(path):
+            nueva = "/" if path == "/club" else (ruta_nueva(path, "/") or path)
+            return RedirectResponse(f"https://{CLUB_HOST}{nueva}{query}", status_code=301)
+    elif lectura:                                  # localhost / Railway
+        nueva = ruta_nueva(path, "/club")
+        if nueva is not None:
+            return RedirectResponse(nueva + query, status_code=301)
     return await call_next(request)
 
 
@@ -335,7 +372,7 @@ async def api_club_registro(payload: dict, request: Request):
     except asyncpg.UniqueViolationError:
         return JSONResponse({"ok": False, "accion": "ya_registrado",
                              "error": "Este RUC ya está en el Club."}, status_code=409)
-    resp = JSONResponse({"ok": True, "link": _destino(rol)})
+    resp = JSONResponse({"ok": True, "link": _destino(request, rol, str(payload.get("siguiente") or ""))})
     return _con_cookie(resp, request, token)
 
 
@@ -350,7 +387,8 @@ async def api_club_reingresar(payload: dict, request: Request):
     if not row:
         return JSONResponse({"ok": False, "error": "Ese correo no coincide con el registrado para este RUC."},
                             status_code=403)
-    return _con_cookie(JSONResponse({"ok": True, "link": _destino(row["rol"])}), request, row["token"])
+    return _con_cookie(JSONResponse({"ok": True, "link": _destino(request, row["rol"], str(payload.get("siguiente") or ""))}),
+                       request, row["token"])
 
 
 @router.post("/api/club/perfil/directorio")
@@ -368,22 +406,24 @@ async def api_club_directorio_optin(payload: dict, request: Request):
 
 
 # --- Paginas ------------------------------------------------------------------
-@router.get("/club", response_class=HTMLResponse)
-async def club_puerta(request: Request, rol: str = "", ref: str = ""):
+@router.get("/entrar", response_class=HTMLResponse)
+async def club_entrar(request: Request, rol: str = "", ref: str = "", sig: str = ""):
+    """Registro / ingreso con RUC. NO es la puerta del Club: lo pide cada herramienta
+    'con tu cuenta'. `sig` = a donde volver despues de entrar."""
     s = await socio_por_token(request.cookies.get(COOKIE))
     if s:
-        return RedirectResponse(_destino(s["rol"]), status_code=303)
+        return RedirectResponse(_destino(request, s["rol"], sig), status_code=303)
     return templates.TemplateResponse(request, "club/puerta.html", {
-        "s": None, "rol": rol if rol in ("contador", "empresario") else "", "origen": (ref or "club")[:60],
+        "s": None, "inicio": inicio(request), "rol": rol if rol in ("contador", "empresario") else "",
+        "origen": (ref or "club")[:60], "sig": _ruta_segura(sig),
         "anpd_url": ANPD_REGISTRO_URL, "psp_whatsapp": PSP_WHATSAPP})
 
 
 async def _nn_resumen(ubigeo: str | None) -> dict | None:
-    """Portada de la vitrina: NEGOCIOS REALES del distrito (juridicas + personas con
-    negocio; sin independientes sin empresa). Solo meses comparables (desde julio
-    2026: mayo/junio no traen el tipo de contribuyente). Cifra grande = mes mas reciente."""
-    if not ubigeo:
-        return None
+    """Portada de la vitrina: NEGOCIOS REALES (juridicas + personas con negocio; sin
+    independientes sin empresa) del distrito, o de todo el Peru si ubigeo es None.
+    Solo meses comparables (desde julio 2026: mayo/junio no traen el tipo de
+    contribuyente). Cifra grande = mes mas reciente."""
     filas = [d for d in await db.nn_desglose(ubigeo) if d["comparable"]][:3]
     if not filas:
         return None
@@ -397,65 +437,88 @@ async def _nn_resumen(ubigeo: str | None) -> dict | None:
             "mes_dato": f"{MESES[int(u['mes'][5:7])]} {u['mes'][:4]}"}
 
 
-@router.get("/club/tablero", response_class=HTMLResponse)
+@router.get("/club", response_class=HTMLResponse)
 async def club_tablero(request: Request, t: str = ""):
-    if t:   # enlace con token -> cookie y URL limpia
-        return _con_cookie(RedirectResponse("/club/tablero", status_code=303), request, t)
+    """TABLERO PUBLICO = home del Club. Sin sesion se ve todo y las gratis se usan;
+    las 'con tu cuenta' llevan a /entrar. Con sesion: datos de su distrito."""
+    home = inicio(request)
+    if t:   # enlace antiguo con token -> cookie y URL limpia
+        return _con_cookie(RedirectResponse(home, status_code=303), request, t)
     s = await socio_por_token(request.cookies.get(COOKIE))
-    if not s:
-        return RedirectResponse("/club", status_code=303)
-    if s["rol"] != "contador":
-        return RedirectResponse("/club/empresario", status_code=303)
-    await _pool().execute("UPDATE club_socios SET ultimo_acceso_en = now() WHERE id = $1", s["id"])
-    p = await padron(s["ruc"])
-    contadores_distrito = await _pool().fetchval(
-        "SELECT count(*) FROM contadores_padron WHERE ubigeo = $1 AND activo_corte_2026_09",
-        s["ubigeo"]) if s["ubigeo"] else None
-    nn_url = f"/mi-distrito?t={s['nn_token']}" if s.get("nn_token") else "/nuevos-negocios?ref=club"
-    nn = await _nn_resumen(s["ubigeo"])
-    secciones = armar_tablero({"digito": s["ruc"][-1], "ubigeo": s["ubigeo"] or "150101", "nn_url": nn_url,
-                               "distrito": s["distrito"] or "tu distrito",
-                               "mes_dato": nn["mes_dato"] if nn else "cada mes"})
+    if s and s["rol"] != "contador":
+        return RedirectResponse("/empresario", status_code=303)
+    p = contadores_distrito = None
+    entrar = f"/entrar?sig={home}"
+    if s:
+        await _pool().execute("UPDATE club_socios SET ultimo_acceso_en = now() WHERE id = $1", s["id"])
+        p = await padron(s["ruc"])
+        if s["ubigeo"]:
+            contadores_distrito = await _pool().fetchval(
+                "SELECT count(*) FROM contadores_padron WHERE ubigeo = $1 AND activo_corte_2026_09", s["ubigeo"])
+        nn_url = f"/mi-distrito?t={s['nn_token']}" if s.get("nn_token") else "/nuevos-negocios?ref=club"
+        nn = await _nn_resumen(s["ubigeo"]) if s["ubigeo"] else None
+    else:
+        nn_url = entrar
+        nn = await _nn_resumen(None)            # todo el Peru
+    secciones = armar_tablero({"digito": s["ruc"][-1] if s else "?",
+                               "digito_txt": f" (el tuyo es {s['ruc'][-1]})" if s else "",
+                               "ubigeo": (s or {}).get("ubigeo") or "150101", "nn_url": nn_url,
+                               "distrito": (s or {}).get("distrito") or "tu distrito",
+                               "mes_dato": nn["mes_dato"] if nn else "cada mes"},
+                              con_sesion=bool(s), entrar=entrar)
     total = sum(len(c["herramientas"]) for c in secciones)
+    ubic = ""
+    if s:
+        ubic = " · ".join(titulo(x) for x in ((p or {}).get("distrito") or s["distrito"],
+                                              (p or {}).get("provincia"), (p or {}).get("departamento")) if x)
     return templates.TemplateResponse(request, "club/tablero.html", {
-        "s": s, "p": p, "nombre": nombre_saludo(s["ruc"], s["razon_social"], s["nombre_comercial"]),
-        "ubic": " · ".join(titulo(x) for x in ((p or {}).get("distrito") or s["distrito"],
-                                               (p or {}).get("provincia"), (p or {}).get("departamento")) if x),
-        "secciones": secciones, "gana": GANA, "nn": nn, "nn_url": nn_url,
+        "s": s, "p": p, "inicio": home, "entrar": entrar,
+        "nombre": nombre_saludo(s["ruc"], s["razon_social"], s["nombre_comercial"]) if s else None,
+        "ubic": ubic, "secciones": secciones, "gana": GANA, "nn": nn, "nn_url": nn_url,
         "contadores_distrito": contadores_distrito, "total": total,
         "activas": sum(c["activas"] for c in secciones)})
 
 
-@router.get("/club/empresario", response_class=HTMLResponse)
+@router.get("/perfil")
+async def club_perfil(request: Request):
+    s = await socio_por_token(request.cookies.get(COOKIE))
+    if not s:
+        return RedirectResponse("/entrar?sig=/perfil", status_code=303)
+    base = inicio(request) if s["rol"] == "contador" else "/empresario"
+    return RedirectResponse(base + "#perfil", status_code=303)
+
+
+@router.get("/empresario", response_class=HTMLResponse)
 async def club_empresario(request: Request):
     s = await socio_por_token(request.cookies.get(COOKIE))
     if not s:
-        return RedirectResponse("/club?rol=empresario", status_code=303)
+        return RedirectResponse("/entrar?rol=empresario&sig=/empresario", status_code=303)
     return templates.TemplateResponse(request, "club/empresario.html", {
-        "s": s, "nombre": nombre_saludo(s["ruc"], s["razon_social"], s["nombre_comercial"])})
+        "s": s, "inicio": inicio(request), "nombre": nombre_saludo(s["ruc"], s["razon_social"], s["nombre_comercial"])})
 
 
-@router.get("/club/igv", response_class=HTMLResponse)
+@router.get("/igv", response_class=HTMLResponse)
 async def club_igv(request: Request):
+    """Gratis y SIN cuenta: no pide sesion."""
     s = await socio_por_token(request.cookies.get(COOKIE))
-    return templates.TemplateResponse(request, "club/igv.html", {"s": s})
+    return templates.TemplateResponse(request, "club/igv.html", {"s": s, "inicio": inicio(request)})
 
 
-@router.get("/club/directorio", response_class=HTMLResponse)
+@router.get("/directorio", response_class=HTMLResponse)
 async def club_directorio_inicio(request: Request, ubigeo: str = ""):
     s = await socio_por_token(request.cookies.get(COOKIE))
     destino = "".join(c for c in ubigeo if c.isdigit()) or (s or {}).get("ubigeo")
     if destino and est.nombre_distrito(destino):
-        return RedirectResponse(f"/club/directorio/{destino}", status_code=303)
+        return RedirectResponse(f"/directorio/{destino}", status_code=303)
     return templates.TemplateResponse(request, "club/directorio.html", {
-        "s": s, "ubigeo": None, "filas": [], "distrito": None})
+        "s": s, "inicio": inicio(request), "ubigeo": None, "filas": [], "distrito": None})
 
 
-@router.get("/club/directorio/{ubigeo}", response_class=HTMLResponse)
+@router.get("/directorio/{ubigeo}", response_class=HTMLResponse)
 async def club_directorio(request: Request, ubigeo: str):
     distrito = est.nombre_distrito(ubigeo)
     if not distrito:
-        return RedirectResponse("/club/directorio", status_code=303)
+        return RedirectResponse("/directorio", status_code=303)
     s = await socio_por_token(request.cookies.get(COOKIE))
     filas = [dict(r) for r in await _pool().fetch(
         "SELECT id, ruc, razon_social, nombre_comercial, especialidad1, especialidad2, distrito, slug "
@@ -467,11 +530,11 @@ async def club_directorio(request: Request, ubigeo: str):
     padron_n = await _pool().fetchval(
         "SELECT count(*) FROM contadores_padron WHERE ubigeo = $1 AND activo_corte_2026_09", ubigeo)
     return templates.TemplateResponse(request, "club/directorio.html", {
-        "s": s, "ubigeo": ubigeo, "distrito": titulo(distrito), "filas": filas,
+        "s": s, "inicio": inicio(request), "ubigeo": ubigeo, "distrito": titulo(distrito), "filas": filas,
         "padron_n": padron_n, "vacias": max(0, 8 - len(filas))})
 
 
-@router.get("/club/c/{slug}", response_class=HTMLResponse)
+@router.get("/c/{slug}", response_class=HTMLResponse)
 async def club_mini_pagina(request: Request, slug: str):
     """Mini-pagina individual: ESQUELETO (se completa despues). Solo si dio opt-in."""
     row = await _pool().fetchrow(
@@ -481,12 +544,13 @@ async def club_mini_pagina(request: Request, slug: str):
         return HTMLResponse("No encontramos esta página.", status_code=404)
     s = await socio_por_token(request.cookies.get(COOKIE))
     return templates.TemplateResponse(request, "club/mini.html", {
-        "s": s, "c": dict(row), "nombre": titulo(row["nombre_comercial"] or row["razon_social"])})
+        "s": s, "inicio": inicio(request), "c": dict(row),
+        "nombre": titulo(row["nombre_comercial"] or row["razon_social"])})
 
 
-@router.get("/club/salir")
+@router.get("/salir")
 async def club_salir(request: Request):
-    resp = RedirectResponse("/club", status_code=303)
+    resp = RedirectResponse(inicio(request), status_code=303)
     resp.delete_cookie(COOKIE)                       # cookie antigua (solo este host)
     if _dominio_cookie(request):
         resp.delete_cookie(COOKIE, domain=_dominio_cookie(request))
