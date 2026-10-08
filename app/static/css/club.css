@@ -1,38 +1,41 @@
 /* Club de Contadores — estilo hoja de calculo (de la maqueta aprobada 2026-10-06). */
 /* Layout: una hoja de calculo. Barra de formula = saludo; cada herramienta es un bloque
    de celdas con su direccion (B2, D2...) y su "funcion"; pestanas de hoja abajo;
-   menu vertical a la derecha. Angulos rectos, lineas de grilla de 1px, tipo chico. */
+   menu vertical a la derecha. Angulos rectos, lineas de grilla de 1px, tipo chico.
+   TRES TEMAS, todos oscuros y con personalidad propia (nunca blanco):
+     Grafito    carbon neutro, nitido, verde/azul/dorado clasicos (default)
+     Medianoche indigo profundo con brillo violeta; acentos aqua/pervinca/miel
+     Sepia      espresso calido tipo libro mayor; acentos salvia/turquesa/cobre */
 :root {
   /* Tema 1 · Grafito (default) */
-  --bg: #101412;      /* hoja */
-  --cell: #151a17;    /* celda */
-  --cell-2: #1a201c;  /* cabeceras de fila/columna */
-  --grid: #252d29;    /* lineas de grilla */
-  --fg: #d3dcd6;
-  --muted: #7d8a83;
-  --faint: #56625b;
-  --accent: #5fb08f;  /* verde contable, apagado */
-  --accent-ink: #0d1a14;
-  --sel: rgba(95,176,143,.12);
-  --warn: #d4a35a;
-  --lv-gratis: #5fb08f; --lv-cuenta: #6f9fe0; --lv-premium: #d2a54e;
+  --bg: #121416;      /* hoja */
+  --cell: #181b1f;    /* celda */
+  --cell-2: #1e2226;  /* cabeceras de fila/columna */
+  --grid: #2c3137;    /* lineas de grilla */
+  --fg: #e3e6e9;
+  --muted: #8a929b;
+  --faint: #5c646d;
+  --accent: #2fd39a;
+  --accent-ink: #0b1a13;
+  --sel: rgba(47,211,154,.12);
+  --warn: #f0b545;
+  --lv-gratis: #2fd39a; --lv-cuenta: #4c9dff; --lv-premium: #f5b83d;
   --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --fs: 12px;
   color-scheme: dark;
 }
-:root[data-tema="tinta"] {
-  --bg: #0e121b; --cell: #131927; --cell-2: #182032; --grid: #232d42;
-  --fg: #d2d9e6; --muted: #7c879c; --faint: #535d72;
-  --accent: #7aa7e8; --accent-ink: #0b1220; --sel: rgba(122,167,232,.12); --warn: #d6a75e;
-  --lv-gratis: #63b896; --lv-cuenta: #86b0ee; --lv-premium: #d9ae5a;
+:root[data-tema="tinta"] {   /* Tema 2 · Medianoche */
+  --bg: #0a0b1f; --cell: #11133a; --cell-2: #171a49; --grid: #2a2e6a;
+  --fg: #eceefe; --muted: #9196c8; --faint: #5f639a;
+  --accent: #8ea2ff; --accent-ink: #0a0b1f; --sel: rgba(142,162,255,.14); --warn: #ffc95c;
+  --lv-gratis: #3fe0c0; --lv-cuenta: #8ea2ff; --lv-premium: #ffc95c;
 }
-:root[data-tema="papel"] {
-  --bg: #e4e2da; --cell: #eeece5; --cell-2: #e0ddd3; --grid: #c9c5b8;
-  --fg: #1e2420; --muted: #5d6660; --faint: #8b918a;
-  --accent: #1f7556; --accent-ink: #eef4f0; --sel: rgba(31,117,86,.10); --warn: #9a6516;
-  --lv-gratis: #1f7556; --lv-cuenta: #2c5ca6; --lv-premium: #8a6212;
-  color-scheme: light;
+:root[data-tema="sepia"] {   /* Tema 3 · Sepia */
+  --bg: #15100b; --cell: #1e1711; --cell-2: #261d15; --grid: #3d3024;
+  --fg: #f3eadf; --muted: #ad9a84; --faint: #75644f;
+  --accent: #e8a04a; --accent-ink: #1a110a; --sel: rgba(232,160,74,.13); --warn: #f0a742;
+  --lv-gratis: #9bd17a; --lv-cuenta: #5fb9d6; --lv-premium: #f09a3e;
 }
 html, body { background: var(--bg); }
 body { margin: 0; }
