@@ -3,7 +3,7 @@
 {% block titulo %}Tablero · Club de Contadores{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
-<link rel="stylesheet" href="/static/css/club-vitrina.css?v=6">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=7">
 {% endblock %}
 {% block contenido %}
 <div class="vitrina" id="hoja">
@@ -26,11 +26,13 @@
       <span class="k">Tu distrito · Nuevos Negocios</span>
       <div class="cifra">{{ nn.total|miles }}</div>
       <h2>negocios nuevos se inscribieron en {{ s.distrito }} en {{ nn.mes_largo }}</h2>
+      <p class="desglose"><b>{{ nn.juridicas|miles }}</b> empresas · <b>{{ nn.naturales|miles }}</b> personas con negocio</p>
       <p>Cada uno puede necesitar contador. Ve quiénes son, con su actividad y fecha de inscripción, antes que la competencia.</p>
       <a class="boton" href="{{ nn_url }}">Ver los negocios de {{ s.distrito }} →</a>
     </div>
     <div class="barras" role="img" aria-label="Altas SUNAT por mes: {% for m in nn.meses %}{{ m.mes }} {{ m.n }}{% if not loop.last %}, {% endif %}{% endfor %}">
       {% for m in nn.meses %}<div style="height:{{ m.pct }}%"><em>{{ m.n|miles }}</em><span>{{ m.mes }}</span></div>{% endfor %}
+      <small class="nota-serie">Solo negocios: empresas y personas con negocio. No cuenta a quien saca RUC sin empresa.</small>
     </div>
   </section>
   {% else %}
