@@ -176,3 +176,10 @@
   .vitrina .rota .f.primera { opacity: 1; }
   .vitrina .rota .esc::after { display: none; }
 }
+
+/* Desglose y nota de criterio en la portada */
+.vitrina .portada .desglose { margin: .55em 0 -.35em; color: var(--v-fg); font-size: 1.07em; }
+.vitrina .portada .desglose b { font-family: var(--mono); color: var(--v-cuenta); }
+.vitrina .barras { position: relative; }
+.vitrina .barras .nota-serie { position: absolute; left: 0; right: 0; bottom: -3.6em; text-align: center; color: var(--v-muted); font-size: .8em; }
+@media (max-width: 980px) { .vitrina .barras { margin-bottom: 2.6em; } }
