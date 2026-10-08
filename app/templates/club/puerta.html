@@ -1,60 +1,74 @@
 {% extends "club/base.html" %}
 {% set hoja = "puerta" %}
-{% block titulo %}Club de Contadores{% endblock %}
+{% block titulo %}Entrar · Club de Contadores{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=11">
+{% endblock %}
 {% block contenido %}
-  <section class="fx" aria-label="Bienvenida">
-    <div class="ref">A1</div>
-    <div class="f">fx</div>
-    <div class="val" id="fxVal"><span class="q">="</span>Bienvenido al Club de Contadores<span class="q">"</span></div>
-  </section>
+{# Mismo lenguaje que el tablero REVISTA: titulo editorial, colores de nivel y tarjetas.
+   Solo cambia lo visual: los IDs y clases que usa el JS de abajo son los de siempre. #}
+<div class="vitrina entrar" id="hoja">
+  <section class="entrar-grid">
+    <div class="entrar-intro lv-cuenta">
+      <span class="k">Club de Contadores · gratis con tu cuenta</span>
+      <h1 id="fxVal"><span class="q">="</span>Bienvenido al Club de Contadores<span class="q">"</span></h1>
+      <p class="lead">Con tu RUC te reconocemos en el padrón SUNAT. No pedimos tu clave SOL.</p>
+      <ul class="beneficios">
+        <li class="lv-cuenta"><span><b>Nuevos Negocios</b> de tu distrito, cada mes</span></li>
+        <li class="lv-cuenta"><span><b>Directorio</b> de Contadores de tu distrito</span></li>
+        <li class="lv-gratis"><span>Las gratis siguen <b>sin cuenta</b>: Calculadora de IGV</span></li>
+      </ul>
+      <a class="volver" href="{{ inicio or '/club' }}">← Volver al tablero</a>
+    </div>
 
-  <div class="estrecho">
-    <section class="panel" id="paso1" aria-label="Entrar">
-      <header class="panel-cab"><b>Entrar al Club</b><span>Elige quién eres y escribe tu RUC.</span></header>
-      <div class="panel-cuerpo">
+    <div class="entrar-form">
+      <section class="entrar-card lv-cuenta" id="paso1" aria-label="Entrar">
+        <header><span class="paso">Paso 1 de 2</span><h2>¿Quién eres?</h2></header>
         <div class="roles" role="group" aria-label="¿Quién eres?">
-          <button type="button" class="rol" data-rol="contador" aria-pressed="{{ 'true' if rol != 'empresario' else 'false' }}">
-            <span class="dir">A</span><b>Soy Contador</b><span>Contador o estudio contable</span></button>
-          <button type="button" class="rol" data-rol="empresario" aria-pressed="{{ 'true' if rol == 'empresario' else 'false' }}">
-            <span class="dir">B</span><b>Soy Empresario</b><span>Tengo un negocio o empresa</span></button>
+          <button type="button" class="rol lv-cuenta" data-rol="contador" aria-pressed="{{ 'true' if rol != 'empresario' else 'false' }}">
+            <span class="dir">Contador</span><b>Soy Contador</b><span>Contador o estudio contable</span></button>
+          <button type="button" class="rol lv-premium" data-rol="empresario" aria-pressed="{{ 'true' if rol == 'empresario' else 'false' }}">
+            <span class="dir">Empresario</span><b>Soy Empresario</b><span>Tengo un negocio o empresa</span></button>
         </div>
         <form id="fRuc" class="campo" novalidate>
-          <label for="ruc">RUC</label>
+          <label for="ruc">Tu RUC</label>
           <input id="ruc" name="ruc" inputmode="numeric" maxlength="11" autocomplete="off" placeholder="10XXXXXXXXX" required>
           <small>Te reconocemos con el padrón SUNAT. No pedimos tu clave SOL.</small>
-          <div class="acciones" style="margin-top:6px"><button class="btn" type="submit" id="btnRuc">Continuar</button></div>
+          <div class="acciones"><button class="btn" type="submit" id="btnRuc">Continuar →</button></div>
         </form>
         <div id="res1" aria-live="polite"></div>
-      </div>
-    </section>
+      </section>
 
-    <section class="panel" id="paso2" hidden aria-label="Registro">
-      <header class="panel-cab"><b>Registro</b><span id="regSub"></span></header>
-      <form class="panel-cuerpo" id="fReg" novalidate>
-        <div class="saludo-reg" id="regSaludo"></div>
-        <div class="fila-campos">
-          <div class="campo"><label for="correo">Correo</label>
-            <input id="correo" type="email" autocomplete="email" required placeholder="tu@correo.com"></div>
-          <div class="campo"><label for="whatsapp">WhatsApp <span style="text-transform:none">(opcional)</span></label>
-            <input id="whatsapp" inputmode="numeric" maxlength="9" autocomplete="tel" placeholder="9XXXXXXXX"></div>
-        </div>
-        <div class="hp" aria-hidden="true"><label for="empresa_web">No llenar</label><input id="empresa_web" tabindex="-1" autocomplete="off"></div>
-        <label class="check" for="consent">
-          <input type="checkbox" id="consent">
-          <span>Autorizo a Perú Sistemas Pro a tratar mis datos para darme acceso al Club y enviarme información de sus herramientas por correo y/o WhatsApp (Ley 29733).
-            <small>Puedes darte de baja cuando quieras. <a href="{{ anpd_url }}" target="_blank" rel="noopener">Registro ante la ANPD</a>.</small></span>
-        </label>
-        <label class="check dir-opt" for="optDir" id="optDirBox">
-          <input type="checkbox" id="optDir">
-          <span>Quiero aparecer en el Directorio de Contadores de mi distrito.
-            <small>Opcional y aparte del registro: los empresarios de tu distrito verán tu nombre y tu mini-página. Puedes quitarte en Mi perfil.</small></span>
-        </label>
-        <div id="res2" aria-live="polite"></div>
-        <div class="acciones"><button class="btn" type="submit" id="btnReg">Entrar al Club</button>
-          <button class="btn sec" type="button" id="btnVolver">Cambiar RUC</button></div>
-      </form>
-    </section>
-  </div>
+      <section class="entrar-card lv-cuenta" id="paso2" hidden aria-label="Registro">
+        <header><span class="paso">Paso 2 de 2</span><h2>Tus datos</h2><span class="sub" id="regSub"></span></header>
+        <form id="fReg" novalidate>
+          <div class="saludo-reg" id="regSaludo"></div>
+          <div class="fila-campos">
+            <div class="campo"><label for="correo">Correo</label>
+              <input id="correo" type="email" autocomplete="email" required placeholder="tu@correo.com"></div>
+            <div class="campo"><label for="whatsapp">WhatsApp <span class="opc">(opcional)</span></label>
+              <input id="whatsapp" inputmode="numeric" maxlength="9" autocomplete="tel" placeholder="9XXXXXXXX"></div>
+          </div>
+          <div class="hp" aria-hidden="true"><label for="empresa_web">No llenar</label><input id="empresa_web" tabindex="-1" autocomplete="off"></div>
+          <label class="check" for="consent">
+            <input type="checkbox" id="consent">
+            <span>Autorizo a Perú Sistemas Pro a tratar mis datos para darme acceso al Club y enviarme información de sus herramientas por correo y/o WhatsApp (Ley 29733).
+              <small>Puedes darte de baja cuando quieras. <a href="{{ anpd_url }}" target="_blank" rel="noopener">Registro ante la ANPD</a>.</small></span>
+          </label>
+          <label class="check dir-opt" for="optDir" id="optDirBox">
+            <input type="checkbox" id="optDir">
+            <span>Quiero aparecer en el Directorio de Contadores de mi distrito.
+              <small>Opcional y aparte del registro: los empresarios de tu distrito verán tu nombre y tu mini-página. Puedes quitarte en Mi perfil.</small></span>
+          </label>
+          <div id="res2" aria-live="polite"></div>
+          <div class="acciones"><button class="btn" type="submit" id="btnReg">Entrar al Club →</button>
+            <button class="btn sec" type="button" id="btnVolver">Cambiar RUC</button></div>
+        </form>
+      </section>
+    </div>
+  </section>
+</div>
 {% endblock %}
 {% block estado %}<span>Padrón SUNAT: <b>157,357</b> contadores</span><span id="estadoTxt">Listo</span>{% endblock %}
 {% block scripts %}

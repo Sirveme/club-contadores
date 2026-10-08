@@ -6,11 +6,11 @@
 <title>{% block titulo %}Club de Contadores{% endblock %}</title>
 <meta name="description" content="Club de Contadores: herramientas para contadores del Perú, con el padrón SUNAT.">
 <meta name="theme-color" content="#101412">
-<script>try{var t=localStorage.getItem("club.tema");if(t==="tinta"||t==="papel")document.documentElement.dataset.tema=t;}catch(e){}</script>
+<script>try{var t=localStorage.getItem("club.tema");if(t==="papel")t="sepia";if(t==="tinta"||t==="sepia")document.documentElement.dataset.tema=t;}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/static/css/club.css?v=5">
+<link rel="stylesheet" href="/static/css/club.css?v=6">
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -55,9 +55,9 @@
   <button type="button" id="fMenos" data-tip="Letra más chica" aria-label="Letra más chica">A−</button>
   <button type="button" id="fMas" data-tip="Letra más grande" aria-label="Letra más grande">A+</button>
   <div class="sep"></div>
-  <button type="button" data-tema="grafito" data-tip="Tema Grafito" aria-label="Tema Grafito"><span class="sw" style="background:#151a17"></span></button>
-  <button type="button" data-tema="tinta" data-tip="Tema Tinta" aria-label="Tema Tinta"><span class="sw" style="background:#182032"></span></button>
-  <button type="button" data-tema="papel" data-tip="Tema Papel" aria-label="Tema Papel"><span class="sw" style="background:#e4e2da"></span></button>
+  <button type="button" data-tema="grafito" data-tip="Tema Grafito" aria-label="Tema Grafito"><span class="sw" style="background:linear-gradient(135deg,#21252a 50%,#2fd39a 50%)"></span></button>
+  <button type="button" data-tema="tinta" data-tip="Tema Medianoche" aria-label="Tema Medianoche"><span class="sw" style="background:linear-gradient(135deg,#191c4a 50%,#8ea2ff 50%)"></span></button>
+  <button type="button" data-tema="sepia" data-tip="Tema Sepia" aria-label="Tema Sepia"><span class="sw" style="background:linear-gradient(135deg,#2a2018 50%,#f09a3e 50%)"></span></button>
   <div class="sep"></div>
   <button type="button" id="btnIr" data-tip="Buscar / ir a  (Ctrl+G)" aria-label="Buscar o ir a">
     <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
