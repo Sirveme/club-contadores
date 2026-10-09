@@ -41,6 +41,7 @@ router = APIRouter()
 
 BASE_DIR = Path(__file__).resolve().parent
 SQL_ESQUEMA = BASE_DIR.parent / "sql" / "alter_v10_club.sql"
+SQL_IDENTIDAD = BASE_DIR.parent / "sql" / "alter_v11_identidad.sql"
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 COOKIE = "club_t"
@@ -99,8 +100,11 @@ def _pool() -> asyncpg.Pool:
 
 
 async def asegurar_esquema() -> None:
+    """Esquema del Club (idempotente): socios (alter_v10) e identidad por persona
+    (alter_v11: personas, accesos, login_intentos). En produccion ya existen: no-op."""
     if db._pool is not None:
-        await db._pool.execute(SQL_ESQUEMA.read_text(encoding="utf-8"))
+        for sql in (SQL_ESQUEMA, SQL_IDENTIDAD):
+            await db._pool.execute(sql.read_text(encoding="utf-8"))
 
 
 def _client_ip(request: Request) -> str | None:

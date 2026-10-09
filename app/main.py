@@ -32,6 +32,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 import estadisticas as est  # noqa: E402
 from . import club  # noqa: E402  (Club de Contadores: /club, /club/tablero, ...)
+from . import identidad  # noqa: E402  (identidad por persona/DNI: /api/id/...)
 
 SITE_BASE = os.getenv("SITE_BASE", "https://observatorio.perusistemas.pro").rstrip("/")
 # URL del registro ante la ANPD (placeholder editable hasta tener el archivo).
@@ -101,6 +102,8 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.include_router(club.router)
 app.middleware("http")(club.enrutar_por_dominio)  # club.perusistemas.pro -> Club
+app.include_router(identidad.router)
+app.add_exception_handler(identidad._Rechazo, identidad.manejar_rechazo)
 templates.env.filters["titulo"] = lambda s: titulo(s)  # Title Case peruano en plantillas
 templates.env.filters["miles"] = lambda n: f"{int(n):,}" if n is not None else ""   # 51,477
 templates.env.filters["pct"] = lambda v: f"{v:.2f}" if v is not None else ""         # 2 decimales
