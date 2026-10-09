@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{% block titulo %}Club de Contadores{% endblock %}</title>
 <meta name="description" content="Club de Contadores: herramientas para contadores del Perú, con el padrón SUNAT.">
-<meta name="theme-color" content="#101412">
-<script>try{var t=localStorage.getItem("club.tema");if(t==="papel")t="sepia";if(t==="tinta"||t==="sepia")document.documentElement.dataset.tema=t;}catch(e){}</script>
+<meta name="theme-color" content="#15100b">
+<script>/* Tema por defecto: Sepia. "grafito" solo si la persona lo eligio. */var d=document.documentElement;d.dataset.tema="sepia";try{var t=localStorage.getItem("club.tema");if(t==="grafito")delete d.dataset.tema;else if(t==="tinta")d.dataset.tema="tinta";}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
