@@ -321,6 +321,8 @@ async def api_registro(payload: dict, request: Request):
         return JSONResponse({"ok": False, "error": "Elige si eres contador o empresario."}, status_code=422)
     if not payload.get("consentimiento"):
         return JSONResponse({"ok": False, "error": "Para registrarte necesitamos tu autorización."}, status_code=422)
+    if perfil == "empresario" and not ruc:
+        return JSONResponse({"ok": False, "error": "Indica el RUC de tu negocio o empresa."}, status_code=422)
     existe = await db._pool.fetchrow("SELECT estado FROM personas WHERE dni = $1", dni)
     if existe:
         accion = "activar" if existe["estado"] == "por_activar" else "ya_registrado"
@@ -401,10 +403,7 @@ async def api_ingresar(payload: dict, request: Request):
 @router.post("/api/id/salir")
 async def api_salir(request: Request):
     """Cierra la sesion en TODOS los dispositivos (sube sesion_version)."""
-    p = await persona_actual(request)
-    if p:
-        await db._pool.execute("UPDATE personas SET sesion_version = sesion_version + 1, updated_at = now() "
-                               "WHERE id = $1", p["id"])
+    await cerrar_sesion_persona(request)
     return _sin_sesion(JSONResponse({"ok": True, "link": club.inicio(request)}), request)
 
 
@@ -439,3 +438,73 @@ async def api_yo(request: Request):
         "FROM accesos WHERE persona_id = $1 AND revocado_en IS NULL ORDER BY es_principal DESC, created_at", p["id"])]
     return JSONResponse({"ok": True, "dni": p["dni"], "nombres": p["nombres"], "nombre_verificado": p["nombre_verificado"],
                          "debe_cambiar_clave": p["debe_cambiar_clave"], "accesos": accesos})
+
+
+# --- Sesion de persona vista por el Club (lectura doble, Fase 1c) ----------------
+async def socio_desde_persona(request: Request) -> dict | None:
+    """Persona con sesion -> los mismos campos que usa el Club para un socio, a partir
+    de su acceso PRINCIPAL. Sin RUC vinculado: contador sin distrito (por confirmar)."""
+    p = await persona_actual(request)
+    if not p:
+        return None
+    a = await db._pool.fetchrow(
+        "SELECT a.*, su.token_baja AS nn_token FROM accesos a LEFT JOIN suscriptores su ON su.id = a.suscriptor_id "
+        "WHERE a.persona_id = $1 AND a.revocado_en IS NULL ORDER BY a.es_principal DESC, a.created_at LIMIT 1", p["id"])
+    a = dict(a) if a else {}
+    act = a.get("actividad")
+    return {
+        "fuente": "persona", "id": str(a["id"]) if a else str(p["id"]), "persona_id": str(p["id"]),
+        "acceso_id": str(a["id"]) if a else None, "dni": p["dni"], "rol": a.get("perfil") or "contador",
+        "ruc": a.get("ruc"), "razon_social": a.get("razon_social") or p["nombre_completo"],
+        "nombre_comercial": a.get("nombre_comercial"), "ubigeo": a.get("ubigeo"),
+        "distrito": club.titulo(a.get("distrito")) or None,
+        "verificacion": act if act in ("padron", "api") else ("no_aplica" if act == "no_aplica" else "por_confirmar"),
+        "nn_token": a.get("nn_token"), "directorio_optin": bool(a.get("directorio_optin")), "slug": a.get("slug"),
+        "correo": p["correo"], "whatsapp": p["whatsapp"], "debe_cambiar_clave": p["debe_cambiar_clave"],
+        "nombre_saludo": club.titulo(p["nombres"]) if p["nombres"] else
+        club.nombre_saludo(a.get("ruc") or "10", p["nombre_completo"], None),
+    }
+
+
+async def cerrar_sesion_persona(request: Request) -> None:
+    """Sube sesion_version: la sesion muere en TODOS los dispositivos."""
+    p = await persona_actual(request)
+    if p:
+        await db._pool.execute("UPDATE personas SET sesion_version = sesion_version + 1, updated_at = now() "
+                               "WHERE id = $1", p["id"])
+
+
+# --- Pantallas (1c) ---------------------------------------------------------------
+from fastapi.responses import HTMLResponse, RedirectResponse  # noqa: E402
+
+
+def _ctx(request: Request, **k):
+    return {"s": None, "inicio": club.inicio(request), "psp_whatsapp": club.PSP_WHATSAPP,
+            "anpd_url": club.ANPD_REGISTRO_URL, "sig": club._ruta_segura(str(request.query_params.get("sig") or "")), **k}
+
+
+@router.get("/registro", response_class=HTMLResponse)
+async def pagina_registro(request: Request):
+    if not REGISTRO_ABIERTO:
+        return club.templates.TemplateResponse(request, "club/pronto.html", _ctx(request, que="El registro con DNI"))
+    if await persona_actual(request):
+        return RedirectResponse(club.inicio(request), status_code=303)
+    return club.templates.TemplateResponse(request, "club/registro.html", _ctx(request, consent_ver=CONSENT_VER))
+
+
+@router.get("/ingresar", response_class=HTMLResponse)
+async def pagina_ingresar(request: Request):
+    if not REGISTRO_ABIERTO:
+        return club.templates.TemplateResponse(request, "club/pronto.html", _ctx(request, que="El ingreso con DNI"))
+    if await persona_actual(request):
+        return RedirectResponse(club.inicio(request), status_code=303)
+    return club.templates.TemplateResponse(request, "club/ingresar.html", _ctx(request))
+
+
+@router.get("/cambiar-clave", response_class=HTMLResponse)
+async def pagina_cambiar_clave(request: Request):
+    p = await persona_actual(request)
+    if not p:
+        return RedirectResponse("/ingresar?sig=/cambiar-clave", status_code=303)
+    return club.templates.TemplateResponse(request, "club/cambiar_clave.html",
+                                           _ctx(request, obligatoria=p["debe_cambiar_clave"]))
