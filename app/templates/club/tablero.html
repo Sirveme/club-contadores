@@ -3,7 +3,7 @@
 {% block titulo %}Tablero · Club de Contadores{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
-<link rel="stylesheet" href="/static/css/club-vitrina.css?v=11">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=14">
 {% endblock %}
 {% block contenido %}
 <div class="vitrina" id="hoja">
@@ -106,7 +106,7 @@
   {# Mi perfil es zona operativa: mantiene el estilo sobrio de hoja de calculo. #}
   {% if s %}
   <section class="panel perfil" id="perfil" aria-label="Mi perfil">
-    <header class="panel-cab"><b>Mi perfil</b><span>{{ s.correo }}{% if s.whatsapp %} · WhatsApp {{ s.whatsapp }}{% endif %} · RUC {{ s.ruc }}</span></header>
+    <header class="panel-cab"><b>Mi perfil</b><span>{% if s.fuente == "persona" %}DNI {{ s.dni }} · {% endif %}{{ s.correo }}{% if s.whatsapp %} · WhatsApp {{ s.whatsapp }}{% endif %}{% if s.ruc %} · RUC {{ s.ruc }}{% endif %}{% if s.fuente == "persona" %} · <a href="/cambiar-clave">Cambiar clave</a>{% endif %}</span></header>
     <div class="panel-cuerpo">
       <label class="check dir-opt" for="optDir">
         <input type="checkbox" id="optDir" {% if s.directorio_optin %}checked{% endif %}>

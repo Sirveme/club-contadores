@@ -1,0 +1,57 @@
+{% extends "club/base.html" %}
+{% set hoja = "puerta" %}
+{% block titulo %}Ingresar · Club de Contadores{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=14">
+{% endblock %}
+{% block contenido %}
+<div class="vitrina entrar" id="hoja">
+  <section class="entrar-grid">
+    <div class="entrar-intro lv-cuenta">
+      <span class="k">Club de Contadores · ingresar</span>
+      <h1>Hola de nuevo</h1>
+      <p class="lead">Ingresa con tu DNI y tu clave para ver Nuevos Negocios de tu distrito y tu perfil.</p>
+      <a class="volver" href="{{ inicio }}">← Volver al tablero</a>
+    </div>
+    <div class="entrar-form">
+      <section class="entrar-card lv-cuenta" aria-label="Ingresar">
+        <header><span class="paso">Tu cuenta</span><h2>Ingresar</h2></header>
+        <form id="fIng" novalidate>
+          <div class="campo"><label for="dni">DNI</label>
+            <input id="dni" inputmode="numeric" maxlength="8" autocomplete="username" placeholder="8 dígitos"></div>
+          <div class="campo"><label for="clave">Clave</label>
+            <input id="clave" type="password" autocomplete="current-password"></div>
+          <div id="r" aria-live="polite"></div>
+          <div class="acciones"><button class="btn" type="submit" id="bIng">Ingresar →</button>
+            <a class="btn sec" href="/registro{% if sig %}?sig={{ sig }}{% endif %}">Crear cuenta</a></div>
+        </form>
+        <p class="nota-clave">¿Olvidaste tu clave? Escríbenos al WhatsApp <b class="mono">{{ psp_whatsapp }}</b> y te ayudamos a recuperarla.</p>
+      </section>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block estado %}<span>Tu cuenta personal del Club</span><span id="estadoTxt">Listo</span>{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const SIG = {{ sig|tojson }}, INICIO = {{ inicio|tojson }};
+  const $ = id => document.getElementById(id);
+  const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  $("fIng").onsubmit = async e => {
+    e.preventDefault();
+    const dni = $("dni").value.replace(/\D/g, "");
+    if (dni.length !== 8) { $("r").innerHTML = '<div class="msg err">El DNI tiene 8 dígitos.</div>'; return; }
+    $("bIng").disabled = true;
+    const r = await fetch("/api/id/ingresar", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dni, clave: $("clave").value, siguiente: SIG }) });
+    let d = {}; try { d = await r.json(); } catch (x) {}
+    if (r.ok && d.ok) {
+      location.href = d.debe_cambiar_clave ? "/cambiar-clave?sig=" + encodeURIComponent(d.link || INICIO) : (d.link || INICIO); return; }
+    $("bIng").disabled = false;
+    $("r").innerHTML = `<div class="msg err">${esc(d.error || "No pudimos ingresar. Intenta de nuevo.")}</div>`;
+  };
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "club/base.html" %}
+{% set hoja = "puerta" %}
+{% block titulo %}Muy pronto · Club de Contadores{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=14">
+{% endblock %}
+{% block contenido %}
+<div class="vitrina entrar" id="hoja">
+  <section class="entrar-grid">
+    <div class="entrar-intro lv-cuenta">
+      <span class="k">Club de Contadores · muy pronto</span>
+      <h1>{{ que }} llega muy pronto</h1>
+      <p class="lead">Estamos preparando tu cuenta personal con DNI y clave. Mientras tanto puedes seguir entrando con tu RUC.</p>
+      <a class="volver" href="{{ inicio }}">← Volver al tablero</a>
+    </div>
+    <div class="entrar-form">
+      <section class="entrar-card lv-cuenta">
+        <header><span class="paso">Mientras tanto</span><h2>Entra con tu RUC</h2></header>
+        <p class="lead" style="margin:0;color:var(--v-fg2)">Nuevos Negocios de tu distrito y el Directorio ya funcionan con tu RUC.</p>
+        <div class="acciones"><a class="btn" href="/entrar{% if sig %}?sig={{ sig }}{% endif %}">Entrar con mi RUC →</a></div>
+      </section>
+    </div>
+  </section>
+</div>
+{% endblock %}

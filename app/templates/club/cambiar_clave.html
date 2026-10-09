@@ -1,0 +1,56 @@
+{% extends "club/base.html" %}
+{% set hoja = "puerta" %}
+{% block titulo %}Cambiar clave · Club de Contadores{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=14">
+{% endblock %}
+{% block contenido %}
+<div class="vitrina entrar" id="hoja">
+  <section class="entrar-grid">
+    <div class="entrar-intro lv-cuenta">
+      <span class="k">Club de Contadores · tu clave</span>
+      <h1>{{ "Elige una clave nueva" if obligatoria else "Cambia tu clave" }}</h1>
+      <p class="lead">{% if obligatoria %}Tu clave fue restablecida por soporte: elige una nueva para seguir.{% else %}Al cambiarla, se cierra tu sesión en tus otros dispositivos.{% endif %}</p>
+      <a class="volver" href="{{ inicio }}">← Volver al tablero</a>
+    </div>
+    <div class="entrar-form">
+      <section class="entrar-card lv-cuenta" aria-label="Cambiar clave">
+        <header><span class="paso">Seguridad</span><h2>Tu clave</h2></header>
+        <form id="fClave" novalidate>
+          <div class="campo"><label for="actual">{{ "Clave temporal" if obligatoria else "Clave actual" }}</label>
+            <input id="actual" type="password" autocomplete="current-password"></div>
+          <div class="fila-campos">
+            <div class="campo"><label for="nueva">Clave nueva</label>
+              <input id="nueva" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></div>
+            <div class="campo"><label for="nueva2">Repite la clave nueva</label>
+              <input id="nueva2" type="password" autocomplete="new-password"></div>
+          </div>
+          <div id="r" aria-live="polite"></div>
+          <div class="acciones"><button class="btn" type="submit" id="bClave">Guardar clave →</button></div>
+        </form>
+      </section>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const SIG = {{ sig|tojson }}, INICIO = {{ inicio|tojson }};
+  const $ = id => document.getElementById(id);
+  const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  $("fClave").onsubmit = async e => {
+    e.preventDefault();
+    if ($("nueva").value !== $("nueva2").value) { $("r").innerHTML = '<div class="msg err">Las dos claves nuevas no coinciden.</div>'; return; }
+    $("bClave").disabled = true;
+    const r = await fetch("/api/id/cambiar-clave", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actual: $("actual").value, nueva: $("nueva").value, nueva2: $("nueva2").value }) });
+    let d = {}; try { d = await r.json(); } catch (x) {}
+    if (r.ok && d.ok) { $("r").innerHTML = '<div class="msg info">Listo: clave guardada.</div>'; setTimeout(() => location.href = SIG || INICIO, 700); return; }
+    $("bClave").disabled = false;
+    $("r").innerHTML = `<div class="msg err">${esc(d.error || "No pudimos guardar tu clave.")}</div>`;
+  };
+})();
+</script>
+{% endblock %}

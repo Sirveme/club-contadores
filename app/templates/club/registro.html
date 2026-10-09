@@ -1,0 +1,188 @@
+{% extends "club/base.html" %}
+{% set hoja = "puerta" %}
+{% block titulo %}Crear cuenta · Club de Contadores{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=14">
+{% endblock %}
+{% block contenido %}
+{# Registro por PERSONA (DNI). 4 pasos: DNI (RENIEC) -> quién eres -> tu RUC -> tus datos. #}
+<div class="vitrina entrar" id="hoja">
+  <section class="entrar-grid">
+    <div class="entrar-intro lv-cuenta">
+      <span class="k">Club de Contadores · tu cuenta personal</span>
+      <h1 id="titulo">Crea tu cuenta con tu DNI</h1>
+      <p class="lead">Tu cuenta es tuya, no de un RUC: con un solo DNI y una clave entras a todos tus RUC.</p>
+      <ul class="beneficios">
+        <li class="lv-cuenta"><span>Te reconocemos con <b>RENIEC</b> y el padrón SUNAT</span></li>
+        <li class="lv-cuenta"><span>Tu <b>RUC 10</b> se verifica al instante con tu DNI</span></li>
+        <li class="lv-gratis"><span>Las gratis siguen <b>sin cuenta</b>: Calculadora de IGV</span></li>
+      </ul>
+      <a class="volver" href="/ingresar{% if sig %}?sig={{ sig }}{% endif %}">¿Ya tienes cuenta? Ingresa →</a>
+    </div>
+
+    <div class="entrar-form">
+      {# --- Paso 1: DNI --- #}
+      <section class="entrar-card lv-cuenta" id="p1" aria-label="Tu DNI">
+        <header><span class="paso">Paso 1 de 4</span><h2>Tu DNI</h2></header>
+        <form id="fDni" class="campo" novalidate>
+          <label for="dni">Número de DNI</label>
+          <input id="dni" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="8 dígitos" required>
+          <small>Lo confirmamos con RENIEC. No guardamos ninguna consulta.</small>
+          <div class="acciones"><button class="btn" type="submit" id="bDni">Continuar →</button></div>
+        </form>
+        <div id="r1" aria-live="polite"></div>
+      </section>
+
+      {# --- Paso 2: quién eres --- #}
+      <section class="entrar-card lv-cuenta" id="p2" hidden aria-label="Quién eres">
+        <header><span class="paso">Paso 2 de 4</span><h2>¿Quién eres?</h2></header>
+        <div class="roles" role="group" aria-label="¿Quién eres?">
+          <button type="button" class="rol lv-cuenta" data-perfil="contador" aria-pressed="true">
+            <span class="dir">Contador</span><b>Soy Contador</b><span>Contador o estudio contable</span></button>
+          <button type="button" class="rol lv-premium" data-perfil="empresario" aria-pressed="false">
+            <span class="dir">Empresario</span><b>Soy Empresario</b><span>Tengo un negocio o empresa</span></button>
+        </div>
+        <div class="acciones"><button class="btn" type="button" id="bPerfil">Continuar →</button>
+          <button class="btn sec" type="button" data-volver="p1">Atrás</button></div>
+      </section>
+
+      {# --- Paso 3: tu RUC --- #}
+      <section class="entrar-card lv-cuenta" id="p3" hidden aria-label="Tu RUC">
+        <header><span class="paso">Paso 3 de 4</span><h2>Tu RUC</h2></header>
+        <div class="opciones" role="radiogroup" aria-label="Tu RUC">
+          <label class="check" for="oSug"><input type="radio" name="oRuc" id="oSug" value="sugerido" checked>
+            <span>Mi RUC es <b class="mono" id="rucSug">—</b><small>Es el RUC 10 que corresponde a tu DNI: queda verificado al instante.</small></span></label>
+          <label class="check" for="oOtro"><input type="radio" name="oRuc" id="oOtro" value="otro">
+            <span>Otro RUC<small>Por ejemplo el RUC 20 de tu empresa o estudio. Queda como declarado mientras lo verificamos.</small></span></label>
+          <div class="campo" id="otroBox" hidden><label for="rucOtro">RUC</label>
+            <input id="rucOtro" inputmode="numeric" maxlength="11" autocomplete="off" placeholder="20XXXXXXXXX"></div>
+          <label class="check" for="oNo" id="oNoBox"><input type="radio" name="oRuc" id="oNo" value="ninguno">
+            <span>Aún no tengo RUC propio<small>Por ejemplo si trabajas como contador dependiente. Puedes vincularlo después.</small></span></label>
+        </div>
+        <div id="r3" aria-live="polite"></div>
+        <div class="acciones"><button class="btn" type="button" id="bRuc">Continuar →</button>
+          <button class="btn sec" type="button" data-volver="p2">Atrás</button></div>
+      </section>
+
+      {# --- Paso 4: tus datos --- #}
+      <section class="entrar-card lv-cuenta" id="p4" hidden aria-label="Tus datos">
+        <header><span class="paso">Paso 4 de 4</span><h2>Tu clave y tus datos</h2></header>
+        <form id="fReg" novalidate>
+          <div class="campo" id="nombreBox" hidden><label for="nombre">Tu nombre completo</label>
+            <input id="nombre" autocomplete="name" placeholder="Como figura en tu DNI">
+            <small>RENIEC no respondió: lo verificaremos después.</small></div>
+          <div class="fila-campos">
+            <div class="campo"><label for="clave">Clave</label>
+              <input id="clave" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></div>
+            <div class="campo"><label for="clave2">Repite tu clave</label>
+              <input id="clave2" type="password" autocomplete="new-password"></div>
+          </div>
+          <div class="fila-campos">
+            <div class="campo"><label for="correo">Correo</label>
+              <input id="correo" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
+            <div class="campo"><label for="whatsapp">WhatsApp</label>
+              <input id="whatsapp" inputmode="numeric" maxlength="9" autocomplete="tel" placeholder="9XXXXXXXX"></div>
+          </div>
+          <div class="hp" aria-hidden="true"><label for="empresa_web">No llenar</label><input id="empresa_web" tabindex="-1" autocomplete="off"></div>
+          {# TEXTO DE CONSENTIMIENTO: borrador pendiente de validación legal (versión {{ consent_ver }}). #}
+          <label class="check" for="consent"><input type="checkbox" id="consent">
+            <span>Autorizo a Perú Sistemas Pro a tratar mis datos personales (DNI, nombre según RENIEC, correo y WhatsApp) para crear y administrar mi cuenta del Club de Contadores y enviarme información de sus herramientas (Ley 29733).
+              <small>Puedo darme de baja cuando quiera. <a href="{{ anpd_url }}" target="_blank" rel="noopener">Registro ante la ANPD</a>.</small></span></label>
+          <label class="check dir-opt" for="optDir" id="optDirBox"><input type="checkbox" id="optDir">
+            <span>Quiero aparecer en el Directorio de Contadores de mi distrito.
+              <small>Opcional y aparte: los empresarios de tu distrito verán tu nombre y tu mini-página. Puedes quitarte en Mi perfil.</small></span></label>
+          <div id="r4" aria-live="polite"></div>
+          <div class="acciones"><button class="btn" type="submit" id="bReg">Crear mi cuenta →</button>
+            <button class="btn sec" type="button" data-volver="p3">Atrás</button></div>
+        </form>
+      </section>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block estado %}<span>Tu cuenta personal del Club</span><span id="estadoTxt">Listo</span>{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const SIG = {{ sig|tojson }}, INICIO = {{ inicio|tojson }}, WA = {{ psp_whatsapp|tojson }};
+  const $ = id => document.getElementById(id);
+  const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const msg = (html, tipo) => `<div class="msg ${tipo || "info"}">${html}</div>`;
+  const st = { dni: "", nombre: null, reniec: false, ruc10: "", perfil: "contador" };
+  const ir = paso => { ["p1", "p2", "p3", "p4"].forEach(p => $(p).hidden = p !== paso);
+    const f = $(paso).querySelector("input:not([type=radio]):not([type=checkbox]), button.rol, input[type=radio]:checked"); f && f.focus(); };
+  async function post(url, body) {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    let d = {}; try { d = await r.json(); } catch (e) {} return { r, d };
+  }
+  document.querySelectorAll("[data-volver]").forEach(b => b.onclick = () => ir(b.dataset.volver));
+
+  // Paso 1: DNI
+  $("fDni").onsubmit = async e => {
+    e.preventDefault();
+    const dni = $("dni").value.replace(/\D/g, "");
+    if (dni.length !== 8) { $("r1").innerHTML = msg("El DNI tiene 8 dígitos.", "err"); return; }
+    $("bDni").disabled = true;
+    const { r, d } = await post("/api/id/dni", { dni });
+    $("bDni").disabled = false;
+    if (!r.ok || !d.ok) { $("r1").innerHTML = msg(esc(d.error || "No pudimos consultar. Intenta de nuevo."), "err"); return; }
+    if (d.accion === "ya_registrado") {
+      $("r1").innerHTML = msg(`Ya tienes cuenta con este DNI. <a href="/ingresar${SIG ? "?sig=" + encodeURIComponent(SIG) : ""}"><b>Ingresa aquí →</b></a>`); return; }
+    if (d.accion === "activar") {
+      $("r1").innerHTML = msg(`Ya te registraste antes con tu RUC. Muy pronto podrás crear tu clave aquí; mientras tanto <a href="/entrar"><b>entra con tu RUC</b></a> o escríbenos al WhatsApp <b class="mono">${esc(WA)}</b>.`); return; }
+    Object.assign(st, { dni, nombre: d.nombre, reniec: d.reniec, ruc10: d.ruc10_sugerido });
+    if (d.reniec) {
+      $("r1").innerHTML = msg(`¿Eres <b>${esc(d.nombre)}</b>?`) +
+        `<div class="acciones"><button class="btn" type="button" id="siSoy">Sí, soy yo →</button>
+         <button class="btn sec" type="button" id="noSoy">No, cambiar DNI</button></div>`;
+      $("siSoy").onclick = () => { $("titulo").textContent = `Hola, ${d.nombre.split(" ").slice(0, 2).join(" ")}`; ir("p2"); };
+      $("noSoy").onclick = () => { $("r1").innerHTML = ""; $("dni").value = ""; $("dni").focus(); };
+    } else {
+      $("r1").innerHTML = msg("RENIEC no respondió en este momento. Sigue: te pediremos tu nombre al final.");
+      $("nombreBox").hidden = false; setTimeout(() => ir("p2"), 900);
+    }
+  };
+
+  // Paso 2: perfil
+  document.querySelectorAll(".rol[data-perfil]").forEach(b => b.onclick = () => {
+    st.perfil = b.dataset.perfil;
+    document.querySelectorAll(".rol[data-perfil]").forEach(x => x.setAttribute("aria-pressed", x === b));
+  });
+  $("bPerfil").onclick = () => {
+    $("rucSug").textContent = st.ruc10;
+    const emp = st.perfil === "empresario";
+    $("oNoBox").hidden = emp; if (emp && $("oNo").checked) $("oSug").checked = true;
+    $("optDirBox").hidden = emp;
+    ir("p3");
+  };
+
+  // Paso 3: RUC
+  document.querySelectorAll("input[name=oRuc]").forEach(x => x.onchange = () => { $("otroBox").hidden = !$("oOtro").checked; if ($("oOtro").checked) $("rucOtro").focus(); });
+  const rucElegido = () => $("oSug").checked ? st.ruc10 : $("oOtro").checked ? $("rucOtro").value.replace(/\D/g, "") : "";
+  $("bRuc").onclick = () => {
+    const ruc = rucElegido();
+    if ($("oOtro").checked && ruc.length !== 11) { $("r3").innerHTML = msg("El RUC tiene 11 dígitos.", "err"); return; }
+    if (ruc.startsWith("10") && ruc !== st.ruc10) {
+      $("r3").innerHTML = msg("Ese RUC 10 pertenece a otra persona: un RUC 10 se forma con el DNI de su titular. Elige tu propio RUC u otra opción.", "err"); return; }
+    $("r3").innerHTML = ""; $("optDirBox").hidden = st.perfil !== "contador" || !ruc; ir("p4");
+  };
+
+  // Paso 4: registro
+  $("fReg").onsubmit = async e => {
+    e.preventDefault();
+    if ($("clave").value !== $("clave2").value) { $("r4").innerHTML = msg("Las dos claves no coinciden.", "err"); return; }
+    if (!$("consent").checked) { $("r4").innerHTML = msg("Marca la autorización para crear tu cuenta.", "err"); return; }
+    $("bReg").disabled = true; $("estadoTxt").textContent = "Creando tu cuenta…";
+    const { r, d } = await post("/api/id/registro", {
+      dni: st.dni, clave: $("clave").value, clave2: $("clave2").value, correo: $("correo").value, whatsapp: $("whatsapp").value,
+      perfil: st.perfil, ruc: rucElegido(), nombre: $("nombre").value, consentimiento: true,
+      directorio_optin: !$("optDirBox").hidden && $("optDir").checked, empresa_web: $("empresa_web").value, siguiente: SIG });
+    if (r.ok && d.ok) { location.href = d.link || INICIO; return; }
+    $("bReg").disabled = false; $("estadoTxt").textContent = "Listo";
+    $("r4").innerHTML = msg(esc(d.error || "No pudimos crear tu cuenta."), "err");
+    if (d.motivo === "ruc10_ajeno") ir("p3");
+  };
+})();
+</script>
+{% endblock %}
