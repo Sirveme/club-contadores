@@ -285,3 +285,14 @@
 @media (max-width: 560px) {
   .vitrina.entrar .roles, .vitrina.entrar .fila-campos { grid-template-columns: 1fr; }
 }
+
+/* ===== Registro / ingreso por DNI (1c) ===== */
+.vitrina.entrar .opciones { display: grid; gap: .7em; }
+.vitrina.entrar .opciones .check input[type=radio] { accent-color: var(--lv); }
+.vitrina.entrar .opciones .check:has(input:checked) { border-color: var(--lv); background: linear-gradient(135deg, color-mix(in srgb, var(--lv) 16%, var(--v-s2)), var(--v-s2) 70%); }
+.vitrina.entrar .mono { font-family: var(--mono); letter-spacing: .02em; }
+.vitrina.entrar .nota-clave { margin: 0; color: var(--v-muted); font-size: .93em; }
+.vitrina.entrar a.btn { text-decoration: none; }
+/* Lo que el JS oculta con `hidden` queda oculto aunque su clase defina display. */
+.vitrina [hidden] { display: none !important; }
+.entrar-card #fIng, .entrar-card #fClave { display: grid; gap: 1em; }
