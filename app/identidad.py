@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import time
 
 import asyncpg
@@ -45,7 +46,7 @@ COOKIE = "club_id"
 DURACION = 30 * 86400                      # Fase 1. Con Facturalo (Fase 2) se acorta.
 SECRETO = os.getenv("SESION_SECRET", "").strip()
 REGISTRO_ABIERTO = os.getenv("IDENTIDAD_REGISTRO_ABIERTO", "0").strip() == "1"
-CONSENT_VER = os.getenv("IDENTIDAD_CONSENT_VER", "identidad-pendiente-legal").strip()
+CONSENT_VER = os.getenv("IDENTIDAD_CONSENT_VER", "club-identidad-2026-10-09").strip()   # texto aprobado 2026-10-09
 APIS_DNI_URL = os.getenv("APIS_NET_PE_DNI_URL", "https://api.apis.net.pe/v2/reniec/dni").strip()
 INTENTOS_MAX, INTENTOS_VENTANA_MIN = 5, 15
 _CORREO_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -508,3 +509,100 @@ async def pagina_cambiar_clave(request: Request):
         return RedirectResponse("/ingresar?sig=/cambiar-clave", status_code=303)
     return club.templates.TemplateResponse(request, "club/cambiar_clave.html",
                                            _ctx(request, obligatoria=p["debe_cambiar_clave"]))
+
+
+# --- Activacion de los socios migrados (1d) ----------------------------------------
+async def _socio_por_activar(request: Request, ruc: str = "", correo: str = "") -> dict | None:
+    """El socio viejo (con su persona 'por_activar') que quiere activar: por su cookie
+    vieja o por RUC + correo registrado (la misma prueba que el reingreso actual)."""
+    s = await club.socio_por_token(request.cookies.get(club.COOKIE))
+    if not s and ruc and correo:
+        row = await db._pool.fetchrow(
+            "SELECT * FROM club_socios WHERE ruc = $1 AND lower(correo) = $2 AND baja_en IS NULL", ruc, correo)
+        s = dict(row) if row else None
+    if not s or not s.get("persona_id"):
+        return None
+    p = await db._pool.fetchrow("SELECT * FROM personas WHERE id = $1", s["persona_id"])
+    return {"socio": s, "persona": dict(p)} if p else None
+
+
+async def _ip_bloqueada(ip: str | None) -> bool:
+    return bool(ip) and await db._pool.fetchval(
+        "SELECT count(*) FROM login_intentos WHERE NOT exito AND ip = $1::inet "
+        "AND creado_en > now() - make_interval(mins => $2)", ip, INTENTOS_VENTANA_MIN) >= INTENTOS_MAX
+
+
+@router.get("/activar", response_class=HTMLResponse)
+async def pagina_activar(request: Request):
+    if not REGISTRO_ABIERTO:
+        return club.templates.TemplateResponse(request, "club/pronto.html", _ctx(request, que="La activación de tu cuenta"))
+    if await persona_actual(request):
+        return RedirectResponse(club.inicio(request), status_code=303)
+    x = await _socio_por_activar(request)
+    if x and x["persona"]["estado"] != "por_activar":
+        x = None
+    return club.templates.TemplateResponse(request, "club/activar.html", _ctx(
+        request, consent_ver=CONSENT_VER, con_cookie=bool(x),
+        nombre=club.nombre_saludo(x["socio"]["ruc"], x["socio"]["razon_social"], x["socio"]["nombre_comercial"]) if x else None,
+        dni=x["persona"]["dni"] if x else None, ruc=x["socio"]["ruc"] if x else None,
+        whatsapp=(x["persona"]["whatsapp"] or "") if x else ""))
+
+
+@router.post("/api/id/activar")
+async def api_activar(payload: dict, request: Request):
+    if not SECRETO:
+        return _sin_secreto()
+    if not REGISTRO_ABIERTO:
+        return JSONResponse({"ok": False, "error": "La activación estará disponible muy pronto."}, status_code=403)
+    ip = club._client_ip(request)
+    if await _ip_bloqueada(ip):
+        return JSONResponse({"ok": False, "error": f"Demasiados intentos. Espera {INTENTOS_VENTANA_MIN} minutos "
+                                                   "o escríbenos por WhatsApp."}, status_code=429)
+    ruc = solo_digitos(payload.get("ruc"))
+    correo_reg = (payload.get("correo") or "").strip().lower()
+    x = await _socio_por_activar(request, ruc, correo_reg)
+    if not x:
+        await db._pool.execute("INSERT INTO login_intentos (dni, ip, exito) VALUES (NULL, $1::inet, false)", ip)
+        return JSONResponse({"ok": False, "error": "El RUC o el correo no coinciden con tu registro anterior."},
+                            status_code=401)
+    p, s = x["persona"], x["socio"]
+    if p["estado"] != "por_activar":
+        return JSONResponse({"ok": False, "accion": "ingresar",
+                             "error": "Tu cuenta ya está activa: ingresa con tu DNI y clave."}, status_code=409)
+    clave, clave2 = str(payload.get("clave") or ""), str(payload.get("clave2") or "")
+    whatsapp = db.norm_whatsapp(payload.get("whatsapp")) or db.norm_whatsapp(p["whatsapp"])
+    if (problema := clave_problema(clave, clave2, p["dni"])):
+        return JSONResponse({"ok": False, "error": problema}, status_code=422)
+    if not whatsapp:
+        return JSONResponse({"ok": False, "error": "El WhatsApp tiene 9 dígitos y empieza en 9."}, status_code=422)
+    if not payload.get("consentimiento"):
+        return JSONResponse({"ok": False, "error": "Para activar tu cuenta necesitamos tu autorización."}, status_code=422)
+    r = await consultar_dni(p["dni"])
+    ok_reniec = r["estado"] == "ok"
+    async with db._pool.acquire() as conn, conn.transaction():
+        sv = await conn.fetchval(
+            """
+            UPDATE personas SET estado = 'activa', clave_hash = $2, whatsapp = $3, correo = coalesce(correo, $4),
+                   nombre_completo = CASE WHEN $5 THEN $6 ELSE nombre_completo END,
+                   nombres = CASE WHEN $5 THEN $7 ELSE nombres END,
+                   apellido_paterno = CASE WHEN $5 THEN $8 ELSE apellido_paterno END,
+                   apellido_materno = CASE WHEN $5 THEN $9 ELSE apellido_materno END,
+                   nombre_verificado = $5, reniec_consultado_en = CASE WHEN $5 THEN now() END,
+                   consentimiento_en = now(), consentimiento_ver = $10, activada_en = now(), ultimo_login_at = now(),
+                   updated_at = now()
+            WHERE id = $1 AND estado = 'por_activar' RETURNING sesion_version
+            """, p["id"], _ph.hash(clave), whatsapp, s["correo"], ok_reniec, r["nombre_completo"], r["nombres"],
+            r["apellido_paterno"], r["apellido_materno"], CONSENT_VER)
+        if sv is None:
+            return JSONResponse({"ok": False, "error": "Tu cuenta ya está activa: ingresa con tu DNI y clave."},
+                                status_code=409)
+        # La cookie vieja (RUC + correo) deja de valer: se rota su token.
+        await conn.execute("UPDATE club_socios SET token = $2 WHERE id = $1", s["id"], secrets.token_urlsafe(32))
+    await db._pool.execute("INSERT INTO login_intentos (dni, ip, exito) VALUES ($1, $2::inet, true)", p["dni"], ip)
+    perfil = await db._pool.fetchval(
+        "SELECT perfil FROM accesos WHERE persona_id = $1 ORDER BY es_principal DESC LIMIT 1", p["id"]) or "contador"
+    resp = JSONResponse({"ok": True, "link": club._destino(request, perfil, str(payload.get("siguiente") or ""))})
+    resp.delete_cookie(club.COOKIE)
+    if club._dominio_cookie(request):
+        resp.delete_cookie(club.COOKIE, domain=club._dominio_cookie(request))
+    return _con_sesion(resp, request, p["id"], sv)

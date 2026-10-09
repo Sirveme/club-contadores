@@ -272,7 +272,7 @@ def _con_cookie(resp, request: Request, token: str):
 #   /club; en club.perusistemas.pro se sirve en "/".
 # URLs viejas (/club/tablero, /club/igv, /club/directorio, ...) -> 301 a las nuevas.
 RUTAS_CLUB = ("/entrar", "/igv", "/directorio", "/c", "/perfil", "/empresario", "/salir",
-              "/registro", "/ingresar", "/cambiar-clave")
+              "/registro", "/ingresar", "/cambiar-clave", "/activar", "/privacidad")
 
 
 def ruta_nueva(path: str, home: str) -> str | None:
@@ -441,6 +441,15 @@ async def club_entrar(request: Request, rol: str = "", ref: str = "", sig: str =
         "anpd_url": ANPD_REGISTRO_URL, "psp_whatsapp": PSP_WHATSAPP})
 
 
+async def _por_activar(s: dict | None) -> bool:
+    """Socio viejo (cookie RUC + correo) cuya persona aun no crea su clave: el tablero
+    le muestra el aviso de activacion (solo con la identidad abierta)."""
+    from . import identidad
+    if not (s and s.get("fuente") == "socio" and s.get("persona_id") and identidad.REGISTRO_ABIERTO):
+        return False
+    return bool(await _pool().fetchval("SELECT estado = 'por_activar' FROM personas WHERE id = $1", s["persona_id"]))
+
+
 async def _nn_resumen(ubigeo: str | None) -> dict | None:
     """Portada de la vitrina: NEGOCIOS REALES (juridicas + personas con negocio; sin
     independientes sin empresa) del distrito, o de todo el Peru si ubigeo es None.
@@ -499,7 +508,7 @@ async def club_tablero(request: Request, t: str = ""):
         "nombre": (s.get("nombre_saludo") or nombre_saludo(s["ruc"] or "", s["razon_social"], s["nombre_comercial"])) if s else None,
         "ubic": ubic, "secciones": secciones, "gana": GANA, "nn": nn, "nn_url": nn_url,
         "contadores_distrito": contadores_distrito, "total": total,
-        "activas": sum(c["activas"] for c in secciones)})
+        "activas": sum(c["activas"] for c in secciones), "por_activar": await _por_activar(s)})
 
 
 @router.get("/perfil")
@@ -583,6 +592,17 @@ async def club_mini_pagina(request: Request, slug: str):
     return templates.TemplateResponse(request, "club/mini.html", {
         "s": s, "inicio": inicio(request), "c": dict(row),
         "nombre": titulo(row["nombre_comercial"] or row["razon_social"])})
+
+
+@router.get("/privacidad", response_class=HTMLResponse)
+async def club_privacidad(request: Request):
+    """Politica de Privacidad del Club. BORRADOR hasta la aprobacion legal: se publica
+    junto con la identidad por DNI (mismo interruptor)."""
+    from . import identidad
+    if not identidad.REGISTRO_ABIERTO:
+        return HTMLResponse("No encontramos esta página.", status_code=404)
+    return templates.TemplateResponse(request, "club/privacidad.html", {
+        "s": await socio_actual(request), "inicio": inicio(request), "anpd_url": ANPD_REGISTRO_URL})
 
 
 @router.get("/salir")
