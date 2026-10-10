@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS personas (
     id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     dni                  char(8) NOT NULL UNIQUE CHECK (dni ~ '^[0-9]{8}$'),
     nombre_completo      text,
-    nombres              text,                     -- para el saludo ("Jorge Luis")
+    nombres              text,                     -- para el saludo ("Juan Carlos")
     apellido_paterno     text,
     apellido_materno     text,
     nombre_verificado    boolean NOT NULL DEFAULT false,   -- true = confirmado en RENIEC
