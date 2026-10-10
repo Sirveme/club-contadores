@@ -46,7 +46,7 @@ COOKIE = "club_id"
 DURACION = 30 * 86400                      # Fase 1. Con Facturalo (Fase 2) se acorta.
 SECRETO = os.getenv("SESION_SECRET", "").strip()
 REGISTRO_ABIERTO = os.getenv("IDENTIDAD_REGISTRO_ABIERTO", "0").strip() == "1"
-CONSENT_VER = os.getenv("IDENTIDAD_CONSENT_VER", "club-identidad-2026-10-09").strip()   # texto aprobado 2026-10-09
+CONSENT_VER = os.getenv("IDENTIDAD_CONSENT_VER", "club-identidad-2026-10-10").strip()   # texto aprobado 2026-10-09; corto + "Leer más" 2026-10-10
 APIS_DNI_URL = os.getenv("APIS_NET_PE_DNI_URL", "https://api.apis.net.pe/v2/reniec/dni").strip()
 INTENTOS_MAX, INTENTOS_VENTANA_MIN = 5, 15
 _CORREO_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -127,7 +127,7 @@ async def consultar_dni(dni: str) -> dict:
 
 
 def enmascarar(r: dict) -> str | None:
-    """'JORGE LUIS SANTANA S.' — basta para que la persona se reconozca, sin exponer
+    """'JUAN PÉREZ G.' — basta para que la persona se reconozca, sin exponer
     el nombre completo de un DNI cualquiera."""
     if r.get("estado") != "ok":
         return None

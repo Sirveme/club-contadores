@@ -56,7 +56,11 @@ MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "ag
          "setiembre", "octubre", "noviembre", "diciembre"]
 
 # Mismas variables (y defaults) que usa la landing de Nuevos Negocios en main.py.
-ANPD_REGISTRO_URL = os.getenv("ANPD_REGISTRO_URL", "#registro-anpd").strip()
+# Verificacion publica de la inscripcion INS-2026-778 en el SIPDP del MINJUS.
+ANPD_REGISTRO_URL = os.getenv("ANPD_REGISTRO_URL", "https://sipdp.minjus.gob.pe/sipdp-virtual/public/qr/validate.xhtml"
+                              "?key=9D0ZkMDFxSOEFTS1FFjnpg%3D%3D&tk=9FCkCdMbvvxA%2BcDqZ%2FT5mg%3D%3D").strip()
+# Foto del garante en /privacidad: basta con dejar el archivo; sin el, un circulo con sus iniciales.
+FOTO_GARANTE = "/static/img/duilio-garante.jpg"
 PSP_WHATSAPP = "".join(c for c in os.getenv("PSP_WHATSAPP", "938246208") if c.isdigit())
 CLUB_HOST = os.getenv("CLUB_HOST", "club.perusistemas.pro").strip().lower()
 CONTADORES_HOST = os.getenv("CONTADORES_HOST", "contadores.perusistemas.pro").strip().lower()
@@ -86,7 +90,7 @@ templates.env.filters["miles"] = lambda n: f"{int(n):,}" if n is not None else "
 
 def nombre_saludo(ruc: str, razon: str | None, nombre_comercial: str | None) -> str:
     """Persona natural: SUNAT escribe 'APELLIDO1 APELLIDO2 NOMBRES' -> desde la 3a
-    palabra ('Jorge Luis'). Juridica: nombre comercial o razon social."""
+    palabra ('Juan Carlos'). Juridica: nombre comercial o razon social."""
     if not ruc.startswith("20"):
         w = (razon or "").split()
         return titulo(" ".join(w[2:] if len(w) > 2 else w)) or "colega"
@@ -596,13 +600,12 @@ async def club_mini_pagina(request: Request, slug: str):
 
 @router.get("/privacidad", response_class=HTMLResponse)
 async def club_privacidad(request: Request):
-    """Politica de Privacidad del Club. BORRADOR hasta la aprobacion legal: se publica
-    junto con la identidad por DNI (mismo interruptor)."""
-    from . import identidad
-    if not identidad.REGISTRO_ABIERTO:
-        return HTMLResponse("No encontramos esta página.", status_code=404)
+    """Politica de Privacidad del Club. Publica (no depende del interruptor de la
+    identidad): debe estar publicada y revisada ANTES de abrir el registro."""
+    foto = FOTO_GARANTE if os.path.exists(os.path.join(BASE_DIR, FOTO_GARANTE.lstrip("/"))) else None
     return templates.TemplateResponse(request, "club/privacidad.html", {
-        "s": await socio_actual(request), "inicio": inicio(request), "anpd_url": ANPD_REGISTRO_URL})
+        "s": await socio_actual(request), "inicio": inicio(request), "anpd_url": ANPD_REGISTRO_URL,
+        "foto_garante": foto})
 
 
 @router.get("/salir")
