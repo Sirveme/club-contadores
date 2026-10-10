@@ -7,7 +7,7 @@ identidad por WhatsApp y corre este script. Genera una clave temporal, obliga a
 cambiarla al ingresar y CIERRA todas sus sesiones abiertas (sesion_version + 1).
 La clave temporal se muestra solo en esta terminal: envíasela por WhatsApp.
 
-  python soporte_clave.py 05200879
+  python soporte_clave.py 12345678
 """
 from __future__ import annotations
 
