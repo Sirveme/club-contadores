@@ -3,7 +3,7 @@
 {% block titulo %}Crear cuenta · Club de Contadores{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
-<link rel="stylesheet" href="/static/css/club-vitrina.css?v=14">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=17">
 {% endblock %}
 {% block contenido %}
 {# Registro por PERSONA (DNI). 4 pasos: DNI (RENIEC) -> quién eres -> tu RUC -> tus datos. #}
@@ -85,10 +85,7 @@
               <input id="whatsapp" inputmode="numeric" maxlength="9" autocomplete="tel" placeholder="9XXXXXXXX"></div>
           </div>
           <div class="hp" aria-hidden="true"><label for="empresa_web">No llenar</label><input id="empresa_web" tabindex="-1" autocomplete="off"></div>
-          {# TEXTO DE CONSENTIMIENTO: borrador pendiente de validación legal (versión {{ consent_ver }}). #}
-          <label class="check" for="consent"><input type="checkbox" id="consent">
-            <span>Autorizo a Perú Sistemas Pro a tratar mis datos personales (DNI, nombre según RENIEC, correo y WhatsApp) para crear y administrar mi cuenta del Club de Contadores y enviarme información de sus herramientas (Ley 29733).
-              <small>Puedo darme de baja cuando quiera. <a href="{{ anpd_url }}" target="_blank" rel="noopener">Registro ante la ANPD</a>.</small></span></label>
+          {% include "club/_consentimiento.html" %}
           <label class="check dir-opt" for="optDir" id="optDirBox"><input type="checkbox" id="optDir">
             <span>Quiero aparecer en el Directorio de Contadores de mi distrito.
               <small>Opcional y aparte: los empresarios de tu distrito verán tu nombre y tu mini-página. Puedes quitarte en Mi perfil.</small></span></label>
@@ -130,7 +127,7 @@
     if (d.accion === "ya_registrado") {
       $("r1").innerHTML = msg(`Ya tienes cuenta con este DNI. <a href="/ingresar${SIG ? "?sig=" + encodeURIComponent(SIG) : ""}"><b>Ingresa aquí →</b></a>`); return; }
     if (d.accion === "activar") {
-      $("r1").innerHTML = msg(`Ya te registraste antes con tu RUC. Muy pronto podrás crear tu clave aquí; mientras tanto <a href="/entrar"><b>entra con tu RUC</b></a> o escríbenos al WhatsApp <b class="mono">${esc(WA)}</b>.`); return; }
+      $("r1").innerHTML = msg(`Ya te registraste antes con tu RUC. <a href="/activar${SIG ? "?sig=" + encodeURIComponent(SIG) : ""}"><b>Crea tu clave para activar tu cuenta →</b></a>`); return; }
     Object.assign(st, { dni, nombre: d.nombre, reniec: d.reniec, ruc10: d.ruc10_sugerido });
     if (d.reniec) {
       $("r1").innerHTML = msg(`¿Eres <b>${esc(d.nombre)}</b>?`) +

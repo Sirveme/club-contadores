@@ -1,0 +1,14 @@
+{# Consentimiento aprobado por Duilio (2026-10-09), version {{ consent_ver }}: version corta a la vista y el
+   texto completo en "Leer más". Casilla DESMARCADA por defecto (aceptacion expresa, Ley 29733): no agregar
+   `checked`. El texto corto marca la casilla; "Leer más" solo despliega, no la marca. #}
+<div class="check consent">
+  <input type="checkbox" id="consent">
+  <div>
+    <label for="consent">Autorizo a Perú Sistemas Pro E.I.R.L. a tratar mis datos (DNI, nombre, correo y WhatsApp) para mi cuenta del Club de Contadores, conforme a la Ley N° 29733.</label>
+    <details class="leer-mas">
+      <summary>Leer más</summary>
+      <p>Autorizo a Perú Sistemas Pro E.I.R.L. a tratar mis datos personales (DNI, nombres y apellidos según RENIEC, correo y WhatsApp) con la finalidad de identificar mi identidad, administrar mi cuenta, controlar accesos y prevenir usos indebidos en el Club de Contadores, y enviarme información sobre sus herramientas. Tratamiento conforme a la Ley N° 29733; Perú Sistemas Pro cuenta con banco de datos inscrito ante la ANPD. Puedo retirar este consentimiento y darme de baja cuando quiera.</p>
+    </details>
+    <small><a href="/privacidad" target="_blank" rel="noopener">Leer la Política de Privacidad</a> · <a href="{{ anpd_url }}" target="_blank" rel="noopener">Verificar inscripción ANPD</a></small>
+  </div>
+</div>

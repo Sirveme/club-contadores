@@ -1,0 +1,198 @@
+{% extends "club/base.html" %}
+{% set hoja = "privacidad" %}
+{% block titulo %}Política de Privacidad · Club de Contadores{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=17">
+{% endblock %}
+{% block contenido %}
+{# Politica de Privacidad del Club. Dos lecturas: "En esencia" (lo corto que da confianza) y
+   "En detalle" (la completa). Textos verificados contra el codigo el 2026-10-10. #}
+<div class="vitrina priv">
+
+  <header class="priv-hero">
+    <div class="priv-hero-txt">
+      <span class="k">Club de Contadores · Política de Privacidad</span>
+      <h1>Tus datos,<br><em>claros.</em></h1>
+      <p class="lead">Qué pedimos, para qué, y lo que nunca haremos. Primero en esencia; luego, en detalle, para quien quiera leerlo todo.</p>
+      <nav class="priv-saltos" aria-label="Secciones">
+        <a class="lv-gratis" href="#esencia">En esencia <span>2 min</span></a>
+        <a class="lv-cuenta" href="#detalle">En detalle <span>10 min</span></a>
+      </nav>
+      <p class="fecha">Vigente desde el 10 de octubre de 2026 · Ley N.° 29733 y su Reglamento</p>
+    </div>
+
+    <a class="sello" href="{{ anpd_url }}" target="_blank" rel="noopener" aria-label="Verificar la inscripción INS-2026-778 en el SIPDP del MINJUS">
+      <img class="sello-qr" src="/static/img/qr-anpd.svg" alt="Código QR de verificación de la inscripción INS-2026-778" width="132" height="132">
+      <div class="sello-txt">
+        <span class="sello-k">Inscripción verificable ante el MINJUS</span>
+        <b>Banco de datos inscrito</b>
+        <span>Registro Nacional de Protección de Datos Personales</span>
+        <span class="mono">Constancia INS-2026-778</span>
+        <i>Verificar en el SIPDP →</i>
+      </div>
+    </a>
+  </header>
+
+  <aside class="garante" aria-label="Quién responde">
+    {% if foto_garante %}
+      <img class="garante-foto" src="{{ foto_garante }}" alt="Duilio Restuccia Eslava" width="96" height="96">
+    {% else %}
+      <div class="garante-foto vacia" role="img" aria-label="Foto de Duilio Restuccia Eslava (pronto)">DR</div>
+    {% endif %}
+    <div>
+      <b>Duilio Restuccia Eslava</b>
+      <span class="garante-rol">Fundador · Ex-SUNAT</span>
+      <p>Respondo personalmente por cómo cuidamos tus datos. Si algo no te queda claro, escríbeme.</p>
+      <span class="garante-contacto"><a href="mailto:info@perusistemas.pro">info@perusistemas.pro</a> · <span class="mono">+51 967 317 946</span></span>
+    </div>
+  </aside>
+
+  {# ============================== EN ESENCIA ============================== #}
+  <section class="esencia lv-gratis" id="esencia" aria-labelledby="t-esencia">
+    <div class="esencia-cab">
+      <span class="k">En esencia</span>
+      <h2 id="t-esencia">Lo que tienes que saber</h2>
+    </div>
+    <ul class="esencia-grid">
+      <li><b>Pedimos lo mínimo</b><span>Tu DNI, tu nombre según RENIEC, tu correo y tu WhatsApp. Y los RUC que tú vincules.</span></li>
+      <li><b>Para tu cuenta y tu seguridad</b><span>Para identificarte, darte acceso a las herramientas, cuidar tu cuenta y avisarte de nuestras novedades.</span></li>
+      <li><b>RENIEC, en el momento</b><span>Confirmamos tu nombre en vivo cuando creas tu cuenta. No archivamos las consultas.</span></li>
+      <li><b>Tú decides</b><span>Te das de baja cuando quieras. Borramos o anonimizamos tus datos en un máximo de 90 días.</span></li>
+    </ul>
+
+    <div class="nunca">
+      <h3>Lo que <em>nunca</em> haremos</h3>
+      <ul>
+        <li>Vender, alquilar o ceder tus datos a nadie.</li>
+        <li>Pedirte tu Clave SOL.</li>
+        <li>Publicarte en el Directorio de Contadores sin tu permiso.</li>
+        <li>Guardar tu clave de forma legible: ni nosotros podemos verla.</li>
+        <li>Consultar tu DNI en RENIEC si no estás creando o activando tu cuenta.</li>
+        <li>Usar tus datos para algo distinto de lo que dice esta política sin pedirte permiso.</li>
+      </ul>
+    </div>
+  </section>
+
+  {# ============================== EN DETALLE ============================== #}
+  <section class="detalle lv-cuenta" id="detalle" aria-labelledby="t-detalle">
+    <div class="detalle-cab">
+      <span class="k">En detalle</span>
+      <h2 id="t-detalle">La política completa</h2>
+    </div>
+
+    <div class="detalle-cuerpo">
+      <nav class="indice" aria-label="Índice">
+        <ol>
+          <li><a href="#d1">Responsable</a></li>
+          <li><a href="#d2">Qué datos tratamos</a></li>
+          <li><a href="#d3">Para qué</a></li>
+          <li><a href="#d4">Cómo verificamos tu identidad</a></li>
+          <li><a href="#d5">Con quién los compartimos</a></li>
+          <li><a href="#d6">Transferencia internacional</a></li>
+          <li><a href="#d7">Cuánto tiempo</a></li>
+          <li><a href="#d8">Cómo los protegemos</a></li>
+          <li><a href="#d9">Tus derechos (ARCO)</a></li>
+          <li><a href="#d10">Cambios</a></li>
+        </ol>
+      </nav>
+
+      <div class="articulos">
+        <article id="d1">
+          <h3><span>1</span>Quién es el responsable</h3>
+          <div class="caja">
+            <b>PERU SISTEMAS PRO E.I.R.L.</b> · RUC 20615446565<br>
+            Cal. Iquitos Mz. A Lote 49, Punchana, Maynas, Loreto, Perú<br>
+            info@perusistemas.pro · +51 967 317 946
+          </div>
+          <p>Somos los titulares del banco de datos de los usuarios del Club de Contadores (club.perusistemas.pro), inscrito en el Registro Nacional de Protección de Datos Personales con la constancia <b>INS-2026-778</b>, que puedes <a href="{{ anpd_url }}" target="_blank" rel="noopener">verificar en el SIPDP del MINJUS</a>. Esta política se rige por la Ley N.° 29733, Ley de Protección de Datos Personales, y su Reglamento (Decreto Supremo N.° 016-2024-JUS).</p>
+        </article>
+
+        <article id="d2">
+          <h3><span>2</span>Qué datos tratamos</h3>
+          <div class="priv-tabla"><table>
+            <thead><tr><th>Dato</th><th>De dónde viene</th></tr></thead>
+            <tbody>
+              <tr><td>DNI, nombres y apellidos</td><td>El DNI lo escribes tú; los nombres los confirmamos en RENIEC en el momento.</td></tr>
+              <tr><td>Correo y WhatsApp</td><td>Los escribes tú al crear o activar tu cuenta.</td></tr>
+              <tr><td>Clave</td><td>La eliges tú. Guardamos solo una huella cifrada (Argon2): nadie puede leerla, ni nosotros.</td></tr>
+              <tr><td>RUC vinculados, razón social, distrito y actividad</td><td>Los RUC los indicas tú; sus datos provienen del padrón público de SUNAT.</td></tr>
+              <tr><td>Datos de seguridad</td><td>Tu dirección IP, los intentos de ingreso (DNI, fecha y si fue correcto) y una cookie de sesión necesaria para mantenerte dentro.</td></tr>
+            </tbody>
+          </table></div>
+          <p>No pedimos datos sensibles, ni tu Clave SOL, ni datos de tarjetas.</p>
+        </article>
+
+        <article id="d3">
+          <h3><span>3</span>Para qué los usamos</h3>
+          <ul class="priv-lista">
+            <li><b>Identificarte</b> y comprobar que eres titular de los RUC que vinculas. Un RUC 10 se forma con el DNI de su titular: así lo verificamos al instante.</li>
+            <li><b>Administrar tu cuenta</b> y darte acceso a las herramientas del Club según su nivel.</li>
+            <li><b>Controlar accesos y prevenir usos indebidos</b>: límite de intentos de ingreso, cierre de sesiones y revisión de cuentas sospechosas.</li>
+            <li><b>Enviarte información sobre nuestras herramientas</b> por correo o WhatsApp. Puedes pedir que paremos cuando quieras.</li>
+            <li><b>Directorio de Contadores</b>: solo si lo autorizas aparte, mostramos tu nombre, distrito y mini-página a los empresarios de tu distrito. Te quitas en Mi perfil.</li>
+          </ul>
+        </article>
+
+        <article id="d4">
+          <h3><span>4</span>Cómo verificamos tu identidad</h3>
+          <p>Cuando escribes tu DNI, lo consultamos <b>en vivo</b> en RENIEC a través del servicio apis.net.pe y te mostramos tu nombre abreviado para que te reconozcas. De esa consulta <b>no guardamos copia</b>: solo contamos cuántas consultas salen de cada conexión, para frenar abusos.</p>
+          <p>Si creas o activas tu cuenta, guardamos en ella el resultado (tus nombres y apellidos) y la fecha de la verificación. Nada más.</p>
+        </article>
+
+        <article id="d5">
+          <h3><span>5</span>Con quién los compartimos</h3>
+          <p>No vendemos ni cedemos tus datos. Solo los tratan, por encargo nuestro, los proveedores que hacen funcionar el Club:</p>
+          <div class="priv-tabla"><table>
+            <thead><tr><th>Proveedor</th><th>Para qué</th><th>Qué recibe</th></tr></thead>
+            <tbody>
+              <tr><td>apis.net.pe</td><td>Consulta a RENIEC (DNI) y a SUNAT (RUC)</td><td>El DNI o RUC consultado</td></tr>
+              <tr><td>Railway</td><td>Aloja la plataforma y su base de datos</td><td>Los datos de tu cuenta</td></tr>
+              <tr><td>Cloudflare</td><td>Conexión segura y entrega del sitio</td><td>El tráfico cifrado entre tu equipo y el Club</td></tr>
+              <tr><td>Google Fonts</td><td>Tipografías de la página</td><td>Tu dirección IP al cargar la página; ningún dato de tu cuenta</td></tr>
+            </tbody>
+          </table></div>
+          <p>Solo entregaríamos datos a una autoridad cuando una ley o un mandato judicial lo exija.</p>
+        </article>
+
+        <article id="d6">
+          <h3><span>6</span>Transferencia internacional</h3>
+          <p>La plataforma y su base de datos están alojadas en los Estados Unidos de América (Railway, región este). Esto es un flujo transfronterizo de datos conforme a la Ley N.° 29733, con proveedores que asumen compromisos de confidencialidad y seguridad.</p>
+        </article>
+
+        <article id="d7">
+          <h3><span>7</span>Cuánto tiempo los conservamos</h3>
+          <p>Mientras tu cuenta esté activa. Si te das de baja o retiras tu consentimiento, eliminamos o anonimizamos tus datos dentro de los noventa (90) días siguientes, salvo que una obligación legal exija conservarlos más tiempo.</p>
+        </article>
+
+        <article id="d8">
+          <h3><span>8</span>Cómo los protegemos</h3>
+          <ul class="priv-lista">
+            <li>Conexión cifrada (TLS) y claves guardadas solo como huella cifrada (Argon2).</li>
+            <li>Sesiones que se cierran en todos tus equipos cuando sales o cambias tu clave.</li>
+            <li>Límite de intentos de ingreso y acceso a los datos restringido a quien lo necesita.</li>
+          </ul>
+        </article>
+
+        <article id="d9">
+          <h3><span>9</span>Tus derechos (ARCO)</h3>
+          <div class="arco">
+            <div><b>A</b><span class="arco-n">Acceso</span><span>Saber qué datos tuyos tenemos y cómo los usamos.</span></div>
+            <div><b>R</b><span class="arco-n">Rectificación</span><span>Corregir los que estén mal o incompletos.</span></div>
+            <div><b>C</b><span class="arco-n">Cancelación</span><span>Pedir que los borremos.</span></div>
+            <div><b>O</b><span class="arco-n">Oposición</span><span>Pedir que dejemos de usarlos para algo.</span></div>
+          </div>
+          <p>Además tienes los derechos de información y de tratamiento objetivo. Para ejercerlos, escribe a <b>info@perusistemas.pro</b> con el asunto «Derechos ARCO», tu nombre, tu DNI y lo que pides. Respondemos las solicitudes de acceso en veinte (20) días hábiles y las demás en diez (10) días hábiles. Si no quedas conforme, puedes reclamar ante la Autoridad Nacional de Protección de Datos Personales del Ministerio de Justicia y Derechos Humanos.</p>
+        </article>
+
+        <article id="d10">
+          <h3><span>10</span>Cambios en esta política</h3>
+          <p>La actualizaremos cuando cambien el Club o las normas. La fecha de vigencia figura arriba. Si un cambio afecta las finalidades, te pediremos un nuevo consentimiento.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <p class="priv-pie"><a href="{{ inicio }}">← Volver al Club</a></p>
+</div>
+{% endblock %}

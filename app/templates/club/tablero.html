@@ -3,7 +3,7 @@
 {% block titulo %}Tablero · Club de Contadores{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
-<link rel="stylesheet" href="/static/css/club-vitrina.css?v=14">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=17">
 {% endblock %}
 {% block contenido %}
 <div class="vitrina" id="hoja">
@@ -27,6 +27,10 @@
       <a class="chip entrar" href="{{ entrar }}">Entrar con tu RUC →</a></div>
     {% endif %}
   </section>
+
+  {% if por_activar %}
+  <a class="aviso-activar" href="/activar"><b>Crea tu clave</b> para seguir entrando con tu DNI. Tu registro y tu Directorio se conservan. <i>Activar mi cuenta →</i></a>
+  {% endif %}
 
   {# --- Portada: el dato de su distrito (solo nosotros lo tenemos) --- #}
   {% if nn %}
