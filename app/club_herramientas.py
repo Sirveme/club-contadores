@@ -140,7 +140,8 @@ ICONOS = {
 }
 
 
-def armar_tablero(valores: dict, con_sesion: bool = True, entrar: str = "/entrar") -> list[dict]:
+def armar_tablero(valores: dict, con_sesion: bool = True, entrar: str = "/entrar",
+                  cta_entrar: str = "Entrar con tu RUC") -> list[dict]:
     """Secciones de la vitrina (una por nivel), activas primero, con los marcadores
     {digito}/{ubigeo}/{nn_url}/{distrito}/{mes_dato} rellenados con datos del socio."""
     def fmt(s: str) -> str:
@@ -161,7 +162,7 @@ def armar_tablero(valores: dict, con_sesion: bool = True, entrar: str = "/entrar
             # Acceso segun nivel: gratis = libre; cuenta = pide RUC si no hay sesion;
             # premium = pide suscripcion (alerta.pe la gestiona en su propio sitio).
             if h["estado"] == "activa" and h["nivel"] == "cuenta" and not con_sesion:
-                h["url"], h["cta"], h["requiere"] = entrar, "Entrar con tu RUC", "cuenta"
+                h["url"], h["cta"], h["requiere"] = entrar, cta_entrar, "cuenta"
             elif h["estado"] == "activa" and h["nivel"] == "premium":
                 h["requiere"] = "pago"
             h["externa"] = (h.get("url") or "").startswith("http")
