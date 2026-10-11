@@ -31,7 +31,8 @@
       <button type="button" data-f="alerta" aria-pressed="false"><s class="sem rojo"></s>Con alerta <i id="nAlerta"></i></button>
       <button type="button" data-f="aviso" aria-pressed="false"><s class="sem amarillo"></s>Revisar <i id="nAviso"></i></button>
       <button type="button" data-f="ok" aria-pressed="false"><s class="sem verde"></s>En orden <i id="nOk"></i></button>
-      <input type="search" id="buscar" placeholder="Filtrar por RUC o nombre…" aria-label="Filtrar resultados">
+      <input type="search" id="buscar" placeholder="Filtrar por RUC, nombre o distrito…" aria-label="Filtrar resultados">
+      <button type="button" class="ver-copiar-todo" id="bCopiarTodo">Copiar resultado</button>
     </div>
     <div class="tabla-wrap"><table class="tabla ver-tabla" id="tVer">
       <thead><tr id="cab"></tr></thead>
@@ -55,5 +56,5 @@
 {% endblock %}
 {% block estado %}<span id="estadoTxt">Listo</span>{% endblock %}
 {% block scripts %}
-<script src="/static/js/club-verificador.js?v=3" defer></script>
+<script src="/static/js/club-verificador.js?v=4" defer></script>
 {% endblock %}

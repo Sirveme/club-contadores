@@ -34,17 +34,42 @@
     return `<td class="ver-marca" ${l}>${chip("info", "Sí" + extra)}</td>`;
   }
 
+  // Texto de una fila para copiar o compartir. Sin nombrar la fuente.
+  function lineaRuc(f) {
+    if (!f.encontrado) return `RUC ${f.ruc} — no figura`;
+    const s = (f.marcas || {}).ssco;
+    return `RUC ${f.ruc} — ${f.razon_social} — ${f.estado.nombre} · ${f.condicion.nombre}` +
+      (s ? ` — ⚠️ SSCO desde ${s.desde || fechaCorta((s.detalle || {}).firme)}` : "");
+  }
+
+  function acciones(f) {
+    return `<div class="ver-acc" role="group" aria-label="Compartir este RUC">
+      <button type="button" data-copiar="${f.ruc}">Copiar</button>
+      <button type="button" data-compartir="${f.ruc}">Compartir</button>
+      <a href="https://wa.me/?text=${encodeURIComponent(lineaRuc(f))}" target="_blank" rel="noopener">WhatsApp</a></div>`;
+  }
+
+  function lineaTiempo(d) {
+    const pasos = [["emision", "Emisión de la resolución"], ["firme", "Quedó firme"], ["publicacion", "Publicación en la lista"]];
+    return `<ol class="linea-tiempo">${pasos.map(([k, t]) =>
+      `<li class="${k === "firme" ? "clave" : ""}"><b>${esc(fechaCorta(d[k]))}</b><span>${t}</span></li>`).join("")}</ol>`;
+  }
+
   function detalle(f) {
-    const partes = [];
-    if (!f.encontrado) return `<p>Este RUC no figura en nuestros datos. Revisa que esté bien escrito.</p>`;
+    const partes = [acciones(f)];
+    if (!f.encontrado) return partes[0] + `<p>Este RUC no figura en nuestros datos. Revisa que esté bien escrito.</p>`;
     if (f.domicilio) partes.push(`<p><b>Domicilio fiscal:</b> ${esc(f.domicilio)}</p>`);
+    const nn = (f.marcas || {}).negocio_nuevo;
+    if (nn && nn.desde) partes.push(`<p><b>Inscrito el</b> ${esc(nn.desde)}</p>`);
     const s = (f.marcas || {}).ssco;
     if (s) {
       const d = s.detalle || {};
       const reps = (d.representantes || []).map((r) =>
         `<li>${esc(r.nombre)} · <span class="mono">${esc(r.tipo)} ${esc(r.doc)}</span></li>`).join("");
-      partes.push(`<div class="ssco-det"><b>SSCO desde ${esc(s.desde || "—")}</b> · ${esc(d.resolucion || "")}
-        <br><small>Emitida ${esc(fechaCorta(d.emision))} · firme ${esc(fechaCorta(d.firme))} · publicada ${esc(fechaCorta(d.publicacion))}</small>
+      partes.push(`<div class="ssco-det"><b>Sujeto Sin Capacidad Operativa</b> · ${esc(d.resolucion || "")}
+        ${lineaTiempo(d)}
+        ${d.firme ? `<p class="aviso-riesgo">Si operaste con este contribuyente después de que la resolución quedó firme
+          (<b>${esc(fechaCorta(d.firme))}</b>), revisa el sustento de esas operaciones.</p>` : ""}
         ${reps ? `<p><b>Representante legal:</b></p><ul>${reps}</ul>` : ""}</div>`);
     }
     const a = f.anexos || { n: 0, lista: [] };
@@ -62,7 +87,7 @@
     if (!datos) return;
     const q = $("buscar").value.trim().toUpperCase();
     const cols = datos.columnas;
-    $("cab").innerHTML = [["ruc", "RUC"], ["razon_social", "Razón social"], ["estado", "Estado"], ["condicion", "Condición"]]
+    $("cab").innerHTML = [["ruc", "RUC"], ["razon_social", "Razón social"], ["estado", "Estado"], ["condicion", "Condición"], ["distrito", "Distrito"]]
       .concat(cols.map((c) => [c.codigo, c.columna]))
       .map(([k, t]) => `<th><button type="button" data-col="${k}">${esc(t)}${orden.col === k ? (orden.asc ? " ▴" : " ▾") : ""}</button></th>`).join("");
     let filas = datos.filas.slice();
@@ -70,26 +95,48 @@
     filas.forEach((f) => { const k = grupo(f); if (k in g) g[k]++; });
     $("nTodos").textContent = filas.length; $("nAlerta").textContent = g.alerta; $("nAviso").textContent = g.aviso; $("nOk").textContent = g.ok;
     if (filtro !== "todos") filas = filas.filter((f) => grupo(f) === filtro);
-    if (q) filas = filas.filter((f) => f.ruc.includes(q) || (f.razon_social || "").toUpperCase().includes(q));
+    if (q) filas = filas.filter((f) => f.ruc.includes(q) || (f.razon_social || "").toUpperCase().includes(q)
+                                   || ((f.distrito || {}).distrito || "").toUpperCase().includes(q));
     const val = (f) => {
       const c = orden.col;
       if (c === "semaforo") return ORDEN[f.semaforo] ?? 9;
       if (c === "estado" || c === "condicion") return f[c] ? f[c].nombre : "~";
       if (c === "ruc" || c === "razon_social") return f[c] || "~";
+      if (c === "distrito") return (f.distrito || {}).distrito || "~";
       return (f.marcas || {})[c] ? 0 : 1;
     };
     filas.sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * (orden.asc ? 1 : -1); });
     $("cuerpo").innerHTML = filas.map((f) => {
       const est = f.encontrado ? chip(f.estado.semaforo, f.estado.nombre) : chip("gris", "No figura");
       const con = f.encontrado ? chip(f.condicion.semaforo, f.condicion.nombre) : "";
+      const u = f.distrito;
+      const dis = u ? `<span class="ver-dist" title="Ubigeo ${esc(f.ubigeo)} · ${esc(u.departamento)} / ${esc(u.provincia)} / ${esc(u.distrito)}">${esc(u.distrito)}</span>`
+                    : `<span class="faint">—</span>`;
       return `<tr class="fila ${f.semaforo}" data-ruc="${f.ruc}" tabindex="0" aria-expanded="false">
           <td class="mono ruc" data-l="RUC">${f.ruc}</td><td class="rs" data-l="Razón social">${esc(f.razon_social || "")}</td>
-          <td data-l="Estado">${est}</td><td data-l="Condición">${con}</td>${cols.map((c) => celdaMarca(f, c)).join("")}</tr>
-        <tr class="det" hidden><td colspan="${4 + cols.length}">${detalle(f)}</td></tr>`;
-    }).join("") || `<tr><td colspan="${4 + cols.length}" class="faint">Ningún RUC con ese filtro.</td></tr>`;
+          <td data-l="Estado">${est}</td><td data-l="Condición">${con}</td><td data-l="Distrito">${dis}</td>${cols.map((c) => celdaMarca(f, c)).join("")}</tr>
+        <tr class="det" hidden><td colspan="${5 + cols.length}">${detalle(f)}</td></tr>`;
+    }).join("") || `<tr><td colspan="${5 + cols.length}" class="faint">Ningún RUC con ese filtro.</td></tr>`;
   }
 
-  $("cuerpo").addEventListener("click", (e) => {
+  async function copiar(texto, boton) {
+    try { await navigator.clipboard.writeText(texto); }
+    catch (x) { const t = document.createElement("textarea"); t.value = texto; document.body.appendChild(t); t.select();
+                document.execCommand("copy"); t.remove(); }
+    if (boton) { const o = boton.textContent; boton.textContent = "Copiado ✓"; setTimeout(() => { boton.textContent = o; }, 1600); }
+  }
+  const fila = (ruc) => datos.filas.find((f) => f.ruc === ruc);
+
+  $("cuerpo").addEventListener("click", async (e) => {
+    const bc = e.target.closest("[data-copiar]"), bs = e.target.closest("[data-compartir]");
+    if (bc) { copiar(lineaRuc(fila(bc.dataset.copiar)), bc); return; }
+    if (bs) {
+      const texto = lineaRuc(fila(bs.dataset.compartir));
+      if (navigator.share) { try { await navigator.share({ text: texto }); } catch (x) { /* cancelado */ } }
+      else window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener");
+      return;
+    }
+    if (e.target.closest(".ver-acc")) return;
     const tr = e.target.closest("tr.fila"); if (!tr) return;
     const det = tr.nextElementSibling; det.hidden = !det.hidden; tr.setAttribute("aria-expanded", String(!det.hidden));
   });
@@ -104,6 +151,10 @@
     pintar();
   }));
   $("buscar").addEventListener("input", pintar);
+  $("bCopiarTodo").addEventListener("click", (e) => {
+    const visibles = [...document.querySelectorAll("#cuerpo tr.fila")].map((tr) => fila(tr.dataset.ruc));
+    copiar(visibles.map(lineaRuc).join("\n") + (datos.datos_al ? `\nDatos al ${datos.datos_al}` : ""), e.currentTarget);
+  });
 
   $("fVer").addEventListener("submit", async (e) => {
     e.preventDefault();

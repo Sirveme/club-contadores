@@ -397,7 +397,27 @@ a { color: inherit; }
     text-transform: uppercase; color: var(--faint); margin-bottom: 2px; }
   .ver-tabla tr.fila td.ruc, .ver-tabla tr.fila td.rs { grid-column: 1 / -1; }
   .ver-tabla tr.fila td.ruc { padding-top: 10px; font-weight: 600; }
-  .ver-tabla tr.fila td.ver-marca.no { display: none; }
   .ver-tabla td.rs { min-width: 0; }
 }
 @media (max-width: 640px) { .ver-tabla tr.det[hidden] { display: none; } }
+
+/* Verificador: acciones por RUC, linea de tiempo SSCO, distrito */
+.ver-acc { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.ver-acc button, .ver-acc a, .ver-copiar-todo { all: unset; cursor: pointer; padding: 4px 10px; border: 1px solid var(--grid);
+  color: var(--fg); font-size: .9em; background: var(--cell-2); }
+.ver-acc button:hover, .ver-acc a:hover, .ver-copiar-todo:hover { border-color: var(--accent); }
+.ver-copiar-todo { margin-left: 6px; }
+.linea-tiempo { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 14px 0 6px; padding: 0; }
+.linea-tiempo li { position: relative; padding: 14px 8px 0 0; border-top: 3px solid color-mix(in srgb, var(--sem-rojo) 40%, var(--grid)); }
+.linea-tiempo li::before { content: ""; position: absolute; top: -8px; left: 0; width: 13px; height: 13px; border-radius: 50%;
+  background: var(--bg); border: 3px solid color-mix(in srgb, var(--sem-rojo) 55%, var(--grid)); }
+.linea-tiempo li.clave { border-top-color: var(--sem-rojo); }
+.linea-tiempo li.clave::before { background: var(--sem-rojo); border-color: var(--sem-rojo); }
+.linea-tiempo b { display: block; font-family: var(--mono); }
+.linea-tiempo span { color: var(--muted); font-size: .88em; }
+.linea-tiempo li.clave span { color: var(--fg); font-weight: 600; }
+.aviso-riesgo { margin: 8px 0 !important; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--sem-amarillo) 55%, var(--grid));
+  background: color-mix(in srgb, var(--sem-amarillo) 10%, var(--bg)); }
+.ver-dist { border-bottom: 1px dotted var(--faint); cursor: help; }
+@media (max-width: 640px) { .ver-copiar-todo { margin-left: 0; } }
+@media (max-width: 640px) { .ver-tabla tr.fila td.ver-marca.no { text-align: left; } }

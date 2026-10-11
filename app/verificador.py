@@ -69,8 +69,9 @@ async def consultar(rucs: list[str]) -> dict:
     async with db._pool.acquire() as conn:
         cat = await _catalogo(conn)
         filas = {r["ruc"]: dict(r) for r in await conn.fetch(
-            f"SELECT ruc, razon_social, estado, condicion, ubigeo, domicilio FROM {ESQUEMA}.padron_reducido "
-            f"WHERE ruc = ANY($1::text[])", rucs)}
+            f"SELECT p.ruc, p.razon_social, p.estado, p.condicion, p.ubigeo, p.domicilio, "
+            f"u.departamento, u.provincia, u.distrito FROM {ESQUEMA}.padron_reducido p "
+            f"LEFT JOIN public.cat_ubigeo u ON u.ubigeo = p.ubigeo WHERE p.ruc = ANY($1::text[])", rucs)}
         marcas: dict[str, dict] = {}
         for r in await conn.fetch(f"SELECT ruc, padron, desde, detalle FROM {ESQUEMA}.v_ruc_marcas "
                                   f"WHERE ruc = ANY($1::text[])", rucs):
@@ -102,6 +103,9 @@ async def consultar(rucs: list[str]) -> dict:
                     "estado": {"valor": f["estado"], "nombre": e_nom, "semaforo": e_sem},
                     "condicion": {"valor": f["condicion"], "nombre": c_nom, "semaforo": c_sem},
                     "domicilio": f["domicilio"], "semaforo": sem, "marcas": m,
+                    "ubigeo": (f["ubigeo"] or "").strip() or None,
+                    "distrito": ({"distrito": f["distrito"], "provincia": f["provincia"], "departamento": f["departamento"]}
+                                 if f["distrito"] else None),
                     "anexos": anexos.get(ruc, {"n": 0, "lista": []})})
     maestra = next((c for c in cat if c["codigo"] == "padron_reducido"), None)
     return {"filas": out,
