@@ -60,9 +60,9 @@ HERRAMIENTAS = [
      "frases": ["Visible en tu distrito", "Tu estudio, con tu nombre"]},
     # --- Con tu cuenta ------------------------------------------------------
     {"id": "nn", "nivel": "cuenta", "estado": "activa", "icono": "chart", "url": "{nn_url}", "mejora": "nn2",
-     "nombre": "Nuevos Negocios", "sub": "Altas SUNAT de tu distrito, cada mes", "efecto": "sube",
-     "ben": "Quiénes se inscribieron en SUNAT en tu distrito. Llega antes que nadie.", "cta": "Ver mi distrito",
-     "frases": ["Datos SUNAT de {mes_dato}", "Con actividad y fecha de alta", "Solo tu distrito", "Descárgalo en CSV"]},
+     "nombre": "Nuevos Negocios", "sub": "Negocios inscritos en tu distrito, cada mes", "efecto": "sube",
+     "ben": "Quiénes se inscribieron en tu distrito. Llega antes que nadie.", "cta": "Ver mi distrito",
+     "frases": ["Inscritos de {mes_dato}", "Con actividad y fecha de alta", "Solo tu distrito", "Descárgalo en CSV"]},
     {"id": "verif", "nivel": "cuenta", "estado": "pronto", "icono": "check",
      "nombre": "Verificar comprobantes", "sub": "Validez de facturas y boletas en SUNAT",
      "ben": "Descarta comprobantes falsos antes de registrarlos.",
@@ -80,7 +80,7 @@ HERRAMIENTAS = [
      "ben": "Prospecta cuadra por cuadra.",
      "frases": ["Calle por calle", "Prospección en tu zona"]},
     {"id": "ubigeo", "nivel": "cuenta", "estado": "pronto", "icono": "layers",
-     "nombre": "RUCs por ubigeo", "sub": "Padrón por código de ubigeo",
+     "nombre": "RUCs por ubigeo", "sub": "RUCs de cada distrito, por ubigeo",
      "ben": "Exporta tu zona y planifica tus visitas.",
      "frases": ["Ubigeo {ubigeo}", "Exportable"]},
     # --- Premium ------------------------------------------------------------
@@ -141,9 +141,11 @@ ICONOS = {
 
 
 def armar_tablero(valores: dict, con_sesion: bool = True, entrar: str = "/entrar",
-                  cta_entrar: str = "Entrar con tu RUC") -> list[dict]:
+                  cta_entrar: str = "Entrar con tu RUC", encender: dict | None = None) -> list[dict]:
     """Secciones de la vitrina (una por nivel), activas primero, con los marcadores
-    {digito}/{ubigeo}/{nn_url}/{distrito}/{mes_dato} rellenados con datos del socio."""
+    {digito}/{ubigeo}/{nn_url}/{distrito}/{mes_dato} rellenados con datos del socio.
+    `encender` = {id: cambios}: activa una herramienta desde afuera (p. ej. el Verificador
+    cuando su interruptor esta abierto) sin tocar su definicion."""
     def fmt(s: str) -> str:
         for k, v in valores.items():
             s = s.replace("{" + k + "}", str(v))
@@ -152,7 +154,7 @@ def armar_tablero(valores: dict, con_sesion: bool = True, entrar: str = "/entrar
     por_id: dict[str, dict] = {}
     secciones = []
     for n in NIVELES:
-        hs = [dict(h) for h in HERRAMIENTAS if h["nivel"] == n["id"]]
+        hs = [{**h, **(encender or {}).get(h["id"], {})} for h in HERRAMIENTAS if h["nivel"] == n["id"]]
         hs.sort(key=lambda h: 0 if h["estado"] == "activa" else 1)   # estable
         for h in hs:
             for k in ("sub", "ben", "url"):

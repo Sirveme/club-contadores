@@ -33,6 +33,7 @@ if str(ROOT_DIR) not in sys.path:
 import estadisticas as est  # noqa: E402
 from . import club  # noqa: E402  (Club de Contadores: /club, /club/tablero, ...)
 from . import identidad  # noqa: E402  (identidad por persona/DNI: /api/id/...)
+from . import verificador  # noqa: E402  (Verificador multi-padron: /verificador)
 
 SITE_BASE = os.getenv("SITE_BASE", "https://observatorio.perusistemas.pro").rstrip("/")
 # URL del registro ante la ANPD (placeholder editable hasta tener el archivo).
@@ -102,7 +103,21 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.include_router(club.router)
 app.middleware("http")(club.enrutar_por_dominio)  # club.perusistemas.pro -> Club
+
+
+@app.middleware("http")
+async def proteger_panel(request: Request, call_next):
+    """/panel/* es interno (lista nombres, correos e IPs): solo administradores con
+    sesion por DNI (ADMIN_DNI). A cualquier otro se le responde 404, sin revelar que
+    existe. Registrado despues del enrutador de dominio: corre primero, con la ruta
+    original."""
+    ruta = request.url.path.rstrip("/").lower()
+    if (ruta == "/panel" or ruta.startswith("/panel/")) and not await identidad.es_admin(request):
+        return HTMLResponse("No encontramos esta página.", status_code=404,
+                            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
+    return await call_next(request)
 app.include_router(identidad.router)
+app.include_router(verificador.router)
 app.add_exception_handler(identidad._Rechazo, identidad.manejar_rechazo)
 templates.env.filters["titulo"] = lambda s: titulo(s)  # Title Case peruano en plantillas
 templates.env.filters["miles"] = lambda n: f"{int(n):,}" if n is not None else ""   # 51,477
@@ -478,7 +493,7 @@ async def panel_reportes(request: Request):
     for r in cons["reportes"].values():
         if r["nivel"] == "departamento":
             deps.append({"slug": r["slug"], "nombre": titulo(r["territorio"])})
-        else:
+        elif r["nivel"] == "provincia":   # el reporte nacional no tiene departamento (clave None -> 500)
             provs_por_dep.setdefault(r["departamento_slug"], []).append(
                 {"slug": r["slug"], "nombre": titulo(r["territorio"])})
     for k in provs_por_dep:

@@ -80,7 +80,7 @@ PSP_WHATSAPP = "".join(c for c in os.getenv("PSP_WHATSAPP", "967317946") if c.is
 CLUB_HOST = os.getenv("CLUB_HOST", "club.perusistemas.pro").strip().lower()
 CONTADORES_HOST = os.getenv("CONTADORES_HOST", "contadores.perusistemas.pro").strip().lower()
 DOMINIO_RAIZ = "perusistemas.pro"
-MSG_ESCRIBENOS = "No encontramos ese RUC en SUNAT. Revísalo o escríbenos y te ayudamos."
+MSG_ESCRIBENOS = "No encontramos ese RUC. Revísalo o escríbenos y te ayudamos."
 
 
 _SIGLAS = {"SAC", "SA", "SAA", "SRL", "EIRL", "SCRL", "SAS"}
@@ -291,7 +291,7 @@ def _con_cookie(resp, request: Request, token: str):
 #   /club; en club.perusistemas.pro se sirve en "/".
 # URLs viejas (/club/tablero, /club/igv, /club/directorio, ...) -> 301 a las nuevas.
 RUTAS_CLUB = ("/entrar", "/igv", "/directorio", "/c", "/perfil", "/empresario", "/salir",
-              "/registro", "/ingresar", "/cambiar-clave", "/activar", "/privacidad")
+              "/registro", "/ingresar", "/cambiar-clave", "/activar", "/privacidad", "/verificador")
 
 
 def ruta_nueva(path: str, home: str) -> str | None:
@@ -464,6 +464,11 @@ async def club_entrar(request: Request, rol: str = "", ref: str = "", sig: str =
         "anpd_url": ANPD_REGISTRO_URL, "psp_whatsapp": PSP_WHATSAPP})
 
 
+def _verificador_tarjeta() -> dict | None:
+    from . import verificador
+    return verificador.tarjeta_tablero()
+
+
 async def _por_activar(s: dict | None) -> bool:
     """Socio viejo (cookie RUC + correo) cuya persona aun no crea su clave: el tablero
     le muestra el aviso de activacion (solo con la identidad abierta)."""
@@ -520,7 +525,8 @@ async def club_tablero(request: Request, t: str = ""):
                                "ubigeo": (s or {}).get("ubigeo") or "150101", "nn_url": nn_url,
                                "distrito": (s or {}).get("distrito") or "tu distrito",
                                "mes_dato": nn["mes_dato"] if nn else "cada mes"},
-                              con_sesion=bool(s), entrar=entrar, cta_entrar=como_entrar())
+                              con_sesion=bool(s), entrar=entrar, cta_entrar=como_entrar(),
+                              encender=_verificador_tarjeta())
     total = sum(len(c["herramientas"]) for c in secciones)
     ubic = ""
     if s:

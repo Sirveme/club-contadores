@@ -53,6 +53,9 @@ REGISTRO_ABIERTO = os.getenv("IDENTIDAD_REGISTRO_ABIERTO", "0").strip() == "1"
 PASE = os.getenv("IDENTIDAD_PASE", "").strip()
 DNI_PRUEBA = {d for d in re.split(r"[\s,;]+", os.getenv("IDENTIDAD_DNI_PRUEBA", "")) if d}
 COOKIE_PASE = "club_pase"
+# Administradores (panel interno, avisos del Club): DNI separados por comas en ADMIN_DNI.
+# Se agregan o quitan en Railway sin tocar codigo. Vacio = nadie es admin.
+ADMIN_DNI = {d for d in re.split(r"[\s,;]+", os.getenv("ADMIN_DNI", "")) if d}
 CONSENT_VER = os.getenv("IDENTIDAD_CONSENT_VER", "club-identidad-2026-10-10").strip()   # texto aprobado 2026-10-09; corto + "Leer más" 2026-10-10
 APIS_DNI_URL = os.getenv("APIS_NET_PE_DNI_URL", "https://api.apis.net.pe/v2/reniec/dni").strip()
 INTENTOS_MAX, INTENTOS_VENTANA_MIN = 5, 15
@@ -218,6 +221,14 @@ def _canjear_pase(request: Request):
     resp.set_cookie(COOKIE_PASE, _firma_pase(), max_age=7 * 86400, httponly=True, samesite="lax", secure=https)
     log.info("identidad: pase de prueba canjeado")
     return resp
+
+
+async def es_admin(request: Request) -> bool:
+    """Sesion de persona valida (DNI + clave) cuyo DNI esta en ADMIN_DNI."""
+    if not ADMIN_DNI:
+        return False
+    p = await persona_actual(request)
+    return bool(p and p["dni"] in ADMIN_DNI)
 
 
 async def persona_actual(request: Request) -> dict | None:
