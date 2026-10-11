@@ -1,0 +1,29 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+*.zip
+
+# --- Datos personales / fuentes SUNAT: NUNCA al repo (es PUBLICO; Ley 29733) ---
+# Padron de contadores y altas SUNAT (personas naturales con nombre y RUC).
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+data-RUCS/
+# Padron Reducido y anexos (18 M de RUC con nombres) y reportes de carga: nunca al repo.
+padron_reducido*
+SSCO*
+cargas-padron/
+# Respaldos y volcados de BD.
+respaldos-db/
+*.dump
+*.backup
+*.sql.gz
+bak_*
+# Notas de trabajo e informes internos (pueden citar datos y detalles de la BD).
+zClaude-*.md
+zClub*.md
+zEstadisticas-*.md
+INFORME-*.md
