@@ -344,3 +344,60 @@ a { color: inherit; }
 }
 .irA li { grid-template-columns: minmax(34px, auto) 1fr auto; }
 .irA li .d { font-size: .85em; }
+
+/* ===== Verificador de RUC ===== */
+:root { --sem-verde: #4fbf7a; --sem-amarillo: #e3b341; --sem-rojo: #e5534b; --sem-gris: #8b949e; --sem-info: #58a6ff; }
+.ver-entrada textarea { background: var(--bg); color: var(--fg); border: 1px solid var(--grid); padding: 8px 9px;
+  font: inherit; font-family: var(--mono); resize: vertical; min-height: 6em; }
+.ver-entrada textarea:focus { outline: none; border-color: var(--accent); }
+.ver-acciones { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.btn-ver { all: unset; cursor: pointer; padding: 8px 16px; font-weight: 600; color: var(--bg); background: var(--lv-gratis); }
+.btn-ver:hover { filter: brightness(1.08); }
+.btn-ver:disabled { opacity: .55; cursor: progress; }
+.ver-cuenta { color: var(--muted); font-family: var(--mono); font-size: .92em; }
+.ver-resultado, .ver-ssco { margin-top: 12px; }
+.ver-filtros { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--grid); }
+.ver-filtros button { all: unset; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; padding: 5px 10px;
+  border: 1px solid var(--grid); color: var(--muted); }
+.ver-filtros button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); background: var(--cell-2); }
+.ver-filtros button i { font-style: normal; font-family: var(--mono); color: var(--faint); }
+.ver-filtros input { margin-left: auto; min-width: 200px; background: var(--bg); color: var(--fg); border: 1px solid var(--grid); padding: 6px 8px; font: inherit; }
+.sem { display: inline-block; width: 9px; height: 9px; border-radius: 50%; text-decoration: none; flex: none; }
+.sem.verde { background: var(--sem-verde); } .sem.amarillo { background: var(--sem-amarillo); }
+.sem.rojo { background: var(--sem-rojo); } .sem.gris { background: var(--sem-gris); } .sem.info { background: var(--sem-info); }
+.chip-sem { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; font-size: .93em; }
+.chip-sem.rojo { color: color-mix(in srgb, var(--sem-rojo) 75%, var(--fg)); font-weight: 600; }
+.chip-sem.amarillo { color: color-mix(in srgb, var(--sem-amarillo) 70%, var(--fg)); }
+.chip-sem.gris { color: var(--muted); }
+.ver-tabla th button { all: unset; cursor: pointer; }
+.ver-tabla td.rs { min-width: 16em; }
+.ver-tabla td.ver-marca.no { color: var(--faint); text-align: center; }
+.ver-tabla tr.fila { cursor: pointer; }
+.ver-tabla tr.fila.rojo td { background: color-mix(in srgb, var(--sem-rojo) 9%, var(--cell)); }
+.ver-tabla tr.fila.amarillo td { background: color-mix(in srgb, var(--sem-amarillo) 6%, var(--cell)); }
+.ver-tabla tr.fila:hover td, .ver-tabla tr.fila:focus td { background: var(--sel); outline: none; }
+.ver-tabla tr.det td { background: var(--bg); padding: 10px 14px; white-space: normal; }
+.ver-tabla tr.det p { margin: 4px 0; } .ver-tabla tr.det ul { margin: 4px 0 6px; padding-left: 1.2em; }
+.ssco-det { border-left: 3px solid var(--sem-rojo); padding: 6px 10px; margin: 6px 0; background: color-mix(in srgb, var(--sem-rojo) 7%, var(--bg)); }
+.ssco-det ul { margin: 4px 0 0; padding-left: 1.2em; }
+.ver-nota { padding: 8px 12px; margin: 0; }
+.faint { color: var(--faint); }
+@media (max-width: 640px) {
+  .ver-filtros input { margin-left: 0; min-width: 0; width: 100%; }
+  .btn-ver { width: 100%; text-align: center; }
+}
+/* Verificador en el celular: cada RUC es una tarjeta (la tabla no cabe a lo ancho) */
+@media (max-width: 640px) {
+  .ver-tabla { min-width: 0; }
+  .ver-tabla thead { display: none; }
+  .ver-tabla, .ver-tabla tbody, .ver-tabla tr.det, .ver-tabla tr.det td { display: block; width: 100%; }
+  .ver-tabla tr.fila { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--grid); }
+  .ver-tabla tr.fila td { display: block; border: 0; padding: 6px 10px; white-space: normal; }
+  .ver-tabla tr.fila td::before { content: attr(data-l); display: block; font-size: .72em; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 2px; }
+  .ver-tabla tr.fila td.ruc, .ver-tabla tr.fila td.rs { grid-column: 1 / -1; }
+  .ver-tabla tr.fila td.ruc { padding-top: 10px; font-weight: 600; }
+  .ver-tabla tr.fila td.ver-marca.no { display: none; }
+  .ver-tabla td.rs { min-width: 0; }
+}
+@media (max-width: 640px) { .ver-tabla tr.det[hidden] { display: none; } }
