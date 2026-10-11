@@ -1,0 +1,30 @@
+{% extends "club/base.html" %}
+{% set hoja = "frescura" %}
+{% block titulo %}Frescura de los datos · Panel{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Fórmula">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">=</span>HOY() − CORTE(padrón)</div>
+  </section>
+  <section class="panel" aria-label="Frescura">
+    <header class="panel-cab"><b>Frescura de los datos</b>
+      <span>Cada padrón tiene su propio corte y su propio ritmo · esquema <span class="mono">{{ esquema }}</span></span></header>
+    <div class="tabla-wrap"><table class="tabla">
+      <thead><tr><th>Padrón</th><th>Corte cargado</th><th>Hace</th><th>Estado</th><th>Ámbar desde</th><th>Rojo desde</th></tr></thead>
+      <tbody>
+      {% for f in filas %}
+        <tr>
+          <td>{{ f.nombre }}</td>
+          <td class="mono">{{ f.corte_txt }}</td>
+          <td class="mono">{% if f.dias is not none %}{{ f.dias }} día{{ "" if f.dias == 1 else "s" }}{% else %}—{% endif %}</td>
+          <td><span class="chip-sem {{ 'verde' if f.semaforo == 'verde' else ('amarillo' if f.semaforo == 'ambar' else 'rojo') }}"><s class="sem {{ 'verde' if f.semaforo == 'verde' else ('amarillo' if f.semaforo == 'ambar' else 'rojo') }}"></s>{{ {"verde": "Al día", "ambar": "Toca revisar", "rojo": "Atrasado"}[f.semaforo] }}</span></td>
+          <td class="mono">{{ f.umbral_ambar_dias }} días</td>
+          <td class="mono">{{ f.umbral_rojo_dias }} días</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <p class="nota" style="padding:0 12px 12px">Los umbrales se cambian en la tabla <span class="mono">padrones</span>, por padrón. Nada aquí descarga datos: cuando un padrón se pone ámbar, toca bajar su corte nuevo y correr su cargador.</p>
+  </section>
+{% endblock %}

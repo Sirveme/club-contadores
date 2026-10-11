@@ -1,0 +1,59 @@
+{% extends "club/base.html" %}
+{% set hoja = "verificador" %}
+{% block titulo %}Verificador de RUC · Club de Contadores{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Fórmula">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">=</span>VERIFICAR(RUC; SSCO; NO_HABIDO; BAJA)</div>
+  </section>
+
+  <section class="panel ver-entrada" aria-label="Verificar RUC" style="--lv: var(--lv-gratis)">
+    <header class="panel-cab"><b style="color:var(--lv-gratis)">Verificador de RUC</b>
+      <span>Gratis · sin cuenta · hasta {{ tope }} RUC por vez{% if datos_al %} · datos al {{ datos_al }}{% endif %}</span></header>
+    <form class="panel-cuerpo" id="fVer" novalidate>
+      <div class="campo"><label for="rucs">Uno o varios RUC</label>
+        <textarea id="rucs" rows="4" spellcheck="false" autocomplete="off"
+          placeholder="Pega aquí tus RUC: uno por línea, separados por comas o copiados de una columna de Excel"></textarea>
+        <small>Encontramos los RUC aunque vengan mezclados con otro texto. Repetidos se cuentan una vez.</small></div>
+      <div class="ver-acciones">
+        <button class="btn-ver" type="submit" id="bVer">Verificar →</button>
+        <span class="ver-cuenta" id="cuenta" aria-live="polite"></span>
+      </div>
+      <div id="vMsg" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <section class="panel ver-resultado" id="resultado" hidden aria-label="Resultado">
+    <header class="panel-cab"><b>Resultado</b><span id="resumen"></span></header>
+    <div class="ver-filtros" role="group" aria-label="Filtrar">
+      <button type="button" data-f="todos" aria-pressed="true">Todos <i id="nTodos"></i></button>
+      <button type="button" data-f="alerta" aria-pressed="false"><s class="sem rojo"></s>Con alerta <i id="nAlerta"></i></button>
+      <button type="button" data-f="aviso" aria-pressed="false"><s class="sem amarillo"></s>Revisar <i id="nAviso"></i></button>
+      <button type="button" data-f="ok" aria-pressed="false"><s class="sem verde"></s>En orden <i id="nOk"></i></button>
+      <input type="search" id="buscar" placeholder="Filtrar por RUC o nombre…" aria-label="Filtrar resultados">
+    </div>
+    <div class="tabla-wrap"><table class="tabla ver-tabla" id="tVer">
+      <thead><tr id="cab"></tr></thead>
+      <tbody id="cuerpo"></tbody>
+    </table></div>
+    <p class="nota ver-nota">Toca una fila para ver el detalle: resolución SSCO con su representante legal, domicilio y locales anexos.</p>
+  </section>
+
+  <section class="panel ver-ssco" aria-label="Buscar en la lista SSCO">
+    <header class="panel-cab"><b style="color:var(--lv-premium)">¿Está en la lista SSCO?</b>
+      <span>Busca por nombre del representante legal o de la empresa, solo dentro de la lista SSCO{% if ssco_al %} · al {{ ssco_al }}{% endif %}</span></header>
+    <form class="panel-cuerpo" id="fSsco" novalidate>
+      <div class="ver-acciones">
+        <div class="campo" style="flex:1"><label for="qSsco">Nombre</label>
+          <input id="qSsco" autocomplete="off" placeholder="Ej.: PÉREZ GARCÍA"></div>
+        <button class="btn-ver" type="submit" id="bSsco">Buscar</button>
+      </div>
+      <div id="rSsco" aria-live="polite"></div>
+    </form>
+  </section>
+{% endblock %}
+{% block estado %}<span id="estadoTxt">Listo</span>{% endblock %}
+{% block scripts %}
+<script src="/static/js/club-verificador.js?v=3" defer></script>
+{% endblock %}

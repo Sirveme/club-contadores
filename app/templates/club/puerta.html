@@ -13,7 +13,7 @@
     <div class="entrar-intro lv-cuenta">
       <span class="k">Club de Contadores · gratis con tu cuenta</span>
       <h1 id="fxVal"><span class="q">="</span>Bienvenido al Club de Contadores<span class="q">"</span></h1>
-      <p class="lead">Con tu RUC te reconocemos en el padrón SUNAT. No pedimos tu clave SOL.</p>
+      <p class="lead">Te reconocemos con tu RUC. No pedimos tu clave SOL.</p>
       <ul class="beneficios">
         <li class="lv-cuenta"><span><b>Nuevos Negocios</b> de tu distrito, cada mes</span></li>
         <li class="lv-cuenta"><span><b>Directorio</b> de Contadores de tu distrito</span></li>
@@ -34,7 +34,7 @@
         <form id="fRuc" class="campo" novalidate>
           <label for="ruc">Tu RUC</label>
           <input id="ruc" name="ruc" inputmode="numeric" maxlength="11" autocomplete="off" placeholder="10XXXXXXXXX" required>
-          <small>Te reconocemos con el padrón SUNAT. No pedimos tu clave SOL.</small>
+          <small>Te reconocemos con tu RUC. No pedimos tu clave SOL.</small>
           <div class="acciones"><button class="btn" type="submit" id="btnRuc">Continuar →</button></div>
         </form>
         <div id="res1" aria-live="polite"></div>
@@ -70,7 +70,7 @@
   </section>
 </div>
 {% endblock %}
-{% block estado %}<span>Padrón SUNAT: <b>157,357</b> contadores</span><span id="estadoTxt">Listo</span>{% endblock %}
+{% block estado %}<span><b>157,357</b> contadores en el Perú</span><span id="estadoTxt">Listo</span>{% endblock %}
 {% block scripts %}
 <script>
 (function () {
@@ -96,7 +96,7 @@
   async function consultar(continuar) {
     const ruc = $("ruc").value.replace(/\D/g, "");
     if (ruc.length !== 11) { $("res1").innerHTML = msg("El RUC tiene 11 dígitos.", "err"); return; }
-    $("btnRuc").disabled = true; $("estadoTxt").textContent = "Consultando padrón…";
+    $("btnRuc").disabled = true; $("estadoTxt").textContent = "Verificando tu RUC…";
     try {
       const { r, d } = await post("/api/club/ruc", { rol, ruc, continuar });
       if (!r.ok || !d.ok) throw new Error(d.error || "No pudimos consultar. Intenta de nuevo.");
@@ -109,13 +109,13 @@
     const res = $("res1");
     if (d.accion === "registro") { actual = { ...d, continuar }; abrirRegistro(d); res.innerHTML = ""; return; }
     if (d.accion === "orientar_empresario") {
-      res.innerHTML = msg(`<b>${esc(d.razon_social || "Este RUC")}</b> no figura como estudio contable en el padrón SUNAT. ¿Quizás eres empresario?`) +
+      res.innerHTML = msg(`<b>${esc(d.razon_social || "Este RUC")}</b> no figura como estudio contable. ¿Quizás eres empresario?`) +
         `<div class="acciones" style="margin-top:8px"><button class="btn" type="button" id="aEmp">Registrarme como empresario</button>
          <button class="btn sec" type="button" id="aSigue">Soy un estudio contable, continuar</button></div>`;
       $("aEmp").onclick = () => { setRol("empresario"); consultar(false); };
       $("aSigue").onclick = () => consultar(true);
     } else if (d.accion === "orientar_contador") {
-      res.innerHTML = msg(`Tu RUC figura como <b>contador o estudio contable</b> en el padrón SUNAT${d.distrito ? " (" + esc(d.distrito) + ")" : ""}. Regístrate en el Club de Contadores: tiene herramientas hechas para ti.`) +
+      res.innerHTML = msg(`Tu RUC figura como <b>contador o estudio contable</b> ${d.distrito ? " (" + esc(d.distrito) + ")" : ""}. Regístrate en el Club de Contadores: tiene herramientas hechas para ti.`) +
         `<div class="acciones" style="margin-top:8px"><button class="btn" type="button" id="aCon">Ir al Club de Contadores</button>
          <button class="btn sec" type="button" id="aSigue">Continuar como empresario</button></div>`;
       $("aCon").onclick = () => { setRol("contador"); consultar(false); };
@@ -140,8 +140,8 @@
     const esContador = d.rol === "contador";
     let saludo = d.nombre ? `Hola, ${esc(d.nombre)}` : "Hola";
     if (esContador && d.distrito) saludo += ` · contador de ${esc(d.distrito)}`;
-    const nota = { padron: "Te reconocimos en el padrón SUNAT de contadores.", api: "SUNAT confirma tu actividad contable (CIIU 6920).",
-                   por_confirmar: "Tu RUC no figura en el padrón de contadores. Entras con acceso completo; confirmaremos tu actividad después.",
+    const nota = { padron: "Te reconocimos como contador.", api: "Contador confirmado.",
+                   por_confirmar: "Aún no confirmamos tu actividad contable. Entras con acceso completo; confirmaremos tu actividad después.",
                    no_aplica: "Entras como empresario." }[d.verificacion] || "";
     $("regSaludo").innerHTML = `${saludo}<small>RUC ${esc(d.ruc)}${d.razon_social ? " · " + esc(d.razon_social) : ""} — ${nota}</small>`;
     $("regSub").textContent = esContador ? "Club de Contadores" : "Empresarios";

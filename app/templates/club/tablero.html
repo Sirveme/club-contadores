@@ -13,17 +13,17 @@
     <div>
       <h1>Hola, {{ nombre }}</h1>
       <p>{% if s.distrito %}Contador de {{ ubic or s.distrito }} · {% endif %}
-        {% if s.verificacion == "padron" %}<span class="ok">verificado en el padrón SUNAT</span>
-        {% elif s.verificacion == "api" %}<span class="ok">SUNAT confirma CIIU 6920</span>
+        {% if s.verificacion == "padron" %}<span class="ok">verificado</span>
+        {% elif s.verificacion == "api" %}<span class="ok">contador confirmado</span>
         {% else %}<span class="pc" title="Marca informativa: tienes acceso completo">actividad por confirmar</span>{% endif %}</p>
     </div>
     {% if contadores_distrito %}<div class="chips"><span class="chip"><b>{{ contadores_distrito|miles }}</b> contadores en tu distrito</span></div>{% endif %}
     {% else %}
     <div>
       <h1>Club de Contadores</h1>
-      <p>Herramientas para contadores del Perú, con el padrón SUNAT. <span class="ok">Las gratis se usan sin cuenta.</span></p>
+      <p>Herramientas para contadores del Perú. <span class="ok">Las gratis se usan sin cuenta.</span></p>
     </div>
-    <div class="chips"><span class="chip"><b>157,357</b> contadores en el padrón</span>
+    <div class="chips"><span class="chip"><b>157,357</b> contadores en el Perú</span>
       <a class="chip entrar" href="{{ entrar }}">{{ como_entrar() }} →</a></div>
     {% endif %}
   </section>
@@ -45,7 +45,7 @@
       {% if s %}<a class="boton" href="{{ nn_url }}">Ver los negocios de {{ s.distrito }} →</a>
       {% else %}<a class="boton" href="{{ entrar }}">Ve los de tu distrito: entra con tu {{ "DNI" if identidad_abierta() else "RUC" }} →</a>{% endif %}
     </div>
-    <div class="barras" role="img" aria-label="Altas SUNAT por mes: {% for m in nn.meses %}{{ m.mes }} {{ m.n }}{% if not loop.last %}, {% endif %}{% endfor %}">
+    <div class="barras" role="img" aria-label="Inscritos por mes: {% for m in nn.meses %}{{ m.mes }} {{ m.n }}{% if not loop.last %}, {% endif %}{% endfor %}">
       {% for m in nn.meses %}<div style="height:{{ m.pct }}%"><em>{{ m.n|miles }}</em><span>{{ m.mes }}</span></div>{% endfor %}
       <small class="nota-serie">Solo negocios: empresas y personas con negocio. No cuenta a quien saca RUC sin empresa.</small>
     </div>
@@ -53,10 +53,10 @@
   {% else %}
   <section class="portada lv-cuenta" aria-label="Nuevos Negocios">
     <div>
-      <span class="k">Nuevos Negocios · SUNAT</span>
+      <span class="k">Nuevos Negocios · cada mes</span>
       <div class="cifra">157,357</div>
-      <h2>contadores en el padrón SUNAT. Llega primero a los negocios nuevos.</h2>
-      <p>Cada mes se inscriben miles de negocios en SUNAT. Elige tu distrito y ve quiénes son, con su actividad y fecha de inscripción.</p>
+      <h2>contadores en el Perú. Llega primero a los negocios nuevos.</h2>
+      <p>Cada mes se inscriben miles de negocios nuevos. Elige tu distrito y ve quiénes son, con su actividad y fecha de inscripción.</p>
       <a class="boton" href="{{ nn_url }}">Ver negocios nuevos →</a>
     </div>
   </section>

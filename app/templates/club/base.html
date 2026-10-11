@@ -4,20 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{% block titulo %}Club de Contadores{% endblock %}</title>
-<meta name="description" content="Club de Contadores: herramientas para contadores del Perú, con el padrón SUNAT.">
+<meta name="description" content="Club de Contadores: herramientas para contadores del Perú.">
 <meta name="theme-color" content="#15100b">
 <script>/* Tema por defecto: Sepia. "grafito" solo si la persona lo eligio. */var d=document.documentElement;d.dataset.tema="sepia";try{var t=localStorage.getItem("club.tema");if(t==="grafito")delete d.dataset.tema;else if(t==="tinta")d.dataset.tema="tinta";}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/static/css/club.css?v=6">
+<link rel="stylesheet" href="/static/css/club.css?v=10">
 {% block head %}{% endblock %}
 </head>
 <body>
 <div class="app" id="app">
   <header class="top">
     <a class="marca" href="{{ inicio or "/club" }}" style="text-decoration:none"><b>Club de Contadores</b><span>club.perusistemas.pro</span></a>
-    <span class="chip"><i></i>Padrón SUNAT · corte 17.09.2026</span>
     <span class="sp"></span>
     {% if s and s.rol == "contador" %}
       <a class="btn-dir{% if not s.ubigeo %} sin{% endif %}" href="/directorio" {% block dir_actual %}{% endblock %}>
@@ -37,10 +36,12 @@
       {% block tabs %}
       {% if s and s.rol == "contador" %}
         <a href="{{ inicio or "/club" }}" {% if hoja == "tablero" %}aria-current="page"{% endif %}>Tablero</a>
+        {% if verificador_abierto() %}<a href="/verificador" {% if hoja == "verificador" %}aria-current="page"{% endif %}>Verificador</a>{% endif %}
         <a href="/directorio" {% if hoja == "directorio" %}aria-current="page"{% endif %}>Contadores de {{ s.distrito or "tu distrito" }}</a>
         <a href="/perfil">Mi perfil</a>
       {% else %}
         <a href="{{ inicio or "/club" }}" {% if hoja == "tablero" %}aria-current="page"{% endif %}>Tablero</a>
+        {% if verificador_abierto() %}<a href="/verificador" {% if hoja == "verificador" %}aria-current="page"{% endif %}>Verificador</a>{% endif %}
         <a href="/igv" {% if hoja == "igv" %}aria-current="page"{% endif %}>Calculadora de IGV</a>
         <a href="/directorio" {% if hoja == "directorio" %}aria-current="page"{% endif %}>Directorio</a>
         {% if not s %}<a href="/entrar" {% if hoja == "puerta" %}aria-current="page"{% endif %}>Entrar</a>{% endif %}
