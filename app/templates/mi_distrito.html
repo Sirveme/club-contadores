@@ -83,7 +83,7 @@
         </tbody>
       </table>
       <p class="muted" style="margin:10px 0 0">Solo negocios: no cuenta a quien saca RUC sin empresa (independientes).
-        {% if desglose|rejectattr("comparable")|list %}* En mayo y junio SUNAT no indicó si la persona tiene negocio, así que esos meses muestran solo las empresas.{% endif %}</p>
+        {% if desglose|rejectattr("comparable")|list %}* En mayo y junio no tenemos ese dato para las personas, así que esos meses muestran solo las empresas.{% endif %}</p>
     </section>
     {% endif %}
 
