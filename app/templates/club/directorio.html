@@ -54,7 +54,7 @@
       {% endif %}
     {% endif %}
     <div class="invita"><span>El Directorio crece con cada contador que se inscribe y acepta aparecer.</span>
-      <a class="btn sec" href="/entrar">Inscribir a un colega</a></div>
+      <a class="btn sec" href="{{ "/registro" if identidad_abierta() else "/entrar" }}">Inscribir a un colega</a></div>
   </div>
   {% endif %}
 {% endblock %}

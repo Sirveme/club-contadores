@@ -3,7 +3,7 @@
 {% block titulo %}Tablero · Club de Contadores{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
-<link rel="stylesheet" href="/static/css/club-vitrina.css?v=17">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=19">
 {% endblock %}
 {% block contenido %}
 <div class="vitrina" id="hoja">
@@ -24,7 +24,7 @@
       <p>Herramientas para contadores del Perú, con el padrón SUNAT. <span class="ok">Las gratis se usan sin cuenta.</span></p>
     </div>
     <div class="chips"><span class="chip"><b>157,357</b> contadores en el padrón</span>
-      <a class="chip entrar" href="{{ entrar }}">Entrar con tu RUC →</a></div>
+      <a class="chip entrar" href="{{ entrar }}">{{ como_entrar() }} →</a></div>
     {% endif %}
   </section>
 
@@ -43,7 +43,7 @@
       <p class="desglose"><b>{{ nn.juridicas|miles }}</b> empresas · <b>{{ nn.naturales|miles }}</b> personas con negocio</p>
       <p>Cada uno puede necesitar contador. Ve quiénes son, con su actividad y fecha de inscripción, antes que la competencia.</p>
       {% if s %}<a class="boton" href="{{ nn_url }}">Ver los negocios de {{ s.distrito }} →</a>
-      {% else %}<a class="boton" href="{{ entrar }}">Ve los de tu distrito: entra con tu RUC →</a>{% endif %}
+      {% else %}<a class="boton" href="{{ entrar }}">Ve los de tu distrito: entra con tu {{ "DNI" if identidad_abierta() else "RUC" }} →</a>{% endif %}
     </div>
     <div class="barras" role="img" aria-label="Altas SUNAT por mes: {% for m in nn.meses %}{{ m.mes }} {{ m.n }}{% if not loop.last %}, {% endif %}{% endfor %}">
       {% for m in nn.meses %}<div style="height:{{ m.pct }}%"><em>{{ m.n|miles }}</em><span>{{ m.mes }}</span></div>{% endfor %}

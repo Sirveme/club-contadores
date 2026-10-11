@@ -26,7 +26,7 @@
     {% elif s %}
       <a class="salir" href="/salir">Salir</a>
     {% elif hoja != "puerta" %}
-      <a class="btn-dir" href="/entrar{% if entrar_sig %}?sig={{ entrar_sig }}{% endif %}">Entrar con tu RUC <span>→</span></a>
+      <a class="btn-dir" href="/entrar{% if entrar_sig %}?sig={{ entrar_sig }}{% endif %}">{{ como_entrar() }} <span>→</span></a>
     {% endif %}
   </header>
 
