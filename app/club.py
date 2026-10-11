@@ -44,6 +44,21 @@ SQL_ESQUEMA = BASE_DIR.parent / "sql" / "alter_v10_club.sql"
 SQL_IDENTIDAD = BASE_DIR.parent / "sql" / "alter_v11_identidad.sql"
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+
+def identidad_abierta() -> bool:
+    """True cuando se entra con DNI + clave (IDENTIDAD_REGISTRO_ABIERTO). Mientras este
+    cerrada, la unica forma de entrar es RUC + correo (/entrar)."""
+    from . import identidad
+    return identidad.REGISTRO_ABIERTO
+
+
+def como_entrar() -> str:
+    """Texto de los botones de entrada, coherente con la forma de entrar vigente."""
+    return "Entrar con tu DNI" if identidad_abierta() else "Entrar con tu RUC"
+
+
+templates.env.globals.update(identidad_abierta=identidad_abierta, como_entrar=como_entrar)
+
 COOKIE = "club_t"
 COOKIE_DIAS = 180
 CONSENT_VER = "club-2026-10-07"
@@ -61,7 +76,7 @@ ANPD_REGISTRO_URL = os.getenv("ANPD_REGISTRO_URL", "https://sipdp.minjus.gob.pe/
                               "?key=9D0ZkMDFxSOEFTS1FFjnpg%3D%3D&tk=9FCkCdMbvvxA%2BcDqZ%2FT5mg%3D%3D").strip()
 # Foto del garante en /privacidad: basta con dejar el archivo; sin el, un circulo con sus iniciales.
 FOTO_GARANTE = "/static/img/duilio-garante.jpg"
-PSP_WHATSAPP = "".join(c for c in os.getenv("PSP_WHATSAPP", "938246208") if c.isdigit())
+PSP_WHATSAPP = "".join(c for c in os.getenv("PSP_WHATSAPP", "967317946") if c.isdigit())
 CLUB_HOST = os.getenv("CLUB_HOST", "club.perusistemas.pro").strip().lower()
 CONTADORES_HOST = os.getenv("CONTADORES_HOST", "contadores.perusistemas.pro").strip().lower()
 DOMINIO_RAIZ = "perusistemas.pro"
@@ -439,6 +454,10 @@ async def club_entrar(request: Request, rol: str = "", ref: str = "", sig: str =
     s = await socio_actual(request)
     if s:
         return RedirectResponse(_destino(request, s["rol"], sig), status_code=303)
+    if identidad_abierta():
+        # Con la identidad abierta se entra con DNI: /entrar (RUC + correo) ya no se ofrece.
+        destino = "/ingresar" + (f"?sig={_ruta_segura(sig)}" if _ruta_segura(sig) else "")
+        return RedirectResponse(destino, status_code=303)
     return templates.TemplateResponse(request, "club/puerta.html", {
         "s": None, "inicio": inicio(request), "rol": rol if rol in ("contador", "empresario") else "",
         "origen": (ref or "club")[:60], "sig": _ruta_segura(sig),
@@ -501,7 +520,7 @@ async def club_tablero(request: Request, t: str = ""):
                                "ubigeo": (s or {}).get("ubigeo") or "150101", "nn_url": nn_url,
                                "distrito": (s or {}).get("distrito") or "tu distrito",
                                "mes_dato": nn["mes_dato"] if nn else "cada mes"},
-                              con_sesion=bool(s), entrar=entrar)
+                              con_sesion=bool(s), entrar=entrar, cta_entrar=como_entrar())
     total = sum(len(c["herramientas"]) for c in secciones)
     ubic = ""
     if s:

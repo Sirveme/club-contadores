@@ -28,6 +28,7 @@ import os
 import re
 import secrets
 import time
+from urllib.parse import urlencode
 
 import asyncpg
 import httpx
@@ -46,6 +47,12 @@ COOKIE = "club_id"
 DURACION = 30 * 86400                      # Fase 1. Con Facturalo (Fase 2) se acorta.
 SECRETO = os.getenv("SESION_SECRET", "").strip()
 REGISTRO_ABIERTO = os.getenv("IDENTIDAD_REGISTRO_ABIERTO", "0").strip() == "1"
+# Pase de prueba: con el registro cerrado, abre la identidad SOLO en el navegador que canjeo el
+# enlace secreto (?pase=IDENTIDAD_PASE) y SOLO para los DNI de IDENTIDAD_DNI_PRUEBA. El resto ve
+# "muy pronto". Sin IDENTIDAD_PASE no existe.
+PASE = os.getenv("IDENTIDAD_PASE", "").strip()
+DNI_PRUEBA = {d for d in re.split(r"[\s,;]+", os.getenv("IDENTIDAD_DNI_PRUEBA", "")) if d}
+COOKIE_PASE = "club_pase"
 CONSENT_VER = os.getenv("IDENTIDAD_CONSENT_VER", "club-identidad-2026-10-10").strip()   # texto aprobado 2026-10-09; corto + "Leer más" 2026-10-10
 APIS_DNI_URL = os.getenv("APIS_NET_PE_DNI_URL", "https://api.apis.net.pe/v2/reniec/dni").strip()
 INTENTOS_MAX, INTENTOS_VENTANA_MIN = 5, 15
@@ -183,6 +190,36 @@ def _sin_sesion(resp, request: Request):
     return resp
 
 
+def _firma_pase() -> str:
+    return hmac.new(SECRETO.encode(), b"pase:" + PASE.encode(), hashlib.sha256).hexdigest()
+
+
+def _pase_ok(request: Request) -> bool:
+    return bool(PASE and SECRETO) and hmac.compare_digest(request.cookies.get(COOKIE_PASE, ""), _firma_pase())
+
+
+def abierto_para(request: Request, dni: str | None = None) -> bool:
+    """La identidad por DNI esta abierta para este pedido: para todos (interruptor) o, con el
+    pase de prueba, para este navegador y solo los DNI autorizados (dni=None: aun no se sabe)."""
+    if REGISTRO_ABIERTO:
+        return True
+    return _pase_ok(request) and (dni is None or dni in DNI_PRUEBA)
+
+
+def _canjear_pase(request: Request):
+    """?pase=<IDENTIDAD_PASE> deja la cookie del pase y vuelve a la misma pagina sin el secreto
+    en la URL. Pase ausente o equivocado -> None (la pagina sigue en "muy pronto")."""
+    dado = str(request.query_params.get("pase") or "")
+    if not (PASE and SECRETO and dado and hmac.compare_digest(dado, PASE)):
+        return None
+    resto = [(k, v) for k, v in request.query_params.multi_items() if k != "pase"]
+    resp = RedirectResponse(request.url.path + ("?" + urlencode(resto) if resto else ""), status_code=303)
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    resp.set_cookie(COOKIE_PASE, _firma_pase(), max_age=7 * 86400, httponly=True, samesite="lax", secure=https)
+    log.info("identidad: pase de prueba canjeado")
+    return resp
+
+
 async def persona_actual(request: Request) -> dict | None:
     """Persona con sesion valida: firma + vencimiento + sesion_version vigente +
     estado activa. Cualquier falla -> None (sin sesion)."""
@@ -269,9 +306,9 @@ async def api_dni(payload: dict, request: Request):
     """Paso 1 del registro: reconoce el DNI. Nombre enmascarado + si ya tiene cuenta
     + su RUC 10 sugerido. Limitado por IP (no es un buscador de nombres). Cerrado,
     igual que el registro, hasta tener el consentimiento legal actualizado."""
-    if not REGISTRO_ABIERTO:
-        return JSONResponse({"ok": False, "error": "El registro con DNI estará disponible muy pronto."}, status_code=403)
     dni = solo_digitos(payload.get("dni"))
+    if not abierto_para(request, dni):
+        return JSONResponse({"ok": False, "error": "El registro con DNI estará disponible muy pronto."}, status_code=403)
     if not dni_valido(dni):
         return JSONResponse({"ok": False, "error": "El DNI tiene 8 dígitos."}, status_code=422)
     ip = club._client_ip(request)
@@ -300,7 +337,7 @@ def _sin_secreto():
 async def api_registro(payload: dict, request: Request):
     if not SECRETO:
         return _sin_secreto()
-    if not REGISTRO_ABIERTO:
+    if not abierto_para(request, solo_digitos(payload.get("dni"))):
         return JSONResponse({"ok": False, "error": "El registro con DNI estará disponible muy pronto."}, status_code=403)
     if (payload.get("empresa_web") or "").strip():          # honeypot
         return JSONResponse({"ok": True})
@@ -486,8 +523,9 @@ def _ctx(request: Request, **k):
 
 @router.get("/registro", response_class=HTMLResponse)
 async def pagina_registro(request: Request):
-    if not REGISTRO_ABIERTO:
-        return club.templates.TemplateResponse(request, "club/pronto.html", _ctx(request, que="El registro con DNI"))
+    if not abierto_para(request):
+        return _canjear_pase(request) or club.templates.TemplateResponse(
+            request, "club/pronto.html", _ctx(request, que="El registro con DNI"))
     if await persona_actual(request):
         return RedirectResponse(club.inicio(request), status_code=303)
     return club.templates.TemplateResponse(request, "club/registro.html", _ctx(request, consent_ver=CONSENT_VER))
@@ -495,8 +533,9 @@ async def pagina_registro(request: Request):
 
 @router.get("/ingresar", response_class=HTMLResponse)
 async def pagina_ingresar(request: Request):
-    if not REGISTRO_ABIERTO:
-        return club.templates.TemplateResponse(request, "club/pronto.html", _ctx(request, que="El ingreso con DNI"))
+    if not abierto_para(request):
+        return _canjear_pase(request) or club.templates.TemplateResponse(
+            request, "club/pronto.html", _ctx(request, que="El ingreso con DNI"))
     if await persona_actual(request):
         return RedirectResponse(club.inicio(request), status_code=303)
     return club.templates.TemplateResponse(request, "club/ingresar.html", _ctx(request))
@@ -534,8 +573,9 @@ async def _ip_bloqueada(ip: str | None) -> bool:
 
 @router.get("/activar", response_class=HTMLResponse)
 async def pagina_activar(request: Request):
-    if not REGISTRO_ABIERTO:
-        return club.templates.TemplateResponse(request, "club/pronto.html", _ctx(request, que="La activación de tu cuenta"))
+    if not abierto_para(request):
+        return _canjear_pase(request) or club.templates.TemplateResponse(
+            request, "club/pronto.html", _ctx(request, que="La activación de tu cuenta"))
     if await persona_actual(request):
         return RedirectResponse(club.inicio(request), status_code=303)
     x = await _socio_por_activar(request)
@@ -552,7 +592,7 @@ async def pagina_activar(request: Request):
 async def api_activar(payload: dict, request: Request):
     if not SECRETO:
         return _sin_secreto()
-    if not REGISTRO_ABIERTO:
+    if not abierto_para(request):
         return JSONResponse({"ok": False, "error": "La activación estará disponible muy pronto."}, status_code=403)
     ip = club._client_ip(request)
     if await _ip_bloqueada(ip):
@@ -566,6 +606,8 @@ async def api_activar(payload: dict, request: Request):
         return JSONResponse({"ok": False, "error": "El RUC o el correo no coinciden con tu registro anterior."},
                             status_code=401)
     p, s = x["persona"], x["socio"]
+    if not abierto_para(request, p["dni"]):        # pase de prueba: solo los DNI autorizados
+        return JSONResponse({"ok": False, "error": "La activación estará disponible muy pronto."}, status_code=403)
     if p["estado"] != "por_activar":
         return JSONResponse({"ok": False, "accion": "ingresar",
                              "error": "Tu cuenta ya está activa: ingresa con tu DNI y clave."}, status_code=409)

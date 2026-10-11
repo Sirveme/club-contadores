@@ -38,7 +38,7 @@ SITE_BASE = os.getenv("SITE_BASE", "https://observatorio.perusistemas.pro").rstr
 # URL del registro ante la ANPD (placeholder editable hasta tener el archivo).
 ANPD_REGISTRO_URL = os.getenv("ANPD_REGISTRO_URL", "#registro-anpd").strip()
 # WhatsApp de Peru Sistemas Pro (para pedir otro distrito y sugerir herramientas).
-PSP_WHATSAPP = "".join(c for c in os.getenv("PSP_WHATSAPP", "938246208") if c.isdigit())
+PSP_WHATSAPP = "".join(c for c in os.getenv("PSP_WHATSAPP", "967317946") if c.isdigit())
 _CORREO_RE = __import__("re").compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 SITE_HOST = SITE_BASE.split("//", 1)[-1]  # dominio sin esquema, para citas
 # Dominio anterior: se redirige con 301 permanente al nuevo (ver middleware abajo).
