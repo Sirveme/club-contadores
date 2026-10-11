@@ -417,3 +417,26 @@
   .vitrina.priv .garante { grid-template-columns: 1fr; justify-items: start; }
   .indice ol { grid-template-columns: 1fr; }
 }
+
+/* Enlaces dentro de las notas del ingreso (p. ej. "Activa tu cuenta") */
+.vitrina.entrar .nota-clave a { color: var(--v-cuenta); font-weight: 600; }
+
+/* Politica (texto de Duilio): "¿Por qué una ley...?", caja ANPD, nota RENIEC, pie */
+.vitrina.priv .lead b { color: var(--v-fg); }
+.vitrina.priv .porque { border-radius: 1.2em; padding: 1.2em 1.4em; max-width: 900px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--v-cuenta) 14%, var(--v-s1)), var(--v-s1) 70%);
+  border: 1px solid color-mix(in srgb, var(--v-cuenta) 40%, var(--v-line)); }
+.porque h3 { margin: 0 0 .4em; font: 800 1.45em/1.15 var(--v-display); font-stretch: 86%; color: var(--v-fg); }
+.porque h3 span { color: var(--v-cuenta); font-weight: 600; font-stretch: 100%; font-size: .72em; }
+.porque p { margin: .5em 0 0; color: var(--v-fg2); line-height: 1.65; }
+.porque b { color: var(--v-fg); }
+.articulos .caja + .caja { margin-top: .7em; }
+.articulos .caja-anpd { border-color: color-mix(in srgb, var(--v-premium) 50%, var(--v-line));
+  background: color-mix(in srgb, var(--v-premium) 8%, var(--v-s1)); }
+.articulos .caja-anpd a { font-weight: 600; }
+.articulos .nota { padding: .8em 1em; border-left: 3px solid var(--v-gratis); border-radius: 0 .7em .7em 0;
+  background: color-mix(in srgb, var(--v-gratis) 8%, var(--v-s1)); }
+.articulos .nota em { font-style: normal; color: var(--v-gratis); font-weight: 600; }
+.vitrina.priv .priv-pie { display: grid; gap: .6em; color: var(--v-muted); border-top: 1px solid var(--v-line); padding-top: 1.2em; }
+.vitrina.priv .priv-pie p { margin: 0; }
+.vitrina.priv .garante-foto { object-position: 50% 30%; }
