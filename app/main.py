@@ -34,6 +34,7 @@ import estadisticas as est  # noqa: E402
 from . import club  # noqa: E402  (Club de Contadores: /club, /club/tablero, ...)
 from . import identidad  # noqa: E402  (identidad por persona/DNI: /api/id/...)
 from . import verificador  # noqa: E402  (Verificador multi-padron: /verificador)
+from . import api_v1  # noqa: E402  (API propia con llave: /api/v1/...)
 
 SITE_BASE = os.getenv("SITE_BASE", "https://observatorio.perusistemas.pro").rstrip("/")
 # URL del registro ante la ANPD (placeholder editable hasta tener el archivo).
@@ -94,11 +95,14 @@ async def lifespan(app: FastAPI):
     ruc_mod.aviso_config()   # avisa si falta APIS_NET_PE_TOKEN (bloquea registros)
     await db.connect()
     await club.asegurar_esquema()
+    await api_v1.asegurar_esquema()
     yield
     await db.disconnect()
 
 
-app = FastAPI(title="Club de Contadores", lifespan=lifespan)
+# Sin documentacion automatica del sitio (listaba todas las rutas internas): la unica
+# documentacion publica es la de la API, en /api/v1/docs.
+app = FastAPI(title="Club de Contadores", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.include_router(club.router)
@@ -118,6 +122,7 @@ async def proteger_panel(request: Request, call_next):
     return await call_next(request)
 app.include_router(identidad.router)
 app.include_router(verificador.router)
+app.mount("/api/v1", api_v1.app)   # API publica con llave (cerrada hasta API_ABIERTA=1)
 app.add_exception_handler(identidad._Rechazo, identidad.manejar_rechazo)
 templates.env.filters["titulo"] = lambda s: titulo(s)  # Title Case peruano en plantillas
 templates.env.filters["miles"] = lambda n: f"{int(n):,}" if n is not None else ""   # 51,477

@@ -64,8 +64,10 @@ async def _catalogo(conn) -> list[dict]:
         f"FROM {ESQUEMA}.padrones WHERE activo ORDER BY orden")]
 
 
-async def consultar(rucs: list[str]) -> dict:
-    """Una fila por RUC (en el orden pedido) + las columnas del catalogo + los cortes."""
+async def consultar(rucs: list[str], iso: bool = False, anexos_max: int = ANEXOS_MUESTRA) -> dict:
+    """Una fila por RUC (en el orden pedido) + las columnas del catalogo + los cortes.
+    iso=True devuelve las fechas como AAAA-MM-DD (API); por defecto dd/mm/aaaa (pantalla)."""
+    _fecha = (lambda d: d.isoformat() if d else None) if iso else globals()["_fecha"]
     async with db._pool.acquire() as conn:
         cat = await _catalogo(conn)
         filas = {r["ruc"]: dict(r) for r in await conn.fetch(
@@ -83,7 +85,7 @@ async def consultar(rucs: list[str]) -> dict:
                 f"row_number() OVER (PARTITION BY ruc ORDER BY domicilio) AS i "
                 f"FROM {ESQUEMA}.padron_anexos WHERE ruc = ANY($1::text[])", rucs):
             a = anexos.setdefault(r["ruc"], {"n": r["n"], "lista": []})
-            if r["i"] <= ANEXOS_MUESTRA:
+            if r["i"] <= anexos_max:
                 a["lista"].append(r["domicilio"])
     columnas = [c for c in cat if c["origen"] in ("marcas", "vista")]
     alerta = {c["codigo"] for c in columnas if c["severidad"] == "alerta"}
