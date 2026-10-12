@@ -14,8 +14,16 @@ y sus propios errores, siempre {"error": {"codigo", "mensaje"}}.
 Configuracion:
   API_ABIERTA=1                sin esto, todo /api/v1 responde 404
   API_CUOTA_GRATIS_MES=100     cuota por defecto del plan gratis (provisional)
-  API_RPM_DEFECTO=60  API_MAX_LOTE=100   (cuota, ritmo y lote se aplican en los pasos 2 y 3)
+  API_RPM_DEFECTO=60           consultas por minuto por llave
+  API_MAX_LOTE=100             (el lote llega en el paso 3)
 Usa el esquema del Verificador (VERIFICADOR_ESQUEMA).
+
+Cada llamada autenticada: ritmo -> validar -> descontar cuota -> consultar -> bitacora.
+- La cuota es por llave, recurso y mes calendario (hora de Lima), y se descuenta de forma
+  atomica (una sola sentencia): dos pedidos simultaneos nunca pasan del limite.
+- Consume cuota todo pedido valido, encuentre o no el RUC. No consumen: llave invalida,
+  RUC mal formado, exceso de ritmo ni cuota agotada.
+- La bitacora (api_uso) guarda cuando, cuanto y con que resultado; NUNCA que RUC se consulto.
 """
 from __future__ import annotations
 
@@ -25,13 +33,15 @@ import logging
 import os
 import re
 import secrets
+import time
+from collections import deque
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import db
+from . import club, db
 from . import padron as P
 from . import verificador as V
 
@@ -55,17 +65,19 @@ app = FastAPI(
 
 
 class ErrorApi(Exception):
-    def __init__(self, http: int, codigo: str, mensaje: str, **extra):
+    def __init__(self, http: int, codigo: str, mensaje: str, cabeceras: dict | None = None, **extra):
         self.http, self.codigo, self.mensaje, self.extra = http, codigo, mensaje, extra
+        self.cabeceras = cabeceras or {}
 
 
-def _error(http: int, codigo: str, mensaje: str, **extra) -> JSONResponse:
-    return JSONResponse({"error": {"codigo": codigo, "mensaje": mensaje, **extra}}, status_code=http, headers=SIN_CACHE)
+def _error(http: int, codigo: str, mensaje: str, cabeceras: dict | None = None, **extra) -> JSONResponse:
+    return JSONResponse({"error": {"codigo": codigo, "mensaje": mensaje, **extra}}, status_code=http,
+                        headers={**SIN_CACHE, **(cabeceras or {})})
 
 
 @app.exception_handler(ErrorApi)
 async def _h_error(request: Request, e: ErrorApi):
-    return _error(e.http, e.codigo, e.mensaje, **e.extra)
+    return _error(e.http, e.codigo, e.mensaje, e.cabeceras, **e.extra)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -115,6 +127,68 @@ async def autenticar(request: Request) -> dict:
     if row["estado"] != "activa":
         raise ErrorApi(403, "llave_revocada", "Esta llave está revocada o suspendida.")
     return dict(row)
+
+
+# --- Ritmo, cuota y bitacora -------------------------------------------------------------
+_ventanas: dict[str, deque] = {}        # llave -> instantes de sus ultimos pedidos (60 s)
+
+
+def ritmo(llave: dict) -> None:
+    """Tope de pedidos por minuto de la llave. En memoria: vale mientras haya una sola
+    instancia del servicio. No consume cuota."""
+    ahora, v = time.monotonic(), _ventanas.setdefault(str(llave["id"]), deque())
+    while v and ahora - v[0] >= 60:
+        v.popleft()
+    if len(v) >= llave["rpm"]:
+        espera = max(1, int(60 - (ahora - v[0])) + 1)
+        raise ErrorApi(429, "demasiado_rapido", f"Vas muy rápido: tu llave permite {llave['rpm']} consultas por minuto.",
+                       {"Retry-After": str(espera)}, reintentar_en_segundos=espera)
+    v.append(ahora)
+
+
+_MES = "date_trunc('month', now() AT TIME ZONE 'America/Lima')::date"
+
+
+async def estado_cuota(llave: dict, recurso: str = "ruc") -> dict:
+    row = await db._pool.fetchrow(
+        f"SELECT coalesce((SELECT unidades FROM {V.ESQUEMA}.api_uso_mes WHERE llave_id = $1 AND recurso = $2 AND mes = {_MES}), 0) AS usada, "
+        f"({_MES} + interval '1 month')::date AS reinicio", llave["id"], recurso)
+    return {"limite": llave["cuota_mes"], "usada": row["usada"], "restante": max(0, llave["cuota_mes"] - row["usada"]),
+            "reinicio": row["reinicio"].isoformat()}
+
+
+def _cab_cuota(c: dict) -> dict:
+    return {"X-Cuota-Limite": str(c["limite"]), "X-Cuota-Usada": str(c["usada"]),
+            "X-Cuota-Restante": str(c["restante"]), "X-Cuota-Reinicio": c["reinicio"]}
+
+
+async def consumir(llave: dict, unidades: int, recurso: str = "ruc") -> dict:
+    """Descuenta `unidades` de la cuota del mes en UNA sentencia (atomica). Si no caben, no
+    descuenta nada y lanza 429. -> estado de la cuota tras descontar."""
+    usada = None
+    if unidades <= llave["cuota_mes"]:
+        usada = await db._pool.fetchval(
+            f"""INSERT INTO {V.ESQUEMA}.api_uso_mes AS u (llave_id, recurso, mes, unidades) VALUES ($1, $2, {_MES}, $3)
+                ON CONFLICT (llave_id, recurso, mes) DO UPDATE SET unidades = u.unidades + $3
+                WHERE u.unidades + $3 <= $4 RETURNING unidades""", llave["id"], recurso, unidades, llave["cuota_mes"])
+    c = await estado_cuota(llave, recurso)
+    if usada is None:
+        raise ErrorApi(429, "cuota_agotada",
+                       f"Llegaste a tu cuota del mes ({c['limite']} consultas). Se reinicia el {c['reinicio']}.",
+                       _cab_cuota(c), reinicio=c["reinicio"], restante=c["restante"], solicitadas=unidades)
+    return c
+
+
+async def bitacora(request: Request, llave: dict, recurso: str, unidades: int, http: int, t0: float) -> None:
+    """Deja el rastro de la llamada (sin el RUC) y marca el ultimo uso de la llave."""
+    try:
+        async with db._pool.acquire() as conn:
+            await conn.execute(
+                f"INSERT INTO {V.ESQUEMA}.api_uso (llave_id, recurso, unidades, http, ms, ip) VALUES ($1, $2, $3, $4, $5, $6::inet)",
+                llave["id"], recurso, unidades, http, int((time.monotonic() - t0) * 1000), club._client_ip(request) or None)
+            await conn.execute(f"UPDATE {V.ESQUEMA}.api_llaves SET ultima_vez = now() WHERE id = $1", llave["id"])
+    except Exception:
+        log.exception("api_v1: no se pudo escribir la bitacora")
 
 
 # --- Formato de salida -------------------------------------------------------------------
@@ -182,20 +256,45 @@ async def ruc(ruc: str, request: Request, anexos: int = 0, formato: str = ""):
     """Estado, condición de domicilio, distrito, domicilio y marcas (SSCO con sus fechas,
     contador, negocio nuevo) de un RUC. `?anexos=1` agrega los locales anexos (hasta 100) y
     `?formato=plano` devuelve todo en un solo nivel."""
+    t0 = time.monotonic()
     llave = await autenticar(request)
     if "ruc" not in llave["alcances"]:
         raise ErrorApi(403, "sin_alcance", "Tu llave no incluye la consulta de RUC.")
+    try:
+        ritmo(llave)
+    except ErrorApi as e:
+        await bitacora(request, llave, "ruc", 0, e.http, t0)
+        raise
     ruc = ruc.strip()
     if not P.RUC_RE.match(ruc):
-        raise ErrorApi(422, "ruc_invalido", "Un RUC tiene 11 dígitos y empieza en 10, 15, 17 o 20.", ruc=ruc[:20])
+        await bitacora(request, llave, "ruc", 0, 422, t0)
+        raise ErrorApi(422, "ruc_invalido", "Un RUC tiene 11 dígitos y empieza en 10, 15, 17 o 20.",
+                       _cab_cuota(await estado_cuota(llave)), ruc=ruc[:20])
+    try:
+        cuota = await consumir(llave, 1)
+    except ErrorApi as e:
+        await bitacora(request, llave, "ruc", 0, e.http, t0)
+        raise
     datos = await V.consultar([ruc], iso=True, anexos_max=ANEXOS_MAX if anexos else 0)
-    await db._pool.execute(f"UPDATE {V.ESQUEMA}.api_llaves SET ultima_vez = now() WHERE id = $1", llave["id"])
     f = datos["filas"][0]
+    cab = {**SIN_CACHE, **_cab_cuota(cuota)}
     if not f["encontrado"]:
-        raise ErrorApi(404, "ruc_no_encontrado", "Ese RUC no figura en nuestros datos.", ruc=ruc,
+        await bitacora(request, llave, "ruc", 1, 404, t0)
+        raise ErrorApi(404, "ruc_no_encontrado", "Ese RUC no figura en nuestros datos.", _cab_cuota(cuota), ruc=ruc,
                        datos_al=datos["datos_al"])
     out = _ruc_json(f, llave, datos, bool(anexos))
-    return JSONResponse(_plano(out) if formato == "plano" else out, headers=SIN_CACHE)
+    await bitacora(request, llave, "ruc", 1, 200, t0)
+    return JSONResponse(_plano(out) if formato == "plano" else out, headers=cab)
+
+
+@app.get("/yo", summary="Tu llave: plan, cuota y consumo", tags=["Cuenta"])
+async def yo(request: Request):
+    """Plan, alcances y cuota del mes de la llave con que llamas. No consume cuota."""
+    llave = await autenticar(request)
+    cuota = await estado_cuota(llave)
+    return JSONResponse({"llave": llave["prefijo"], "nombre": llave["nombre"], "plan": llave["plan_codigo"],
+                         "alcances": list(llave["alcances"]), "consultas_por_minuto": llave["rpm"], "cuota": cuota},
+                        headers={**SIN_CACHE, **_cab_cuota(cuota)})
 
 
 async def asegurar_esquema():
