@@ -1,0 +1,85 @@
+{% extends "club/base.html" %}
+{% set hoja = "panel_llaves" %}
+{% block titulo %}Llaves de la API · Panel{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Fórmula">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">=</span>LLAVES(API; cuota; consumo)</div>
+  </section>
+
+  {% if nueva %}
+  <section class="panel llave-nueva" aria-label="Llave creada">
+    <header class="panel-cab"><b style="color:var(--lv-gratis)">Llave creada: {{ nueva.nombre }}</b>
+      <span>Cópiala ahora: es la única vez que se muestra completa.</span></header>
+    <div class="panel-cuerpo">
+      <div class="llave-caja"><code id="llaveNueva">{{ nueva.llave }}</code>
+        <button type="button" class="btn-ver" id="bCopiarLlave">Copiar</button></div>
+      <p class="nota">Se usa en la cabecera <span class="mono">Authorization: Bearer &lt;llave&gt;</span>. Si se pierde, revócala y crea otra.</p>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if aviso %}<div class="msg info">{{ aviso }}</div>{% endif %}
+  {% if errores %}<div class="msg err">{% for e in errores %}{{ e }}<br>{% endfor %}</div>{% endif %}
+  {% if not api_abierta %}<div class="msg info">La API está <b>cerrada</b> al público (API_ABIERTA): puedes preparar llaves; empezarán a responder cuando se abra.</div>{% endif %}
+
+  <section class="panel" aria-label="Llaves">
+    <header class="panel-cab"><b>Llaves de la API</b><span>{{ llaves|length }} llave{{ "" if llaves|length == 1 else "s" }} · esquema <span class="mono">{{ esquema }}</span></span></header>
+    <div class="tabla-wrap"><table class="tabla">
+      <thead><tr><th>Llave</th><th>Nombre</th><th>Plan</th><th>Estado</th><th>Este mes</th><th>Llamadas 30 días</th><th>Último uso</th></tr></thead>
+      <tbody>
+      {% for k in llaves %}
+        <tr>
+          <td class="mono"><a href="/panel/llaves/{{ k.prefijo }}">{{ k.prefijo }}</a></td>
+          <td>{{ k.nombre }}{% if k.cliente_ruc %} <span class="faint mono">· {{ k.cliente_ruc }}</span>{% endif %}</td>
+          <td>{{ k.plan_codigo }}{% if "ssco_representantes" in k.alcances %} <span class="faint">+ representantes</span>{% endif %}</td>
+          <td><span class="chip-sem {{ {'activa': 'verde', 'suspendida': 'amarillo', 'revocada': 'gris'}[k.estado] }}"><s class="sem {{ {'activa': 'verde', 'suspendida': 'amarillo', 'revocada': 'gris'}[k.estado] }}"></s>{{ k.estado }}</span></td>
+          <td class="mono">{{ k.usada_mes }} / {{ k.cuota_mes }}</td>
+          <td class="mono">{{ k.llamadas_30d }}{% if k.errores_30d %} <span class="faint">({{ k.errores_30d }} con error)</span>{% endif %}</td>
+          <td class="mono">{{ k.ultima_vez.strftime("%d/%m/%Y %H:%M") if k.ultima_vez else "—" }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="faint">Todavía no hay llaves.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="panel" aria-label="Crear llave" style="margin-top:12px">
+    <header class="panel-cab"><b>Crear una llave</b><span>Para una integración: una hoja de cálculo, un sistema, un bot.</span></header>
+    <form class="panel-cuerpo" method="post" action="/panel/llaves/crear">
+      <div class="campo"><label for="nombre">Nombre</label>
+        <input id="nombre" name="nombre" maxlength="80" required placeholder="Hoja de proveedores · Estudio Pérez" value="{{ previo.nombre if previo else '' }}"></div>
+      <div class="ver-acciones">
+        <div class="campo"><label for="plan">Plan</label>
+          <select id="plan" name="plan">
+            <option value="gratis" {% if not previo or previo.plan == 'gratis' %}selected{% endif %}>gratis</option>
+            <option value="pago" {% if previo and previo.plan == 'pago' %}selected{% endif %}>pago</option>
+          </select></div>
+        <div class="campo"><label for="cuota">Consultas por mes</label>
+          <input id="cuota" name="cuota" inputmode="numeric" placeholder="{{ cuota_gratis }} (gratis)" value="{{ previo.cuota if previo else '' }}"></div>
+        <div class="campo"><label for="rpm">Por minuto</label>
+          <input id="rpm" name="rpm" inputmode="numeric" placeholder="{{ rpm_defecto }}" value="{{ previo.rpm if previo else '' }}"></div>
+        <div class="campo"><label for="cliente_ruc">RUC del cliente (opcional)</label>
+          <input id="cliente_ruc" name="cliente_ruc" inputmode="numeric" maxlength="11" value="{{ previo.cliente_ruc if previo else '' }}"></div>
+      </div>
+      {% for a, texto in alcances_panel %}
+      <label class="check-simple"><input type="checkbox" name="alcances" value="{{ a }}"> {{ texto }}</label>
+      {% endfor %}
+      <p class="nota" style="margin:0">Plan gratis: si dejas la cuota vacía, toma {{ cuota_gratis }} al mes (variable API_CUOTA_GRATIS_MES). Plan pago: la cuota es obligatoria.</p>
+      <div><button class="btn-ver" type="submit">Crear llave →</button></div>
+    </form>
+  </section>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const b = document.getElementById("bCopiarLlave");
+  if (b) b.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(document.getElementById("llaveNueva").textContent.trim()); b.textContent = "Copiada ✓"; }
+    catch (e) { b.textContent = "Selecciónala y copia"; }
+  });
+})();
+</script>
+{% endblock %}

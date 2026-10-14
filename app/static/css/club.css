@@ -421,3 +421,15 @@ a { color: inherit; }
 .ver-dist { border-bottom: 1px dotted var(--faint); cursor: help; }
 @media (max-width: 640px) { .ver-copiar-todo { margin-left: 0; } }
 @media (max-width: 640px) { .ver-tabla tr.fila td.ver-marca.no { text-align: left; } }
+
+/* Panel de llaves de la API */
+.llave-caja { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; background: var(--bg);
+  border: 1px dashed var(--lv-gratis); }
+.llave-caja code { font-family: var(--mono); font-size: 1.05em; word-break: break-all; color: var(--fg); }
+.llave-datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 16px; margin: 0; }
+.llave-datos dt { color: var(--muted); font-size: .82em; text-transform: uppercase; letter-spacing: .06em; }
+.llave-datos dd { margin: 2px 0 0; }
+.check-simple { display: flex; gap: 8px; align-items: center; color: var(--fg); }
+.btn-sec, .btn-peligro { all: unset; cursor: pointer; padding: 7px 14px; border: 1px solid var(--grid); color: var(--fg); background: var(--cell-2); }
+.btn-peligro { border-color: color-mix(in srgb, var(--sem-rojo) 60%, var(--grid)); color: color-mix(in srgb, var(--sem-rojo) 80%, var(--fg)); }
+.btn-sec:hover, .btn-peligro:hover { filter: brightness(1.15); }

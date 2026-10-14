@@ -1,0 +1,74 @@
+{% extends "club/base.html" %}
+{% set hoja = "panel_llaves" %}
+{% block titulo %}{{ k.prefijo }} · Llaves de la API{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Fórmula">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">=</span>CONSUMO("{{ k.prefijo }}")</div>
+  </section>
+  <p style="margin:0 0 10px"><a href="/panel/llaves">← Todas las llaves</a></p>
+  {% if aviso %}<div class="msg info">{{ aviso }}</div>{% endif %}
+
+  <section class="panel" aria-label="Llave">
+    <header class="panel-cab"><b>{{ k.nombre }}</b><span class="mono">{{ k.prefijo }}</span>
+      <span class="chip-sem {{ {'activa': 'verde', 'suspendida': 'amarillo', 'revocada': 'gris'}[k.estado] }}"><s class="sem {{ {'activa': 'verde', 'suspendida': 'amarillo', 'revocada': 'gris'}[k.estado] }}"></s>{{ k.estado }}</span></header>
+    <div class="panel-cuerpo">
+      <dl class="llave-datos">
+        <div><dt>Plan</dt><dd>{{ k.plan_codigo }}</dd></div>
+        <div><dt>Alcances</dt><dd class="mono">{{ k.alcances|join(", ") }}</dd></div>
+        <div><dt>Cliente</dt><dd class="mono">{{ k.cliente_ruc or "—" }}</dd></div>
+        <div><dt>Este mes</dt><dd class="mono">{{ cuota.usada }} de {{ cuota.limite }} · quedan {{ cuota.restante }} · reinicia {{ cuota.reinicio }}</dd></div>
+        <div><dt>Por minuto</dt><dd class="mono">{{ k.rpm }}</dd></div>
+        <div><dt>Creada</dt><dd class="mono">{{ k.creada_en.strftime("%d/%m/%Y %H:%M") }} · {{ k.creada_por or "—" }}</dd></div>
+        <div><dt>Último uso</dt><dd class="mono">{{ k.ultima_vez.strftime("%d/%m/%Y %H:%M") if k.ultima_vez else "—" }}</dd></div>
+        {% if k.revocada_en %}<div><dt>Revocada</dt><dd class="mono">{{ k.revocada_en.strftime("%d/%m/%Y %H:%M") }}</dd></div>{% endif %}
+      </dl>
+      {% if k.estado != "revocada" %}
+      <div class="ver-acciones">
+        {% if k.estado == "activa" %}
+        <form method="post" action="/panel/llaves/{{ k.prefijo }}/suspender"><button class="btn-sec" type="submit">Suspender</button></form>
+        {% else %}
+        <form method="post" action="/panel/llaves/{{ k.prefijo }}/reactivar"><button class="btn-sec" type="submit">Reactivar</button></form>
+        {% endif %}
+        <form method="post" action="/panel/llaves/{{ k.prefijo }}/revocar"
+              onsubmit="return confirm('¿Revocar {{ k.prefijo }}? Es definitivo: la integración dejará de funcionar.')">
+          <button class="btn-peligro" type="submit">Revocar</button></form>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if k.estado != "revocada" %}
+  <section class="panel" aria-label="Ajustar" style="margin-top:12px">
+    <header class="panel-cab"><b>Ajustar</b><span>Cuota, ritmo y alcances (se aplican de inmediato)</span></header>
+    <form class="panel-cuerpo" method="post" action="/panel/llaves/{{ k.prefijo }}/ajustar">
+      <div class="ver-acciones">
+        <div class="campo"><label for="cuota">Consultas por mes</label><input id="cuota" name="cuota" inputmode="numeric" value="{{ k.cuota_mes }}"></div>
+        <div class="campo"><label for="rpm">Por minuto</label><input id="rpm" name="rpm" inputmode="numeric" value="{{ k.rpm }}"></div>
+      </div>
+      {% for a, texto in alcances_panel %}
+      <label class="check-simple"><input type="checkbox" name="alcances" value="{{ a }}" {% if a in k.alcances %}checked{% endif %}
+        {% if k.plan_codigo == "gratis" %}disabled{% endif %}> {{ texto }}{% if k.plan_codigo == "gratis" %} <span class="faint">(no disponible en el plan gratis)</span>{% endif %}</label>
+      {% endfor %}
+      <div><button class="btn-ver" type="submit">Guardar</button></div>
+    </form>
+  </section>
+  {% endif %}
+
+  <section class="panel" aria-label="Consumo" style="margin-top:12px">
+    <header class="panel-cab"><b>Consumo de los últimos 30 días</b><span>Conteos: la bitácora no guarda qué RUC se consultó</span></header>
+    <div class="tabla-wrap"><table class="tabla">
+      <thead><tr><th>Día</th><th>Llamadas</th><th>Consultas cobradas</th><th>No encontrados</th><th>Inválidos</th><th>Rechazados (429)</th></tr></thead>
+      <tbody>
+      {% for d in dias %}
+        <tr><td class="mono">{{ d.dia.strftime("%d/%m/%Y") }}</td><td class="mono">{{ d.llamadas }}</td><td class="mono">{{ d.unidades }}</td>
+            <td class="mono">{{ d.no_encontrados }}</td><td class="mono">{{ d.invalidos }}</td><td class="mono">{{ d.rechazados }}</td></tr>
+      {% else %}
+        <tr><td colspan="6" class="faint">Sin uso en los últimos 30 días.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% if meses %}<p class="nota" style="padding:8px 12px;margin:0">Por mes: {% for m in meses %}<span class="mono">{{ m.mes.strftime("%m/%Y") }}: {{ m.unidades }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+  </section>
+{% endblock %}
