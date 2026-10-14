@@ -41,7 +41,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import club, db
@@ -60,11 +60,130 @@ _LLAVE_RE = re.compile(r"^(psp_live_[a-z0-9]{8})_[A-Za-z0-9_-]{20,}$")
 _SUFIJO_ENTIDAD = re.compile(r"\s*/\s*SUNAT\s*$", re.I)
 SIN_CACHE = {"Cache-Control": "private, no-store", "X-Robots-Tag": "noindex"}
 
+GUIA = """
+Consulta de RUC con semáforos: **estado** del contribuyente, **condición de domicilio**, **SSCO**
+(con la fecha en que la resolución quedó firme), contador, negocio nuevo, distrito y domicilio.
+Solo lectura. Se consulta únicamente por RUC.
+
+## Autenticación
+Cada integración usa su llave, en la cabecera:
+
+    Authorization: Bearer psp_live_xxxxxxxx_…
+
+(también se acepta `X-API-Key: psp_live_…`). La llave **nunca** va en la URL. Usa el botón
+**Authorize** de esta página para probar con la tuya.
+
+## Cuota y ritmo
+- Cada llave tiene una cuota de consultas por mes calendario (hora de Lima) y un tope por minuto.
+- Consume **una consulta por cada RUC válido**, se encuentre o no. No consumen: la llave inválida,
+  el RUC mal formado, el exceso de ritmo ni la cuota agotada.
+- En el lote, la cuota se descuenta **todo o nada**: si no alcanza, no se procesa nada.
+- Toda respuesta trae `X-Cuota-Limite`, `X-Cuota-Usada`, `X-Cuota-Restante` y `X-Cuota-Reinicio`.
+- No registramos **qué** RUC consultas: solo cuántas consultas haces.
+
+## Errores
+Siempre `{"error": {"codigo": "…", "mensaje": "…"}}`:
+
+| HTTP | codigo | Cuándo |
+|---|---|---|
+| 401 | `llave_invalida` | Falta la llave o no es válida |
+| 403 | `llave_revocada`, `sin_alcance` | Llave revocada o suspendida; o sin permiso para ese recurso |
+| 404 | `ruc_no_encontrado` | El RUC es válido pero no figura (consume) |
+| 413 | `lote_muy_grande` | Más RUC distintos que el tope del lote |
+| 422 | `ruc_invalido`, `sin_rucs_validos`, `solicitud_invalida` | Formato incorrecto (no consume) |
+| 429 | `cuota_agotada` (trae `reinicio`), `demasiado_rapido` (trae `Retry-After`) | Cuota del mes o ritmo |
+
+## Formatos
+- Por defecto, JSON anidado. `?formato=plano` lo devuelve en un solo nivel (`estado_nombre`,
+  `ssco_firme`, `distrito`…), ideal para hojas de cálculo.
+- Las fechas van como `AAAA-MM-DD`. `datos_al` y `cortes` dicen a qué fecha corresponde cada dato.
+
+## Google Sheets
+Descarga el script en [`/api/v1/sheets/RUC.gs`](sheets/RUC.gs): en tu hoja, *Extensiones → Apps
+Script*, pégalo y guarda. Luego el menú *Perú Sistemas Pro → Configurar llave*. Funciones:
+`=RUC(A2)`, `=RUC(A2; "estado")`, `=RUCS(A2:A200)` y `=RUC_SALDO()`.
+"""
+SCRIPT_SHEETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             "integraciones", "google-sheets", "RUC.gs")
+
 app = FastAPI(
-    title="API Perú Sistemas Pro", version="1.0",
-    description="Consulta de RUC con semáforos: estado, condición de domicilio, SSCO y más. "
-                "Autenticación con llave: `Authorization: Bearer psp_live_…`.",
-    docs_url="/docs", redoc_url=None, openapi_url="/openapi.json")
+    title="API Perú Sistemas Pro", version="1.0", description=GUIA,
+    contact={"name": "Perú Sistemas Pro", "url": "https://club.perusistemas.pro"},
+    servers=[{"url": "/api/v1"}],
+    docs_url=None, redoc_url=None, openapi_url="/openapi.json")
+
+# Tema oscuro de la documentacion (colores del Club, sepia). Nunca fondo blanco.
+_CSS_DOCS = """
+body{background:#14110e;margin:0}
+.swagger-ui{color:#e8e1d6;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.swagger-ui .wrapper{max-width:1180px}
+.swagger-ui .info{margin:28px 0}
+.swagger-ui .info .title,.swagger-ui .info h1,.swagger-ui .info h2,.swagger-ui .info h3,.swagger-ui .info h4,
+.swagger-ui .info p,.swagger-ui .info li,.swagger-ui .info table,.swagger-ui .info td,.swagger-ui .info th,
+.swagger-ui .opblock-tag,.swagger-ui .opblock .opblock-summary-path,.swagger-ui .opblock .opblock-summary-description,
+.swagger-ui .opblock-description-wrapper p,.swagger-ui .opblock-title_normal p,.swagger-ui .response-col_status,
+.swagger-ui .response-col_description,.swagger-ui .parameter__name,.swagger-ui .parameter__type,.swagger-ui label,
+.swagger-ui .tab li,.swagger-ui .responses-inner h4,.swagger-ui .responses-inner h5,.swagger-ui .opblock-section-header h4,
+.swagger-ui table thead tr th,.swagger-ui table thead tr td,.swagger-ui .servers-title,.swagger-ui .scheme-container label,
+.swagger-ui .dialog-ux .modal-ux-header h3,.swagger-ui .dialog-ux .modal-ux-content p,.swagger-ui .dialog-ux .modal-ux-content h4,
+.swagger-ui .auth-container h4,.swagger-ui .auth-container label,.swagger-ui .markdown p,.swagger-ui .renderedMarkdown p,
+.swagger-ui .markdown li,.swagger-ui .renderedMarkdown li,.swagger-ui .response-control-media-type__title,
+.swagger-ui .parameters-col_description,.swagger-ui .model,.swagger-ui .model-title,.swagger-ui .prop-type{color:#e8e1d6}
+.swagger-ui .info a,.swagger-ui a.nostyle,.swagger-ui .markdown a,.swagger-ui .renderedMarkdown a{color:#7cc4e4}
+.swagger-ui .info .title small{background:#3a3128}.swagger-ui .info .title small.version-stamp{background:#6c8f3c}
+.swagger-ui code,.swagger-ui .markdown code,.swagger-ui .renderedMarkdown code,.swagger-ui .info code{background:#2a231c;color:#e6b673;border-radius:3px}
+.swagger-ui .info pre,.swagger-ui .markdown pre{background:#0f0d0b;border:1px solid #3a3128}
+.swagger-ui .info table td,.swagger-ui .info table th,.swagger-ui table tbody tr td{border-color:#3a3128;color:#d8cfc2}
+.swagger-ui .scheme-container{background:#1d1915;box-shadow:none;border:1px solid #3a3128}
+.swagger-ui .opblock-tag{border-bottom-color:#3a3128}
+.swagger-ui .opblock{background:#1a1612;border-color:#3a3128;box-shadow:none}
+.swagger-ui .opblock .opblock-section-header{background:#211c17;box-shadow:none}
+.swagger-ui .opblock.opblock-get{border-color:#3d6f86;background:#16191a}
+.swagger-ui .opblock.opblock-post{border-color:#4f7a3a;background:#161a14}
+.swagger-ui .opblock-body pre.microlight,.swagger-ui .highlight-code>.microlight{background:#0f0d0b!important}
+.swagger-ui input[type=text],.swagger-ui input[type=password],.swagger-ui textarea,.swagger-ui select{background:#0f0d0b;color:#e8e1d6;border:1px solid #3a3128}
+.swagger-ui .btn{color:#e8e1d6;border-color:#5a4c3d;background:transparent;box-shadow:none}
+.swagger-ui .btn.authorize{color:#9bd17a;border-color:#9bd17a}.swagger-ui .btn.authorize svg{fill:#9bd17a}
+.swagger-ui .btn.execute{background:#3d6f86;border-color:#3d6f86}
+.swagger-ui .dialog-ux .modal-ux{background:#1d1915;border:1px solid #3a3128}
+.swagger-ui .dialog-ux .modal-ux-header{border-bottom-color:#3a3128}
+.swagger-ui .dialog-ux .backdrop-ux{background:rgba(0,0,0,.7)}
+.swagger-ui .arrow,.swagger-ui .expand-operation svg,.swagger-ui .authorization__btn svg,.swagger-ui .opblock-control-arrow svg{fill:#d8cfc2}
+.swagger-ui .responses-table .response,.swagger-ui .parameters-container,.swagger-ui .responses-wrapper{background:transparent}
+.swagger-ui .tab li button.tablinks{color:#e8e1d6}
+.swagger-ui section.models{border-color:#3a3128}
+"""
+
+
+@app.get("/docs", include_in_schema=False)
+async def documentacion():
+    from fastapi.openapi.docs import get_swagger_ui_html
+    html = get_swagger_ui_html(openapi_url="/api/v1/openapi.json", title="API Perú Sistemas Pro · Documentación",
+                               swagger_ui_parameters={"defaultModelsExpandDepth": -1, "tryItOutEnabled": True,
+                                                      "syntaxHighlight": {"theme": "monokai"}})
+    cuerpo = html.body.decode("utf-8").replace("</head>", f"<meta name=\"color-scheme\" content=\"dark\"><style>{_CSS_DOCS}</style></head>", 1)
+    return HTMLResponse(cuerpo, headers={"Cache-Control": "public, max-age=600"})
+
+
+def _openapi():
+    """Esquema con las dos formas de enviar la llave (boton Authorize de la documentacion)."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    from fastapi.openapi.utils import get_openapi
+    esq = get_openapi(title=app.title, version=app.version, description=app.description, routes=app.routes,
+                      contact=app.contact, servers=app.servers)
+    esq.setdefault("components", {})["securitySchemes"] = {
+        "llave": {"type": "http", "scheme": "bearer", "description": "Tu llave: psp_live_…"},
+        "x_api_key": {"type": "apiKey", "in": "header", "name": "X-API-Key"}}
+    for ruta, metodos in esq.get("paths", {}).items():
+        for op in metodos.values():
+            if not ruta.startswith("/sheets"):
+                op["security"] = [{"llave": []}, {"x_api_key": []}]
+    app.openapi_schema = esq
+    return esq
+
+
+app.openapi = _openapi
 
 
 class ErrorApi(Exception):
@@ -254,7 +373,31 @@ def _plano(d: dict) -> dict:
 
 
 # --- Endpoints ---------------------------------------------------------------------------
-@app.get("/ruc/{ruc}", summary="Consulta un RUC", tags=["RUC"])
+_EJ_ERROR = lambda codigo, mensaje: {"application/json": {"example": {"error": {"codigo": codigo, "mensaje": mensaje}}}}
+_EJ_RUC = {"ruc": "20607011274", "encontrado": True, "razon_social": "INVERSIONES NUEVA LINEA E.I.R.L.",
+           "estado": {"codigo": "ACTIVO", "nombre": "Activo", "semaforo": "verde"},
+           "condicion": {"codigo": "HABIDO", "nombre": "Habido", "semaforo": "verde"}, "semaforo": "rojo",
+           "ubigeo": "080106", "departamento": "CUSCO", "provincia": "CUSCO", "distrito": "SANTIAGO",
+           "domicilio": "CAL. TARAPACA MZA. C LOTE. 1 URB. PRIMAVERA - CUSCO - CUSCO - SANTIAGO",
+           "marcas": {"ssco": {"desde": "2026-09-18", "resolucion": "Resolución de Intendencia N.º 094-024-0004915",
+                               "emision": "2026-09-03", "firme": "2026-09-18", "publicacion": "2026-09-30"},
+                      "contador": None, "negocio_nuevo": None},
+           "anexos": {"total": 0}, "datos_al": "2026-10-10",
+           "cortes": {"ssco": "2026-09-30", "contador": "2026-09-17", "negocio_nuevo": "2026-08-31"}}
+_RESP_COMUNES = {
+    401: {"description": "Llave inválida", "content": _EJ_ERROR("llave_invalida", "Falta la llave o no es válida.")},
+    403: {"description": "Llave revocada o sin alcance", "content": _EJ_ERROR("llave_revocada", "Esta llave está revocada o suspendida.")},
+    429: {"description": "Cuota agotada o demasiado rápido", "content": {"application/json": {"example": {"error": {
+        "codigo": "cuota_agotada", "mensaje": "Llegaste a tu cuota del mes (100 consultas). Se reinicia el 2026-11-01.",
+        "reinicio": "2026-11-01", "restante": 0, "solicitadas": 1}}}}}}
+
+
+@app.get("/ruc/{ruc}", summary="Consulta un RUC", tags=["RUC"], responses={
+    200: {"description": "El RUC con sus semáforos. Los representantes legales del SSCO solo van en planes pagados.",
+          "content": {"application/json": {"example": _EJ_RUC}}},
+    404: {"description": "RUC válido que no figura (consume)", "content": _EJ_ERROR("ruc_no_encontrado", "Ese RUC no figura en nuestros datos.")},
+    422: {"description": "RUC mal formado (no consume)", "content": _EJ_ERROR("ruc_invalido", "Un RUC tiene 11 dígitos y empieza en 10, 15, 17 o 20.")},
+    **_RESP_COMUNES})
 async def ruc(ruc: str, request: Request, anexos: int = 0, formato: str = ""):
     """Estado, condición de domicilio, distrito, domicilio y marcas (SSCO con sus fechas,
     contador, negocio nuevo) de un RUC. `?anexos=1` agrega los locales anexos (hasta 100) y
@@ -304,7 +447,14 @@ def _normalizar(valor) -> str:
     return str(valor if valor is not None else "").strip()
 
 
-@app.post("/ruc/lote", summary="Consulta varios RUC de una vez", tags=["RUC"])
+@app.post("/ruc/lote", summary="Consulta varios RUC de una vez", tags=["RUC"], responses={
+    200: {"description": "Un resultado por RUC válido distinto, en el orden recibido.", "content": {"application/json": {"example": {
+        "resultados": [_EJ_RUC, {"ruc": "20999999990", "encontrado": False}], "no_validos": [{"valor": "123", "motivo": "ruc_invalido"}],
+        "resumen": {"solicitados": 3, "validos": 2, "encontrados": 1, "no_encontrados": 1, "con_alerta": 1},
+        "datos_al": "2026-10-10", "cortes": {"ssco": "2026-09-30", "contador": "2026-09-17", "negocio_nuevo": "2026-08-31"}}}}},
+    413: {"description": "Demasiados RUC distintos", "content": _EJ_ERROR("lote_muy_grande", "Envía hasta 100 RUC distintos por lote.")},
+    422: {"description": "Ningún RUC válido o cuerpo mal formado", "content": _EJ_ERROR("sin_rucs_validos", "El lote no trae ningún RUC válido.")},
+    **_RESP_COMUNES})
 async def ruc_lote(cuerpo: Lote, request: Request, formato: str = ""):
     """Hasta API_MAX_LOTE RUC distintos por llamada, en el orden en que llegan (los repetidos
     cuentan una vez). Consume una consulta por cada RUC valido, encuentre o no; los no
@@ -358,7 +508,19 @@ async def ruc_lote(cuerpo: Lote, request: Request, formato: str = ""):
     return JSONResponse(out, headers={**SIN_CACHE, **_cab_cuota(cuota)})
 
 
-@app.get("/yo", summary="Tu llave: plan, cuota y consumo", tags=["Cuenta"])
+@app.get("/sheets/RUC.gs", summary="Script para Google Sheets", tags=["Google Sheets"],
+         response_class=PlainTextResponse, responses={200: {"content": {"text/plain": {}}}})
+async def script_sheets():
+    """El archivo de Apps Script con `=RUC()`, `=RUCS()` y `=RUC_SALDO()`. Pégalo en
+    *Extensiones → Apps Script* de tu hoja. No necesita llave para descargarlo."""
+    return PlainTextResponse(open(SCRIPT_SHEETS, encoding="utf-8").read(), headers={
+        "Content-Disposition": 'inline; filename="RUC.gs"', "Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/yo", summary="Tu llave: plan, cuota y consumo", tags=["Cuenta"], responses={
+    200: {"content": {"application/json": {"example": {"llave": "psp_live_a1b2c3d4", "nombre": "Hoja de proveedores", "plan": "gratis",
+          "alcances": ["ruc"], "consultas_por_minuto": 60,
+          "cuota": {"limite": 100, "usada": 37, "restante": 63, "reinicio": "2026-11-01"}}}}}, 401: _RESP_COMUNES[401]})
 async def yo(request: Request):
     """Plan, alcances y cuota del mes de la llave con que llamas. No consume cuota."""
     llave = await autenticar(request)
