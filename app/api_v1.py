@@ -15,7 +15,7 @@ Configuracion:
   API_ABIERTA=1                sin esto, todo /api/v1 responde 404
   API_CUOTA_GRATIS_MES=100     cuota por defecto del plan gratis (provisional)
   API_RPM_DEFECTO=60           consultas por minuto por llave
-  API_MAX_LOTE=100             (el lote llega en el paso 3)
+  API_MAX_LOTE=100             RUC distintos y validos por lote
 Usa el esquema del Verificador (VERIFICADOR_ESQUEMA).
 
 Cada llamada autenticada: ritmo -> validar -> descontar cuota -> consultar -> bitacora.
@@ -36,7 +36,10 @@ import secrets
 import time
 from collections import deque
 
+from typing import Any
+
 from fastapi import FastAPI, Request
+from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -285,6 +288,74 @@ async def ruc(ruc: str, request: Request, anexos: int = 0, formato: str = ""):
     out = _ruc_json(f, llave, datos, bool(anexos))
     await bitacora(request, llave, "ruc", 1, 200, t0)
     return JSONResponse(_plano(out) if formato == "plano" else out, headers=cab)
+
+
+class Lote(BaseModel):
+    rucs: list[Any] = Field(..., description="RUC como texto o como número (p. ej. desde una hoja de cálculo).",
+                            examples=[["20607011274", 20100047218]])
+
+
+def _normalizar(valor) -> str:
+    """Un RUC venga como texto o como numero (las hojas de calculo mandan 20607011274.0)."""
+    if isinstance(valor, bool):
+        return str(valor)
+    if isinstance(valor, float) and valor.is_integer():
+        return str(int(valor))
+    return str(valor if valor is not None else "").strip()
+
+
+@app.post("/ruc/lote", summary="Consulta varios RUC de una vez", tags=["RUC"])
+async def ruc_lote(cuerpo: Lote, request: Request, formato: str = ""):
+    """Hasta API_MAX_LOTE RUC distintos por llamada, en el orden en que llegan (los repetidos
+    cuentan una vez). Consume una consulta por cada RUC valido, encuentre o no; los no
+    validos se devuelven aparte y no consumen. Si la cuota no alcanza para todo el lote, no
+    se procesa nada (429). `?formato=plano` aplana cada resultado."""
+    t0 = time.monotonic()
+    llave = await autenticar(request)
+    if "ruc" not in llave["alcances"]:
+        raise ErrorApi(403, "sin_alcance", "Tu llave no incluye la consulta de RUC.")
+    try:
+        ritmo(llave)
+    except ErrorApi as e:
+        await bitacora(request, llave, "ruc", 0, e.http, t0)
+        raise
+    if len(cuerpo.rucs) > MAX_LOTE * 5:
+        await bitacora(request, llave, "ruc", 0, 413, t0)
+        raise ErrorApi(413, "lote_muy_grande", f"Envía hasta {MAX_LOTE} RUC por lote.", maximo=MAX_LOTE)
+    validos, vistos, no_validos = [], set(), []
+    for v in cuerpo.rucs:
+        x = _normalizar(v)
+        if not P.RUC_RE.match(x):
+            no_validos.append({"valor": x[:20], "motivo": "ruc_invalido"})
+        elif x not in vistos:
+            vistos.add(x)
+            validos.append(x)
+    if len(validos) > MAX_LOTE:
+        await bitacora(request, llave, "ruc", 0, 413, t0)
+        raise ErrorApi(413, "lote_muy_grande", f"Envía hasta {MAX_LOTE} RUC distintos por lote (llegaron {len(validos)}).",
+                       _cab_cuota(await estado_cuota(llave)), maximo=MAX_LOTE, recibidos=len(validos))
+    if not validos:
+        await bitacora(request, llave, "ruc", 0, 422, t0)
+        raise ErrorApi(422, "sin_rucs_validos", "El lote no trae ningún RUC válido (11 dígitos, empieza en 10, 15, 17 o 20).",
+                       _cab_cuota(await estado_cuota(llave)), no_validos=no_validos[:20])
+    try:
+        cuota = await consumir(llave, len(validos))
+    except ErrorApi as e:
+        await bitacora(request, llave, "ruc", 0, e.http, t0)
+        raise
+    datos = await V.consultar(validos, iso=True, anexos_max=0)
+    resultados = []
+    for f in datos["filas"]:
+        r = _ruc_json(f, llave, datos, False) if f["encontrado"] else {"ruc": f["ruc"], "encontrado": False}
+        resultados.append(_plano(r) if formato == "plano" else r)
+    encontrados = [f for f in datos["filas"] if f["encontrado"]]
+    out = {"resultados": resultados, "no_validos": no_validos,
+           "resumen": {"solicitados": len(cuerpo.rucs), "validos": len(validos), "encontrados": len(encontrados),
+                       "no_encontrados": len(validos) - len(encontrados),
+                       "con_alerta": sum(1 for f in encontrados if f["semaforo"] == "rojo")},
+           "datos_al": datos["datos_al"], "cortes": {c["codigo"]: c["corte"] for c in datos["columnas"]}}
+    await bitacora(request, llave, "ruc", len(validos), 200, t0)
+    return JSONResponse(out, headers={**SIN_CACHE, **_cab_cuota(cuota)})
 
 
 @app.get("/yo", summary="Tu llave: plan, cuota y consumo", tags=["Cuenta"])
