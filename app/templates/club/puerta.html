@@ -128,7 +128,12 @@
       $("fRe").onsubmit = async e => {
         e.preventDefault();
         const { r, d: x } = await post("/api/club/reingresar", { ruc: d.ruc, correo: $("reCorreo").value, siguiente: SIG });
-        if (r.ok && x.ok) location.href = x.link; else $("reMsg").innerHTML = msg(esc(x.error || "No pudimos entrar."), "err");
+        if (r.ok && x.ok) { location.href = x.link; return; }
+        if (x.accion === "ingresar" || x.accion === "activar") {
+          $("reMsg").innerHTML = msg(`${esc(x.error)} <a href="${esc(x.link)}"><b>${x.accion === "ingresar" ? "Ingresar con mi DNI" : "Crear mi clave"} →</b></a>`);
+          return;
+        }
+        $("reMsg").innerHTML = msg(esc(x.error || "No pudimos entrar."), "err");
       };
     } else {   // escribenos: RUC invalido o inexistente en SUNAT
       res.innerHTML = msg(`${esc(d.mensaje)}<br>WhatsApp: <b class="mono">${esc(WA)}</b> · <a href="https://wa.me/51${esc(WA)}" target="_blank" rel="noopener">Escríbenos</a>`, "err");

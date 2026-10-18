@@ -18,6 +18,7 @@
   <header class="top">
     <a class="marca" href="{{ inicio or "/club" }}" style="text-decoration:none"><b>Club de Contadores</b><span>club.perusistemas.pro</span></a>
     <span class="sp"></span>
+    {% if s and s.admin %}<a class="btn-dir" href="/panel/llaves" title="Panel de administración">Panel</a>{% endif %}
     {% if s and s.rol == "contador" %}
       <a class="btn-dir{% if not s.ubigeo %} sin{% endif %}" href="/directorio" {% block dir_actual %}{% endblock %}>
         Contadores de tu distrito{% if s.distrito %} <span>{{ s.distrito }} →</span>{% endif %}</a>

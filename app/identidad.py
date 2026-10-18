@@ -47,6 +47,9 @@ COOKIE = "club_id"
 DURACION = 30 * 86400                      # Fase 1. Con Facturalo (Fase 2) se acorta.
 SECRETO = os.getenv("SESION_SECRET", "").strip()
 REGISTRO_ABIERTO = os.getenv("IDENTIDAD_REGISTRO_ABIERTO", "0").strip() == "1"
+# Ingresar (DNI + clave) y activar (migrados que crean su clave) van APARTE del registro de
+# cuentas nuevas: quien ya tiene cuenta entra aunque el registro siga cerrado. Abierto por defecto.
+INGRESO_ABIERTO = os.getenv("IDENTIDAD_INGRESO_ABIERTO", "1").strip() == "1"
 # Pase de prueba: con el registro cerrado, abre la identidad SOLO en el navegador que canjeo el
 # enlace secreto (?pase=IDENTIDAD_PASE) y SOLO para los DNI de IDENTIDAD_DNI_PRUEBA. El resto ve
 # "muy pronto". Sin IDENTIDAD_PASE no existe.
@@ -207,6 +210,11 @@ def abierto_para(request: Request, dni: str | None = None) -> bool:
     if REGISTRO_ABIERTO:
         return True
     return _pase_ok(request) and (dni is None or dni in DNI_PRUEBA)
+
+
+def ingreso_para(request: Request, dni: str | None = None) -> bool:
+    """Ingresar y activar: abiertos con INGRESO_ABIERTO (o con el registro abierto, o con el pase)."""
+    return INGRESO_ABIERTO or abierto_para(request, dni)
 
 
 def _canjear_pase(request: Request):
@@ -502,7 +510,8 @@ async def socio_desde_persona(request: Request) -> dict | None:
     a = dict(a) if a else {}
     act = a.get("actividad")
     return {
-        "fuente": "persona", "id": str(a["id"]) if a else str(p["id"]), "persona_id": str(p["id"]),
+        "fuente": "persona", "admin": p["dni"] in ADMIN_DNI,
+        "id": str(a["id"]) if a else str(p["id"]), "persona_id": str(p["id"]),
         "acceso_id": str(a["id"]) if a else None, "dni": p["dni"], "rol": a.get("perfil") or "contador",
         "ruc": a.get("ruc"), "razon_social": a.get("razon_social") or p["nombre_completo"],
         "nombre_comercial": a.get("nombre_comercial"), "ubigeo": a.get("ubigeo"),
@@ -544,7 +553,7 @@ async def pagina_registro(request: Request):
 
 @router.get("/ingresar", response_class=HTMLResponse)
 async def pagina_ingresar(request: Request):
-    if not abierto_para(request):
+    if not ingreso_para(request):
         return _canjear_pase(request) or club.templates.TemplateResponse(
             request, "club/pronto.html", _ctx(request, que="El ingreso con DNI"))
     if await persona_actual(request):
@@ -584,7 +593,7 @@ async def _ip_bloqueada(ip: str | None) -> bool:
 
 @router.get("/activar", response_class=HTMLResponse)
 async def pagina_activar(request: Request):
-    if not abierto_para(request):
+    if not ingreso_para(request):
         return _canjear_pase(request) or club.templates.TemplateResponse(
             request, "club/pronto.html", _ctx(request, que="La activación de tu cuenta"))
     if await persona_actual(request):
@@ -603,7 +612,7 @@ async def pagina_activar(request: Request):
 async def api_activar(payload: dict, request: Request):
     if not SECRETO:
         return _sin_secreto()
-    if not abierto_para(request):
+    if not ingreso_para(request):
         return JSONResponse({"ok": False, "error": "La activación estará disponible muy pronto."}, status_code=403)
     ip = club._client_ip(request)
     if await _ip_bloqueada(ip):
@@ -617,7 +626,7 @@ async def api_activar(payload: dict, request: Request):
         return JSONResponse({"ok": False, "error": "El RUC o el correo no coinciden con tu registro anterior."},
                             status_code=401)
     p, s = x["persona"], x["socio"]
-    if not abierto_para(request, p["dni"]):        # pase de prueba: solo los DNI autorizados
+    if not ingreso_para(request, p["dni"]):        # pase de prueba: solo los DNI autorizados
         return JSONResponse({"ok": False, "error": "La activación estará disponible muy pronto."}, status_code=403)
     if p["estado"] != "por_activar":
         return JSONResponse({"ok": False, "accion": "ingresar",

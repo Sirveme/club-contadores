@@ -215,15 +215,17 @@ async def socio_por_token(token: str | None) -> dict | None:
 
 
 async def socio_actual(request: Request) -> dict | None:
-    """Quien esta dentro: primero la sesion vieja (RUC + correo, club_t) y, si no
-    hay, la sesion de PERSONA (DNI, club_id) adaptada a los mismos campos. Lectura
-    doble mientras dura la transicion (Fase 1c-1e)."""
+    """Quien esta dentro. MANDA LA PERSONA (DNI, club_id); la sesion vieja (RUC + correo,
+    club_t) solo se lee si no hay persona, mientras dura la transicion (se retira en la 1e)."""
+    from . import identidad              # import tardio: identidad importa club
+    p = await identidad.socio_desde_persona(request)
+    if p:
+        return p
     s = await socio_por_token(request.cookies.get(COOKIE))
     if s:
         s["fuente"] = "socio"
         return s
-    from . import identidad              # import tardio: identidad importa club
-    return await identidad.socio_desde_persona(request)
+    return None
 
 
 async def _slug_libre(base: str, ruc: str) -> str:
@@ -264,7 +266,11 @@ def inicio(request: Request) -> str:
 
 
 def _ruta_segura(sig: str) -> str:
-    return sig if sig.startswith("/") and not sig.startswith("//") else ""
+    """Solo rutas internas: "/algo". Fuera "//otro.sitio", "/\\otro.sitio" (los navegadores
+    tratan la barra invertida como "/") y caracteres de control."""
+    if not sig.startswith("/") or sig.startswith("//") or "\\" in sig or any(ord(c) < 32 for c in sig):
+        return ""
+    return sig
 
 
 def _destino(request: Request, rol: str, siguiente: str = "") -> str:
@@ -418,11 +424,22 @@ async def api_club_reingresar(payload: dict, request: Request):
     ruc = "".join(c for c in str(payload.get("ruc") or "") if c.isdigit())
     correo = (payload.get("correo") or "").strip().lower()
     row = await _pool().fetchrow(
-        "SELECT token, rol FROM club_socios WHERE ruc = $1 AND lower(correo) = $2 AND baja_en IS NULL",
+        "SELECT token, rol, persona_id FROM club_socios WHERE ruc = $1 AND lower(correo) = $2 AND baja_en IS NULL",
         ruc, correo)
     if not row:
         return JSONResponse({"ok": False, "error": "Ese correo no coincide con el registrado para este RUC."},
                             status_code=403)
+    # RUC + correo ya NO es una puerta para quien tiene cuenta por DNI: lo lleva a su ingreso
+    # (o a crear su clave). Nunca da sesion de persona: es una prueba mas debil que una clave.
+    from . import identidad
+    sig = _ruta_segura(str(payload.get("siguiente") or ""))
+    estado = await _pool().fetchval("SELECT estado FROM personas WHERE id = $1", row["persona_id"]) if row["persona_id"] else None
+    if estado == "activa":
+        return JSONResponse({"ok": False, "accion": "ingresar", "link": "/ingresar" + (f"?sig={sig}" if sig else ""),
+                             "error": "Tu cuenta ya usa DNI y clave: ingresa con tu DNI."}, status_code=409)
+    if estado == "por_activar" and identidad.ingreso_para(request):
+        return JSONResponse({"ok": False, "accion": "activar", "link": "/activar" + (f"?sig={sig}" if sig else ""),
+                             "error": "Ahora entras con tu DNI: crea tu clave una sola vez y listo."}, status_code=409)
     return _con_cookie(JSONResponse({"ok": True, "link": _destino(request, row["rol"], str(payload.get("siguiente") or ""))}),
                        request, row["token"])
 
@@ -469,11 +486,11 @@ def _verificador_tarjeta() -> dict | None:
     return verificador.tarjeta_tablero()
 
 
-async def _por_activar(s: dict | None) -> bool:
+async def _por_activar(s: dict | None, request: Request) -> bool:
     """Socio viejo (cookie RUC + correo) cuya persona aun no crea su clave: el tablero
     le muestra el aviso de activacion (solo con la identidad abierta)."""
     from . import identidad
-    if not (s and s.get("fuente") == "socio" and s.get("persona_id") and identidad.REGISTRO_ABIERTO):
+    if not (s and s.get("fuente") == "socio" and s.get("persona_id") and identidad.ingreso_para(request)):
         return False
     return bool(await _pool().fetchval("SELECT estado = 'por_activar' FROM personas WHERE id = $1", s["persona_id"]))
 
@@ -537,7 +554,7 @@ async def club_tablero(request: Request, t: str = ""):
         "nombre": (s.get("nombre_saludo") or nombre_saludo(s["ruc"] or "", s["razon_social"], s["nombre_comercial"])) if s else None,
         "ubic": ubic, "secciones": secciones, "gana": GANA, "nn": nn, "nn_url": nn_url,
         "contadores_distrito": contadores_distrito, "total": total,
-        "activas": sum(c["activas"] for c in secciones), "por_activar": await _por_activar(s)})
+        "activas": sum(c["activas"] for c in secciones), "por_activar": await _por_activar(s, request)})
 
 
 @router.get("/perfil")

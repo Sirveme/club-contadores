@@ -118,6 +118,13 @@ async def proteger_panel(request: Request, call_next):
     original."""
     ruta = request.url.path.rstrip("/").lower()
     if (ruta == "/panel" or ruta.startswith("/panel/")) and not await identidad.es_admin(request):
+        # Sin sesion de persona (DNI): a ingresar y de vuelta aqui. Con sesion pero sin ser
+        # admin: 404, sin revelar nada mas.
+        if request.method in ("GET", "HEAD") and not await identidad.persona_actual(request):
+            from urllib.parse import quote
+            sig = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+            return Response(status_code=303, headers={"Location": "/ingresar?sig=" + quote(sig, safe="/?=&"),
+                                                      "Cache-Control": "no-store"})
         return HTMLResponse("No encontramos esta página.", status_code=404,
                             headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
     return await call_next(request)
