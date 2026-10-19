@@ -440,3 +440,7 @@
 .vitrina.priv .priv-pie { display: grid; gap: .6em; color: var(--v-muted); border-top: 1px solid var(--v-line); padding-top: 1.2em; }
 .vitrina.priv .priv-pie p { margin: 0; }
 .vitrina.priv .garante-foto { object-position: 50% 30%; }
+/* Ingreso en dos pasos (DNI -> clave) y selector "¿A donde vas hoy?" */
+.entrar-card #pDni, .entrar-card #pClave { display: grid; gap: 1em; }
+.vitrina.entrar a.rol:hover, .vitrina.entrar a.rol:focus-visible { border-color: var(--lv); }
+.vitrina.entrar a.rol[aria-current] { border-color: var(--lv); }

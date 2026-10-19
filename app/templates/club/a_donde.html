@@ -1,0 +1,31 @@
+{% extends "club/base.html" %}
+{% set hoja = "puerta" %}
+{% set sin_cambio_lado = true %}
+{% block titulo %}¿A dónde vas hoy? · Club de Contadores{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=20">
+{% endblock %}
+{% block contenido %}
+<div class="vitrina entrar" id="hoja">
+  <section class="entrar-grid">
+    <div class="entrar-intro lv-cuenta">
+      <span class="k">Hola, {{ nombre }}</span>
+      <h1>¿A dónde vas hoy?</h1>
+      <p class="lead">Tienes los dos perfiles. Elige uno: lo recordamos para la próxima vez y puedes cambiar cuando quieras desde la cabecera.</p>
+    </div>
+    <div class="entrar-form">
+      <section class="entrar-card lv-cuenta" aria-label="Elige tu perfil">
+        <header><span class="paso">Tu cuenta</span><h2>Elige tu lado</h2></header>
+        <div class="roles" role="group" aria-label="¿A dónde vas hoy?">
+          <a class="rol lv-cuenta" href="/lado/contador{% if sig %}?sig={{ sig|urlencode }}{% endif %}"{% if lado == "contador" %} aria-current="true"{% endif %}>
+            <span class="dir">Contador</span><b>Club de Contadores</b><span>Tablero, Nuevos Negocios de tu distrito y Directorio</span></a>
+          <a class="rol lv-premium" href="/lado/empresario{% if sig %}?sig={{ sig|urlencode }}{% endif %}"{% if lado == "empresario" %} aria-current="true"{% endif %}>
+            <span class="dir">Empresario</span><b>Club de Empresarios</b><span>Tu panel de empresario</span></a>
+        </div>
+      </section>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block estado %}<span>Tu cuenta personal del Club</span><span>Listo</span>{% endblock %}

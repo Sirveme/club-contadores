@@ -83,7 +83,7 @@ async def migrar(conn) -> list[dict]:
                                  club_socio_id, vigencia_inicio)
             VALUES ($1, $2, $3, 'titular', 'dni_en_ruc', $4, $5, true, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
                     $16, $17, $18, $19::date)
-            ON CONFLICT (persona_id, ruc) DO NOTHING
+            ON CONFLICT (persona_id, ruc, perfil) DO NOTHING
             """, pid, s["ruc"], s["rol"], actividad, s["revisar"], s["razon_social"], s["nombre_comercial"],
             s["ubigeo"], s["distrito"], s["directorio_optin"], s["directorio_optin_en"], s["directorio_optin_ver"],
             s["slug"], s["especialidad1"], s["especialidad2"], s["suscriptor_id"], s["origen"], s["id"],

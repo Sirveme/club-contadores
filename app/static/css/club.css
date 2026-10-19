@@ -204,7 +204,7 @@ a { color: inherit; }
 /* --- Pestanas de hoja + barra de estado --- */
 .pie-hoja { margin-top: auto; display: flex; align-items: stretch; gap: 0; border-top: 1px solid var(--grid);
   margin-inline: -16px; padding-inline: 16px; background: var(--cell-2); flex-wrap: wrap; }
-.tabs { display: flex; }
+.tabs { display: flex; flex-wrap: wrap; max-width: 100%; }
 .tabs a { padding: 6px 13px; border-right: 1px solid var(--grid); color: var(--muted); text-decoration: none; font-size: .95em; }
 .tabs a:first-child { border-left: 1px solid var(--grid); }
 .tabs a[aria-current] { background: var(--bg); color: var(--fg); box-shadow: inset 0 2px 0 var(--accent); font-weight: 500; }

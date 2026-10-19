@@ -3,30 +3,35 @@
 {% block titulo %}Ingresar · Club de Contadores{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
-<link rel="stylesheet" href="/static/css/club-vitrina.css?v=19">
+<link rel="stylesheet" href="/static/css/club-vitrina.css?v=20">
 {% endblock %}
 {% block contenido %}
 <div class="vitrina entrar" id="hoja">
   <section class="entrar-grid">
     <div class="entrar-intro lv-cuenta">
-      <span class="k">Club de Contadores · ingresar</span>
-      <h1>Hola de nuevo</h1>
-      <p class="lead">Ingresa con tu DNI y tu clave para ver Nuevos Negocios de tu distrito y tu perfil.</p>
+      <span class="k">{{ "Club de Empresarios" if para == "empresario" else "Club de Contadores" }} · ingresar</span>
+      <h1>Ingresa con tu DNI</h1>
+      <p class="lead">Basta tu DNI: sabemos si eres del Club de Contadores, del de Empresarios o de los dos, y te llevamos a lo tuyo.</p>
       <a class="volver" href="{{ inicio }}">← Volver al tablero</a>
     </div>
     <div class="entrar-form">
       <section class="entrar-card lv-cuenta" aria-label="Ingresar">
-        <header><span class="paso">Tu cuenta</span><h2>Ingresar</h2></header>
         <form id="fIng" novalidate>
-          <div class="campo"><label for="dni">DNI</label>
-            <input id="dni" inputmode="numeric" maxlength="8" autocomplete="username" placeholder="8 dígitos"></div>
-          <div class="campo"><label for="clave">Clave</label>
-            <input id="clave" type="password" autocomplete="current-password"></div>
+          <div id="pDni">
+            <header><span class="paso">Paso 1 de 2</span><h2>Tu DNI</h2></header>
+            <div class="campo"><label for="dni">DNI</label>
+              <input id="dni" inputmode="numeric" maxlength="8" autocomplete="username" placeholder="8 dígitos" autofocus></div>
+          </div>
+          <div id="pClave" hidden>
+            <header><span class="paso">Paso 2 de 2</span><h2>Tu clave</h2></header>
+            <p class="sub">DNI <b class="mono" id="dniVer"></b> · <a href="#" id="otroDni">cambiar</a></p>
+            <div class="campo"><label for="clave">Clave</label>
+              <input id="clave" type="password" autocomplete="current-password"></div>
+          </div>
           <div id="r" aria-live="polite"></div>
-          <div class="acciones"><button class="btn" type="submit" id="bIng">Ingresar →</button>
-            <a class="btn sec" href="/registro{% if sig %}?sig={{ sig }}{% endif %}">Crear cuenta</a></div>
-          <p class="nota-clave">¿Te registraste antes con tu RUC y correo? <a href="/activar{% if sig %}?sig={{ sig }}{% endif %}">Activa tu cuenta</a>: creas tu clave una sola vez y desde entonces entras con tu DNI.</p>
+          <div class="acciones" id="aIng"><button class="btn" type="submit" id="bIng">Continuar →</button></div>
         </form>
+        <p class="nota-clave">¿Te registraste antes con tu RUC y correo? <a href="/activar{% if sig %}?sig={{ sig }}{% endif %}">Activa tu cuenta</a>: creas tu clave una sola vez y desde entonces entras con tu DNI.</p>
         <p class="nota-clave">¿Olvidaste tu clave? Escríbenos al WhatsApp <b class="mono">{{ psp_whatsapp }}</b> y te ayudamos a recuperarla.</p>
       </section>
     </div>
@@ -37,23 +42,54 @@
 {% block scripts %}
 <script>
 (function () {
-  const SIG = {{ sig|tojson }}, INICIO = {{ inicio|tojson }};
+  const SIG = {{ sig|tojson }}, PARA = {{ para|tojson }}, INICIO = {{ inicio|tojson }};
+  const REGISTRO = {{ registro_abierto|tojson }}, WA = {{ psp_whatsapp|tojson }};
   const $ = id => document.getElementById(id);
   const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const q = o => { const p = new URLSearchParams(Object.entries(o).filter(([, v]) => v)).toString(); return p ? "?" + p : ""; };
+  const ACTIVAR = "/activar" + q({ sig: SIG }), CREAR = "/registro" + q({ sig: SIG, para: PARA });
+  let dni = "";
+  const aviso = (html, tipo = "info") => { $("r").innerHTML = `<div class="msg ${tipo}">${html}</div>`; };
+  const alPaso1 = () => {
+    dni = ""; $("pClave").hidden = true; $("pDni").hidden = false; $("aIng").hidden = false;
+    $("bIng").textContent = "Continuar →"; $("r").innerHTML = ""; $("clave").value = ""; $("dni").focus();
+  };
+  const activar = msg => { $("aIng").hidden = true;
+    aviso(`${esc(msg)} <a href="${esc(ACTIVAR)}"><b>Activar mi cuenta →</b></a>`); };
+  $("otroDni").onclick = e => { e.preventDefault(); alPaso1(); };
+  $("dni").oninput = () => { if ($("aIng").hidden) { $("aIng").hidden = false; $("r").innerHTML = ""; } };
+
   $("fIng").onsubmit = async e => {
     e.preventDefault();
-    const dni = $("dni").value.replace(/\D/g, "");
-    if (dni.length !== 8) { $("r").innerHTML = '<div class="msg err">El DNI tiene 8 dígitos.</div>'; return; }
     $("bIng").disabled = true;
-    const r = await fetch("/api/id/ingresar", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dni, clave: $("clave").value, siguiente: SIG }) });
-    let d = {}; try { d = await r.json(); } catch (x) {}
-    if (r.ok && d.ok) {
-      location.href = d.debe_cambiar_clave ? "/cambiar-clave?sig=" + encodeURIComponent(d.link || INICIO) : (d.link || INICIO); return; }
-    $("bIng").disabled = false;
-    if (d.accion === "activar") {
-      $("r").innerHTML = `<div class="msg info">${esc(d.error)} <a href="/activar${SIG ? "?sig=" + encodeURIComponent(SIG) : ""}"><b>Activar mi cuenta →</b></a></div>`; return; }
-    $("r").innerHTML = `<div class="msg err">${esc(d.error || "No pudimos ingresar. Intenta de nuevo.")}</div>`;
+    try {
+      if (!dni) {                                   // paso 1: el DNI dice que sigue
+        const v = $("dni").value.replace(/\D/g, "");
+        if (v.length !== 8) { aviso("El DNI tiene 8 dígitos.", "err"); return; }
+        const r = await fetch("/api/id/paso", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dni: v }) });
+        let d = {}; try { d = await r.json(); } catch (x) {}
+        if (!r.ok || !d.ok) { aviso(esc(d.error || "No pudimos continuar. Intenta de nuevo."), "err"); return; }
+        if (d.siguiente === "clave") {
+          dni = v; $("dniVer").textContent = v; $("pDni").hidden = true; $("pClave").hidden = false;
+          $("bIng").textContent = "Ingresar →"; $("r").innerHTML = ""; $("clave").focus(); return;
+        }
+        if (d.siguiente === "activar") { activar("Tu cuenta viene del registro anterior (RUC y correo): crea tu clave una sola vez y listo."); return; }
+        $("aIng").hidden = true;
+        if (d.registro_abierto) aviso(`Aún no tienes cuenta con este DNI. <a href="${esc(CREAR)}"><b>Crear mi cuenta →</b></a>`);
+        else aviso(`Aún no hay una cuenta con este DNI. Las cuentas nuevas abren muy pronto. ` +
+                   `¿Ya eras socio con tu RUC y correo? <a href="${esc(ACTIVAR)}"><b>Activa tu cuenta →</b></a> ` +
+                   `¿Dudas? WhatsApp <b class="mono">${esc(WA)}</b>.`);
+        return;
+      }
+      const r = await fetch("/api/id/ingresar", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dni, clave: $("clave").value, siguiente: SIG, para: PARA }) });
+      let d = {}; try { d = await r.json(); } catch (x) {}
+      if (r.ok && d.ok) {
+        location.href = d.debe_cambiar_clave ? "/cambiar-clave?sig=" + encodeURIComponent(d.link || INICIO) : (d.link || INICIO); return; }
+      if (d.accion === "activar") { activar(d.error); return; }
+      aviso(esc(d.error || "No pudimos ingresar. Intenta de nuevo."), "err");
+    } finally { $("bIng").disabled = false; }
   };
 })();
 </script>

@@ -70,11 +70,24 @@ CREATE TABLE IF NOT EXISTS accesos (
     revocado_en          timestamptz,
     created_at           timestamptz NOT NULL DEFAULT now(),
     updated_at           timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT uq_acceso_persona_ruc UNIQUE (persona_id, ruc),
+    CONSTRAINT uq_acceso_persona_ruc_perfil UNIQUE (persona_id, ruc, perfil),
     CONSTRAINT ck_acceso_dni_en_ruc_es_ruc10 CHECK (verificacion <> 'dni_en_ruc' OR left(ruc, 2) = '10')
 );
--- Un RUC 10 tiene UN solo titular verificado.
-CREATE UNIQUE INDEX IF NOT EXISTS ux_acceso_titular_ruc ON accesos (ruc)
+-- Acceso, Paso 2: un mismo RUC puede llevar LOS DOS perfiles (contador y empresario), una fila
+-- por perfil. Migracion idempotente de las tablas creadas antes (corre en cada arranque: no-op).
+-- Todo se ancla al esquema de ESTA tabla accesos (nunca a otro del search_path).
+DO $$
+DECLARE esq text := (SELECT relnamespace::regnamespace::text FROM pg_class WHERE oid = 'accesos'::regclass);
+BEGIN
+    EXECUTE format('ALTER TABLE %I.accesos DROP CONSTRAINT IF EXISTS uq_acceso_persona_ruc', esq);
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_acceso_persona_ruc_perfil'
+                                                 AND conrelid = 'accesos'::regclass) THEN
+        EXECUTE format('ALTER TABLE %I.accesos ADD CONSTRAINT uq_acceso_persona_ruc_perfil UNIQUE (persona_id, ruc, perfil)', esq);
+    END IF;
+    EXECUTE format('DROP INDEX IF EXISTS %I.ux_acceso_titular_ruc', esq);
+END $$;
+-- Un RUC 10 tiene UN solo titular verificado (por perfil).
+CREATE UNIQUE INDEX IF NOT EXISTS ux_acceso_titular_ruc_perfil ON accesos (ruc, perfil)
     WHERE relacion = 'titular' AND verificacion = 'dni_en_ruc';
 -- Un solo RUC principal por persona.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_acceso_principal ON accesos (persona_id) WHERE es_principal;

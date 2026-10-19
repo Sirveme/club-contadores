@@ -212,6 +212,58 @@ def abierto_para(request: Request, dni: str | None = None) -> bool:
     return _pase_ok(request) and (dni is None or dni in DNI_PRUEBA)
 
 
+# --- Perfiles y "lado" (Acceso, Paso 2) ------------------------------------------------------
+# Una persona puede tener los dos perfiles (accesos contador y empresario). El "lado" es la
+# ultima eleccion ("¿A donde vas hoy?"): solo elige ENTRE SUS PROPIOS accesos, no da permisos.
+PERFILES = ("contador", "empresario")
+COOKIE_LADO = "club_lado"
+PASO_MAX, PASO_VENTANA_S = 30, 600          # consultas de DNI (paso 1 del ingreso) por IP
+_pasos: dict[str, list[float]] = {}
+
+
+async def perfiles_de(persona_id) -> list[str]:
+    """Perfiles vigentes de la persona, contador primero. Sin RUC vinculado: contador."""
+    filas = await db._pool.fetch("SELECT DISTINCT perfil FROM accesos WHERE persona_id = $1 AND revocado_en IS NULL",
+                                 persona_id)
+    return [x for x in PERFILES if x in {r["perfil"] for r in filas}] or ["contador"]
+
+
+def lado_elegido(request: Request) -> str | None:
+    v = request.cookies.get(COOKIE_LADO)
+    return v if v in PERFILES else None
+
+
+def para_valido(v) -> str:
+    """Pista de origen de las landings (?para=empresario): solo un perfil conocido."""
+    return v if v in PERFILES else ""
+
+
+async def destino_al_entrar(request: Request, persona_id, siguiente: str = "", para: str = "") -> str:
+    """Despues de la clave: la pagina pedida; si no, su inicio segun SUS perfiles (no segun la
+    URL por la que entro). Con los dos: la pista de origen, su ultima eleccion o el selector."""
+    sig = club._ruta_segura(siguiente)
+    if sig:
+        return sig
+    ps = await perfiles_de(persona_id)
+    if len(ps) == 1:
+        return club._destino(request, ps[0])
+    for pref in (para_valido(para), lado_elegido(request)):
+        if pref in ps:
+            return f"/lado/{pref}"
+    return "/a-donde"
+
+
+def _paso_excedido(ip: str | None) -> bool:
+    import time
+    ahora, k = time.monotonic(), ip or "-"
+    t = [x for x in _pasos.get(k, []) if ahora - x < PASO_VENTANA_S]
+    t.append(ahora)
+    _pasos[k] = t
+    if len(_pasos) > 5000:                    # memoria acotada
+        _pasos.clear()
+    return len(t) > PASO_MAX
+
+
 def ingreso_para(request: Request, dni: str | None = None) -> bool:
     """Ingresar y activar: abiertos con INGRESO_ABIERTO (o con el registro abierto, o con el pase)."""
     return INGRESO_ABIERTO or abierto_para(request, dni)
@@ -450,11 +502,28 @@ async def api_ingresar(payload: dict, request: Request):
     if not ok:
         return JSONResponse({"ok": False, "error": "DNI o clave incorrectos."}, status_code=401)
     await db._pool.execute("UPDATE personas SET ultimo_login_at = now() WHERE id = $1", p["id"])
-    perfil = await db._pool.fetchval(
-        "SELECT perfil FROM accesos WHERE persona_id = $1 ORDER BY es_principal DESC LIMIT 1", p["id"]) or "contador"
-    resp = JSONResponse({"ok": True, "debe_cambiar_clave": p["debe_cambiar_clave"],
-                         "link": club._destino(request, perfil, str(payload.get("siguiente") or ""))})
+    link = await destino_al_entrar(request, p["id"], str(payload.get("siguiente") or ""), str(payload.get("para") or ""))
+    resp = JSONResponse({"ok": True, "debe_cambiar_clave": p["debe_cambiar_clave"], "link": link})
     return _con_sesion(resp, request, p["id"], p["sesion_version"])
+
+
+@router.post("/api/id/paso")
+async def api_paso(payload: dict, request: Request):
+    """Paso 1 del ingreso (hub): con el DNI, que sigue: 'clave' (cuenta activa), 'activar'
+    (registro anterior por RUC) o 'crear' (sin cuenta). NO revela nombre ni perfil: el destino
+    se decide recien despues de la clave. Limitado por IP."""
+    if not ingreso_para(request):
+        return JSONResponse({"ok": False, "error": "El ingreso con DNI estará disponible muy pronto."}, status_code=403)
+    dni = solo_digitos(payload.get("dni"))
+    if not dni_valido(dni):
+        return JSONResponse({"ok": False, "error": "El DNI tiene 8 dígitos."}, status_code=422)
+    if _paso_excedido(club._client_ip(request)):
+        return JSONResponse({"ok": False, "error": "Demasiadas consultas. Espera unos minutos e intenta de nuevo."},
+                            status_code=429)
+    estado = await db._pool.fetchval("SELECT estado FROM personas WHERE dni = $1 AND baja_en IS NULL", dni)
+    siguiente = {"activa": "clave", "por_activar": "activar"}.get(estado, "crear")
+    return JSONResponse({"ok": True, "siguiente": siguiente, "registro_abierto": abierto_para(request, dni)},
+                        headers={"Cache-Control": "no-store"})
 
 
 @router.post("/api/id/salir")
@@ -498,19 +567,22 @@ async def api_yo(request: Request):
 
 
 # --- Sesion de persona vista por el Club (lectura doble, Fase 1c) ----------------
-async def socio_desde_persona(request: Request) -> dict | None:
-    """Persona con sesion -> los mismos campos que usa el Club para un socio, a partir
-    de su acceso PRINCIPAL. Sin RUC vinculado: contador sin distrito (por confirmar)."""
+async def socio_desde_persona(request: Request, perfil: str | None = None) -> dict | None:
+    """Persona con sesion -> los mismos campos que usa el Club para un socio, a partir del
+    acceso del perfil pedido (o del lado elegido; si no, el PRINCIPAL). Sin RUC vinculado:
+    contador sin distrito (por confirmar)."""
     p = await persona_actual(request)
     if not p:
         return None
     a = await db._pool.fetchrow(
         "SELECT a.*, su.token_baja AS nn_token FROM accesos a LEFT JOIN suscriptores su ON su.id = a.suscriptor_id "
-        "WHERE a.persona_id = $1 AND a.revocado_en IS NULL ORDER BY a.es_principal DESC, a.created_at LIMIT 1", p["id"])
+        "WHERE a.persona_id = $1 AND a.revocado_en IS NULL "
+        "ORDER BY (a.perfil = $2) DESC, a.es_principal DESC, a.created_at LIMIT 1",
+        p["id"], perfil if perfil in PERFILES else (lado_elegido(request) or ""))
     a = dict(a) if a else {}
     act = a.get("actividad")
     return {
-        "fuente": "persona", "admin": p["dni"] in ADMIN_DNI,
+        "fuente": "persona", "admin": p["dni"] in ADMIN_DNI, "perfiles": await perfiles_de(p["id"]),
         "id": str(a["id"]) if a else str(p["id"]), "persona_id": str(p["id"]),
         "acceso_id": str(a["id"]) if a else None, "dni": p["dni"], "rol": a.get("perfil") or "contador",
         "ruc": a.get("ruc"), "razon_social": a.get("razon_social") or p["nombre_completo"],
@@ -556,9 +628,45 @@ async def pagina_ingresar(request: Request):
     if not ingreso_para(request):
         return _canjear_pase(request) or club.templates.TemplateResponse(
             request, "club/pronto.html", _ctx(request, que="El ingreso con DNI"))
-    if await persona_actual(request):
-        return RedirectResponse(club.inicio(request), status_code=303)
-    return club.templates.TemplateResponse(request, "club/ingresar.html", _ctx(request))
+    p = await persona_actual(request)
+    if p:
+        destino = await destino_al_entrar(request, p["id"], str(request.query_params.get("sig") or ""),
+                                          str(request.query_params.get("para") or ""))
+        return RedirectResponse(destino, status_code=303)
+    return club.templates.TemplateResponse(request, "club/ingresar.html", _ctx(
+        request, para=para_valido(request.query_params.get("para")), registro_abierto=abierto_para(request)))
+
+
+@router.get("/a-donde", response_class=HTMLResponse)
+async def pagina_a_donde(request: Request):
+    """Selector para quien tiene los dos perfiles: "¿A donde vas hoy?"."""
+    p = await persona_actual(request)
+    if not p:
+        return RedirectResponse("/ingresar?sig=/a-donde", status_code=303)
+    ps = await perfiles_de(p["id"])
+    if len(ps) < 2:
+        return RedirectResponse(club._destino(request, ps[0]), status_code=303)
+    s = await socio_desde_persona(request)
+    return club.templates.TemplateResponse(request, "club/a_donde.html", {
+        **_ctx(request), "s": s, "nombre": s["nombre_saludo"], "lado": lado_elegido(request)},
+        headers={"Cache-Control": "no-store"})
+
+
+@router.get("/lado/{perfil}")
+async def elegir_lado(perfil: str, request: Request):
+    """Recuerda el lado elegido (contador / empresario) y lleva a su inicio (o a ?sig=)."""
+    p = await persona_actual(request)
+    if not p:
+        return RedirectResponse("/ingresar" + (f"?sig=/lado/{perfil}" if perfil in PERFILES else ""), status_code=303)
+    ps = await perfiles_de(p["id"])
+    if perfil not in ps:
+        return RedirectResponse(club._destino(request, ps[0]), status_code=303)
+    sig = club._ruta_segura(str(request.query_params.get("sig") or ""))
+    resp = RedirectResponse(sig or club._destino(request, perfil), status_code=303)
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    resp.set_cookie(COOKIE_LADO, perfil, max_age=365 * 86400, httponly=True, samesite="lax", secure=https,
+                    domain=club._dominio_cookie(request))
+    return resp
 
 
 @router.get("/cambiar-clave", response_class=HTMLResponse)
@@ -661,9 +769,8 @@ async def api_activar(payload: dict, request: Request):
         # La cookie vieja (RUC + correo) deja de valer: se rota su token.
         await conn.execute("UPDATE club_socios SET token = $2 WHERE id = $1", s["id"], secrets.token_urlsafe(32))
     await db._pool.execute("INSERT INTO login_intentos (dni, ip, exito) VALUES ($1, $2::inet, true)", p["dni"], ip)
-    perfil = await db._pool.fetchval(
-        "SELECT perfil FROM accesos WHERE persona_id = $1 ORDER BY es_principal DESC LIMIT 1", p["id"]) or "contador"
-    resp = JSONResponse({"ok": True, "link": club._destino(request, perfil, str(payload.get("siguiente") or ""))})
+    link = await destino_al_entrar(request, p["id"], str(payload.get("siguiente") or ""), str(payload.get("para") or ""))
+    resp = JSONResponse({"ok": True, "link": link})
     resp.delete_cookie(club.COOKIE)
     if club._dominio_cookie(request):
         resp.delete_cookie(club.COOKIE, domain=club._dominio_cookie(request))

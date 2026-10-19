@@ -46,18 +46,29 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 def identidad_abierta() -> bool:
-    """True cuando se entra con DNI + clave (IDENTIDAD_REGISTRO_ABIERTO). Mientras este
-    cerrada, la unica forma de entrar es RUC + correo (/entrar)."""
+    """True cuando se entra con DNI + clave (IDENTIDAD_INGRESO_ABIERTO o el registro abierto).
+    Solo si se cierra vuelve la puerta vieja RUC + correo (/entrar), como respaldo."""
     from . import identidad
-    return identidad.REGISTRO_ABIERTO
+    return identidad.INGRESO_ABIERTO or identidad.REGISTRO_ABIERTO
 
 
 def como_entrar() -> str:
     """Texto de los botones de entrada, coherente con la forma de entrar vigente."""
-    return "Entrar con tu DNI" if identidad_abierta() else "Entrar con tu RUC"
+    return "Ingresar" if identidad_abierta() else "Entrar con tu RUC"
 
 
-templates.env.globals.update(identidad_abierta=identidad_abierta, como_entrar=como_entrar)
+def url_entrar(sig: str = "", para: str = "") -> str:
+    """La puerta vigente: el ingreso con DNI (hub) o, si se cerro, la vieja de RUC + correo."""
+    from urllib.parse import urlencode
+    sig = _ruta_segura(sig)
+    if identidad_abierta():
+        q = {k: v for k, v in (("sig", sig), ("para", para if para in ("contador", "empresario") else "")) if v}
+        return "/ingresar" + (f"?{urlencode(q, safe='/')}" if q else "")
+    q = {k: v for k, v in (("rol", para if para in ("contador", "empresario") else ""), ("sig", sig)) if v}
+    return "/entrar" + (f"?{urlencode(q, safe='/')}" if q else "")
+
+
+templates.env.globals.update(identidad_abierta=identidad_abierta, como_entrar=como_entrar, url_entrar=url_entrar)
 
 COOKIE = "club_t"
 COOKIE_DIAS = 180
@@ -214,11 +225,12 @@ async def socio_por_token(token: str | None) -> dict | None:
     return dict(row) if row else None
 
 
-async def socio_actual(request: Request) -> dict | None:
+async def socio_actual(request: Request, perfil: str | None = None) -> dict | None:
     """Quien esta dentro. MANDA LA PERSONA (DNI, club_id); la sesion vieja (RUC + correo,
-    club_t) solo se lee si no hay persona, mientras dura la transicion (se retira en la 1e)."""
+    club_t) solo se lee si no hay persona, mientras dura la transicion (se retira en la 1e).
+    `perfil`: con los dos perfiles, el acceso de ese lado (lo pide cada pagina)."""
     from . import identidad              # import tardio: identidad importa club
-    p = await identidad.socio_desde_persona(request)
+    p = await identidad.socio_desde_persona(request, perfil)
     if p:
         return p
     s = await socio_por_token(request.cookies.get(COOKIE))
@@ -297,7 +309,8 @@ def _con_cookie(resp, request: Request, token: str):
 #   /club; en club.perusistemas.pro se sirve en "/".
 # URLs viejas (/club/tablero, /club/igv, /club/directorio, ...) -> 301 a las nuevas.
 RUTAS_CLUB = ("/entrar", "/igv", "/directorio", "/c", "/perfil", "/empresario", "/salir",
-              "/registro", "/ingresar", "/cambiar-clave", "/activar", "/privacidad", "/verificador")
+              "/registro", "/ingresar", "/cambiar-clave", "/activar", "/privacidad", "/verificador",
+              "/a-donde", "/lado")
 
 
 def ruta_nueva(path: str, home: str) -> str | None:
@@ -434,7 +447,7 @@ async def api_club_reingresar(payload: dict, request: Request):
     from . import identidad
     sig = _ruta_segura(str(payload.get("siguiente") or ""))
     estado = await _pool().fetchval("SELECT estado FROM personas WHERE id = $1", row["persona_id"]) if row["persona_id"] else None
-    if estado == "activa":
+    if estado == "activa" and identidad.ingreso_para(request):     # ingreso cerrado: respaldo, entra como antes
         return JSONResponse({"ok": False, "accion": "ingresar", "link": "/ingresar" + (f"?sig={sig}" if sig else ""),
                              "error": "Tu cuenta ya usa DNI y clave: ingresa con tu DNI."}, status_code=409)
     if estado == "por_activar" and identidad.ingreso_para(request):
@@ -473,8 +486,7 @@ async def club_entrar(request: Request, rol: str = "", ref: str = "", sig: str =
         return RedirectResponse(_destino(request, s["rol"], sig), status_code=303)
     if identidad_abierta():
         # Con la identidad abierta se entra con DNI: /entrar (RUC + correo) ya no se ofrece.
-        destino = "/ingresar" + (f"?sig={_ruta_segura(sig)}" if _ruta_segura(sig) else "")
-        return RedirectResponse(destino, status_code=303)
+        return RedirectResponse(url_entrar(sig, rol), status_code=303)
     return templates.TemplateResponse(request, "club/puerta.html", {
         "s": None, "inicio": inicio(request), "rol": rol if rol in ("contador", "empresario") else "",
         "origen": (ref or "club")[:60], "sig": _ruta_segura(sig),
@@ -522,9 +534,11 @@ async def club_tablero(request: Request, t: str = ""):
         return _con_cookie(RedirectResponse(home, status_code=303), request, t)
     s = await socio_actual(request)
     if s and s["rol"] != "contador":
-        return RedirectResponse("/empresario", status_code=303)
+        if "contador" not in s.get("perfiles", ()):
+            return RedirectResponse("/empresario", status_code=303)
+        s = await socio_actual(request, "contador")      # tiene los dos: esta pagina es del lado contador
     p = contadores_distrito = None
-    entrar = f"/entrar?sig={home}"
+    entrar = url_entrar(home)
     if s:
         if s.get("fuente") == "socio":
             await _pool().execute("UPDATE club_socios SET ultimo_acceso_en = now() WHERE id = $1", s["id"])
@@ -561,7 +575,7 @@ async def club_tablero(request: Request, t: str = ""):
 async def club_perfil(request: Request):
     s = await socio_actual(request)
     if not s:
-        return RedirectResponse("/entrar?sig=/perfil", status_code=303)
+        return RedirectResponse(url_entrar("/perfil"), status_code=303)
     base = inicio(request) if s["rol"] == "contador" else "/empresario"
     return RedirectResponse(base + "#perfil", status_code=303)
 
@@ -570,7 +584,9 @@ async def club_perfil(request: Request):
 async def club_empresario(request: Request):
     s = await socio_actual(request)
     if not s:
-        return RedirectResponse("/entrar?rol=empresario&sig=/empresario", status_code=303)
+        return RedirectResponse(url_entrar("/empresario", "empresario"), status_code=303)
+    if s["rol"] != "empresario" and "empresario" in s.get("perfiles", ()):
+        s = await socio_actual(request, "empresario")    # tiene los dos: esta pagina es del lado empresario
     return templates.TemplateResponse(request, "club/empresario.html", {
         "s": s, "inicio": inicio(request),
         "nombre": s.get("nombre_saludo") or nombre_saludo(s["ruc"] or "", s["razon_social"], s["nombre_comercial"])})

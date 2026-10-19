@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/static/css/club.css?v=13">
+<link rel="stylesheet" href="/static/css/club.css?v=14">
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -19,6 +19,8 @@
     <a class="marca" href="{{ inicio or "/club" }}" style="text-decoration:none"><b>Club de Contadores</b><span>club.perusistemas.pro</span></a>
     <span class="sp"></span>
     {% if s and s.admin %}<a class="btn-dir" href="/panel/llaves" title="Panel de administración">Panel</a>{% endif %}
+    {% if s and s.perfiles and s.perfiles|length > 1 and not sin_cambio_lado %}{% set otro = "empresario" if s.rol == "contador" else "contador" %}
+      <a class="btn-dir" href="/lado/{{ otro }}" title="Tienes los dos perfiles">Ir a {{ "Empresario" if otro == "empresario" else "Contadores" }} <span>⇄</span></a>{% endif %}
     {% if s and s.rol == "contador" %}
       <a class="btn-dir{% if not s.ubigeo %} sin{% endif %}" href="/directorio" {% block dir_actual %}{% endblock %}>
         Contadores de tu distrito{% if s.distrito %} <span>{{ s.distrito }} →</span>{% endif %}</a>
@@ -26,7 +28,7 @@
     {% elif s %}
       <a class="salir" href="/salir">Salir</a>
     {% elif hoja != "puerta" %}
-      <a class="btn-dir" href="/entrar{% if entrar_sig %}?sig={{ entrar_sig }}{% endif %}">{{ como_entrar() }} <span>→</span></a>
+      <a class="btn-dir" href="{{ url_entrar(entrar_sig or "") }}">{{ como_entrar() }} <span>→</span></a>
     {% endif %}
   </header>
 
@@ -45,7 +47,7 @@
         {% if verificador_abierto() %}<a href="/verificador" {% if hoja == "verificador" %}aria-current="page"{% endif %}>Verificador</a>{% endif %}
         <a href="/igv" {% if hoja == "igv" %}aria-current="page"{% endif %}>Calculadora de IGV</a>
         <a href="/directorio" {% if hoja == "directorio" %}aria-current="page"{% endif %}>Directorio</a>
-        {% if not s %}<a href="/entrar" {% if hoja == "puerta" %}aria-current="page"{% endif %}>Entrar</a>{% endif %}
+        {% if not s %}<a href="{{ url_entrar() }}" {% if hoja == "puerta" %}aria-current="page"{% endif %}>{{ "Ingresar" if identidad_abierta() else "Entrar" }}</a>{% endif %}
       {% endif %}
       {% endblock %}
     </nav>
