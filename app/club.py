@@ -57,6 +57,12 @@ def como_entrar() -> str:
     return "Ingresar" if identidad_abierta() else "Entrar con tu RUC"
 
 
+def url_club(request: Request) -> str:
+    """Base de los enlaces al hub desde otra landing: absoluta en contadores. (ahorra el 301);
+    relativa en club., Railway y localhost, donde la misma app sirve el ingreso."""
+    return f"https://{CLUB_HOST}" if _host(request) == CONTADORES_HOST else ""
+
+
 def url_entrar(sig: str = "", para: str = "") -> str:
     """La puerta vigente: el ingreso con DNI (hub) o, si se cerro, la vieja de RUC + correo."""
     from urllib.parse import urlencode

@@ -610,16 +610,20 @@ from fastapi.responses import HTMLResponse, RedirectResponse  # noqa: E402
 
 def _ctx(request: Request, **k):
     return {"s": None, "inicio": club.inicio(request), "psp_whatsapp": club.PSP_WHATSAPP,
-            "anpd_url": club.ANPD_REGISTRO_URL, "sig": club._ruta_segura(str(request.query_params.get("sig") or "")), **k}
+            "anpd_url": club.ANPD_REGISTRO_URL, "sig": club._ruta_segura(str(request.query_params.get("sig") or "")),
+            "para": para_valido(request.query_params.get("para")), **k}
 
 
 @router.get("/registro", response_class=HTMLResponse)
 async def pagina_registro(request: Request):
+    p = await persona_actual(request)
+    if p:                                  # ya tiene cuenta: a lo suyo (misma regla que /ingresar), abierto o no
+        destino = await destino_al_entrar(request, p["id"], str(request.query_params.get("sig") or ""),
+                                          str(request.query_params.get("para") or ""))
+        return RedirectResponse(destino, status_code=303)
     if not abierto_para(request):
         return _canjear_pase(request) or club.templates.TemplateResponse(
             request, "club/pronto.html", _ctx(request, que="El registro con DNI"))
-    if await persona_actual(request):
-        return RedirectResponse(club.inicio(request), status_code=303)
     return club.templates.TemplateResponse(request, "club/registro.html", _ctx(request, consent_ver=CONSENT_VER))
 
 
@@ -633,8 +637,7 @@ async def pagina_ingresar(request: Request):
         destino = await destino_al_entrar(request, p["id"], str(request.query_params.get("sig") or ""),
                                           str(request.query_params.get("para") or ""))
         return RedirectResponse(destino, status_code=303)
-    return club.templates.TemplateResponse(request, "club/ingresar.html", _ctx(
-        request, para=para_valido(request.query_params.get("para")), registro_abierto=abierto_para(request)))
+    return club.templates.TemplateResponse(request, "club/ingresar.html", _ctx(request, registro_abierto=abierto_para(request)))
 
 
 @router.get("/a-donde", response_class=HTMLResponse)

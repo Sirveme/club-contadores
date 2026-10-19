@@ -60,11 +60,22 @@
     .consent input{ margin-top:3px; flex:0 0 auto; width:18px; height:18px; accent-color:var(--green); }
     .legal{ font-size:11.5px; color:var(--muted); margin:10px 0 0; }
     .oculto{ display:none; }
+    /* Cuenta del Club: el mismo ingreso unico del hub (DNI), con la pista ?para=contador */
+    .cuenta{ display:flex; align-items:center; gap:8px; margin:0 0 12px; font-size:14px; }
+    .cuenta span{ margin-right:auto; color:var(--muted); font-weight:600; }
+    .cuenta a{ text-decoration:none; font-weight:700; padding:8px 13px; border-radius:10px; white-space:nowrap; }
+    .cuenta .ing{ background:var(--green); color:#062018; }
+    .cuenta .crear{ border:1px solid var(--green-d); color:var(--green); }
     .spin{ color:var(--muted); font-size:14px; }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <nav class="cuenta" aria-label="Tu cuenta del Club de Contadores">
+      <span>Club de Contadores</span>
+      <a class="ing" href="{{ club_url }}/ingresar?para=contador">Ingresar</a>
+      <a class="crear" href="{{ club_url }}/registro?para=contador">Crear cuenta</a>
+    </nav>
     <header>
       <div class="sello">
         <b>Registrados ante la Autoridad Nacional de Protección de Datos Personales</b>

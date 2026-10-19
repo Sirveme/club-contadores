@@ -23,7 +23,7 @@
       <section class="entrar-card lv-cuenta">
         <header><span class="paso">¿Ya tienes cuenta?</span><h2>Ingresa con tu DNI</h2></header>
         <p class="lead" style="margin:0;color:var(--v-fg2)">¿Te registraste antes con tu RUC y correo? <a href="/activar{% if sig %}?sig={{ sig }}{% endif %}">Activa tu cuenta</a>: creas tu clave una sola vez. ¿Dudas? WhatsApp <b class="mono">{{ psp_whatsapp }}</b>.</p>
-        <div class="acciones"><a class="btn" href="{{ url_entrar(sig or "") }}">Ingresar con mi DNI →</a></div>
+        <div class="acciones"><a class="btn" href="{{ url_entrar(sig or "", para or "") }}">Ingresar con mi DNI →</a></div>
       </section>
       {% else %}
       <section class="entrar-card lv-cuenta">

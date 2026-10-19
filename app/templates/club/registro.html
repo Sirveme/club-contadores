@@ -38,9 +38,9 @@
       <section class="entrar-card lv-cuenta" id="p2" hidden aria-label="Quién eres">
         <header><span class="paso">Paso 2 de 4</span><h2>¿Quién eres?</h2></header>
         <div class="roles" role="group" aria-label="¿Quién eres?">
-          <button type="button" class="rol lv-cuenta" data-perfil="contador" aria-pressed="true">
+          <button type="button" class="rol lv-cuenta" data-perfil="contador" aria-pressed="{{ 'false' if para == 'empresario' else 'true' }}">
             <span class="dir">Contador</span><b>Soy Contador</b><span>Contador o estudio contable</span></button>
-          <button type="button" class="rol lv-premium" data-perfil="empresario" aria-pressed="false">
+          <button type="button" class="rol lv-premium" data-perfil="empresario" aria-pressed="{{ 'true' if para == 'empresario' else 'false' }}">
             <span class="dir">Empresario</span><b>Soy Empresario</b><span>Tengo un negocio o empresa</span></button>
         </div>
         <div class="acciones"><button class="btn" type="button" id="bPerfil">Continuar →</button>
@@ -106,7 +106,7 @@
   const $ = id => document.getElementById(id);
   const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const msg = (html, tipo) => `<div class="msg ${tipo || "info"}">${html}</div>`;
-  const st = { dni: "", nombre: null, reniec: false, ruc10: "", perfil: "contador" };
+  const st = { dni: "", nombre: null, reniec: false, ruc10: "", perfil: {{ (para or "contador")|tojson }} };   // ?para= de la landing
   const ir = paso => { ["p1", "p2", "p3", "p4"].forEach(p => $(p).hidden = p !== paso);
     const f = $(paso).querySelector("input:not([type=radio]):not([type=checkbox]), button.rol, input[type=radio]:checked"); f && f.focus(); };
   async function post(url, body) {

@@ -740,8 +740,9 @@ async def nuevos_negocios(request: Request, ref: str = "", origen: str = ""):
     # al enviarlo (POST /api/nn/ruc); nada bloquea la carga inicial.
     # `ref` (del volante, ej. ?ref=asamblea) tiene prioridad sobre `origen`.
     campana = (ref or origen or "nuevos-negocios").strip()[:60] or "nuevos-negocios"
+    from .club import url_club
     return templates.TemplateResponse(request, "nuevos_negocios.html", {
-        "request": request, "anpd_url": ANPD_REGISTRO_URL, "origen": campana})
+        "request": request, "anpd_url": ANPD_REGISTRO_URL, "origen": campana, "club_url": url_club(request)})
 
 
 async def _clasificar_ruc(ruc: str) -> dict:
