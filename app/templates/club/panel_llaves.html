@@ -27,7 +27,7 @@
   <section class="panel" aria-label="Llaves">
     <header class="panel-cab"><b>Llaves de la API</b><span>{{ llaves|length }} llave{{ "" if llaves|length == 1 else "s" }} · esquema <span class="mono">{{ esquema }}</span></span></header>
     <div class="tabla-wrap"><table class="tabla">
-      <thead><tr><th>Llave</th><th>Nombre</th><th>Plan</th><th>Estado</th><th>Este mes</th><th>Llamadas 30 días</th><th>Último uso</th></tr></thead>
+      <thead><tr><th title="Solo identifica la llave: no sirve para consultar">Prefijo</th><th>Nombre</th><th>Plan</th><th>Estado</th><th>Este mes</th><th>Llamadas 30 días</th><th>Último uso</th></tr></thead>
       <tbody>
       {% for k in llaves %}
         <tr>
@@ -44,6 +44,7 @@
       {% endfor %}
       </tbody>
     </table></div>
+    <p class="nota" style="margin:8px 12px 12px">La columna <b>Prefijo</b> solo identifica cada llave: <b>no es la llave</b> y no sirve para consultar. La llave completa (<span class="mono">psp_live_xxxxxxxx_…</span>, con un segundo tramo largo) se muestra una sola vez, al crearla. Si se perdió, revócala y crea otra.</p>
   </section>
 
   <section class="panel" aria-label="Crear llave" style="margin-top:12px">
