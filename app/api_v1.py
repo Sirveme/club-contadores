@@ -63,6 +63,8 @@ SIN_CACHE = {"Cache-Control": "private, no-store", "X-Robots-Tag": "noindex"}
 GUIA = """
 Consulta de RUC con semáforos: **estado** del contribuyente, **condición de domicilio**, **SSCO**
 (con la fecha en que la resolución quedó firme), contador, negocio nuevo, distrito y domicilio.
+Además, `listas`: en qué listas públicas figura (agente de retención, buen contribuyente,
+deuda en cobranza coactiva, exportador de servicios…), cada una de `tipo` `riesgo` o `info`.
 Solo lectura. Se consulta únicamente por RUC.
 
 ## Autenticación
@@ -95,7 +97,9 @@ Siempre `{"error": {"codigo": "…", "mensaje": "…"}}`:
 
 ## Formatos
 - Por defecto, JSON anidado. `?formato=plano` lo devuelve en un solo nivel (`estado_nombre`,
-  `ssco_firme`, `distrito`…), ideal para hojas de cálculo.
+  `ssco_firme`, `distrito`…), ideal para hojas de cálculo. Cada lista va como columna
+  verdadero/falso (`agente_retencion`, `deuda_coactiva`…), más `listas` (sus nombres),
+  `listas_riesgo` y `deuda_coactiva_monto`.
 - Las fechas van como `AAAA-MM-DD`. `datos_al` y `cortes` dicen a qué fecha corresponde cada dato.
 
 ## Google Sheets
@@ -103,6 +107,67 @@ Descarga el script en [`/api/v1/sheets/RUC.gs`](sheets/RUC.gs): en tu hoja, *Ext
 Script*, pégalo y guarda. Luego el menú *Perú Sistemas Pro → Configurar llave*. Funciones:
 `=RUC(A2)`, `=RUC(A2; "estado")`, `=RUCS(A2:A200)` y `=RUC_SALDO()`.
 """
+# Padrones publicos (alter_v15, esquema propio). Nombres SIN pistas de la fuente. tipo: 'riesgo'
+# (advertencia) o 'info'. historico: listas viejas que no describen la situacion actual.
+SUNAT_ESQUEMA = os.getenv("SUNAT_ESQUEMA", "sunat").strip()
+if not re.match(r"^[a-z_][a-z0-9_]*$", SUNAT_ESQUEMA):
+    raise RuntimeError("SUNAT_ESQUEMA invalido")
+PADRONES = {
+    "deuda_coactiva": ("Deuda en cobranza coactiva", "riesgo"),
+    "ssco_vinculada": ("Vinculada a un sujeto sin capacidad operativa", "riesgo"),
+    "cpe_anotacion_judicial": ("Comprobante con anotación judicial", "riesgo"),
+    "spot_no_aplica_ilima": ("No aplicaba detracciones (lista de 2013)", "riesgo"),
+    "spot_ingreso_fondos": ("Detracciones ingresadas como recaudación (2015-2016)", "riesgo"),
+    "agente_retencion": ("Agente de retención del IGV", "info"),
+    "buen_contribuyente": ("Buen contribuyente", "info"),
+    "percepcion_venta_interna": ("Agente de percepción del IGV (venta interna)", "info"),
+    "percepcion_hidrocarburos": ("Agente de percepción del IGV (combustibles)", "info"),
+    "renuncia_exoneracion_apendice_i": ("Renunció a la exoneración del IGV (Apéndice I)", "info"),
+    "exceptuada_percepcion": ("Exceptuada de la percepción del IGV", "info"),
+    "exportador_servicios": ("Exportador de servicios", "info"),
+    "exportador_sin_garantia": ("Exportador sin garantía para la devolución", "info"),
+    "productor_minero": ("Productor minero (DL 1552)", "info"),
+    "fabricante_joyas": ("Fabricante nacional de joyas (DL 1552)", "info"),
+    "taxfree_vigente": ("Establecimiento Tax Free", "info"),
+    "taxfree_excluido": ("Excluido de Tax Free", "info"),
+    "imprenta_autorizada": ("Imprenta autorizada", "info"),
+    "rs295_2018": ("Incluido en la RS 295-2018", "info"),
+}
+# Del detalle de cada padron solo sale lo publico y sin codigos internos (dependencias, etc.).
+_DETALLE_PUBLICO = {"resolucion", "monto_deuda", "periodo", "tipo", "servicio", "hasta", "inscripcion",
+                    "distrito", "provincia", "supuestos", "ssco_origen", "expediente", "rol", "comprobante",
+                    "anotacion", "ingresos", "monto_total"}
+
+
+async def padrones_de(rucs: list[str]) -> tuple[dict | None, str | None]:
+    """{ruc: [padron, ...]} y la fecha de corte, en UNA consulta (el filtro por RUC usa el indice
+    de cada rama de la vista). Sin el esquema cargado -> (None, None): la API sigue sin el campo."""
+    import json as _json
+    import asyncpg
+    try:
+        filas = await db._pool.fetch(
+            f"SELECT ruc, padron, desde, historico, detalle FROM {SUNAT_ESQUEMA}.v_ruc_padrones "
+            "WHERE ruc = ANY($1::varchar[]) AND padron <> 'ssco'", rucs)       # el SSCO ya va en marcas
+        corte = await db._pool.fetchval(f"SELECT max(corte) FROM {SUNAT_ESQUEMA}.cargas")
+    except (asyncpg.UndefinedTableError, asyncpg.InvalidSchemaNameError):
+        log.warning("api_v1: sin esquema %s (padrones): la API responde sin ese campo", SUNAT_ESQUEMA)
+        return None, None
+    out: dict = {r: [] for r in rucs}
+    for f in filas:
+        nombre, tipo = PADRONES.get(f["padron"], (f["padron"].replace("_", " ").capitalize(), "info"))
+        det = f["detalle"]
+        det = _json.loads(det) if isinstance(det, str) else (det or {})
+        p = {"codigo": f["padron"], "nombre": nombre, "tipo": tipo,
+             "desde": f["desde"].isoformat() if f["desde"] else None, "historico": f["historico"]}
+        for k, v in det.items():
+            if k in _DETALLE_PUBLICO and v not in (None, ""):
+                p[k] = _SUFIJO_ENTIDAD.sub("", v) if k == "resolucion" and isinstance(v, str) else v
+        out[f["ruc"]].append(p)
+    for lista in out.values():
+        lista.sort(key=lambda p: (p["tipo"] != "riesgo", p["historico"], p["nombre"]))
+    return out, corte.isoformat() if corte else None
+
+
 SCRIPT_SHEETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              "integraciones", "google-sheets", "RUC.gs")
 
@@ -314,8 +379,10 @@ async def bitacora(request: Request, llave: dict, recurso: str, unidades: int, h
 
 
 # --- Formato de salida -------------------------------------------------------------------
-def _ruc_json(f: dict, llave: dict, datos: dict, con_anexos: bool) -> dict:
-    """Una fila de verificador.consultar() en el formato publico de la API."""
+def _ruc_json(f: dict, llave: dict, datos: dict, con_anexos: bool, padrones: list | None = None,
+              corte_padrones: str | None = None) -> dict:
+    """Una fila de verificador.consultar() en el formato publico de la API. `padrones`: None =
+    no disponible (sin el campo); [] = no figura en ninguno."""
     m = f.get("marcas") or {}
     marcas: dict = {}
     for col in datos["columnas"]:
@@ -343,6 +410,9 @@ def _ruc_json(f: dict, llave: dict, datos: dict, con_anexos: bool) -> dict:
            "provincia": u.get("provincia"), "distrito": u.get("distrito"), "domicilio": f.get("domicilio"),
            "marcas": marcas, "anexos": {"total": f["anexos"]["n"]},
            "datos_al": datos["datos_al"], "cortes": {c["codigo"]: c["corte"] for c in datos["columnas"]}}
+    if padrones is not None:                     # expuesto como "listas": sin la palabra de la fuente
+        out["listas"] = padrones
+        out["cortes"]["listas"] = corte_padrones
     if con_anexos:
         out["anexos"]["lista"] = f["anexos"]["lista"]
         out["anexos"]["truncado"] = f["anexos"]["n"] > len(f["anexos"]["lista"])
@@ -363,6 +433,14 @@ def _plano(d: dict) -> dict:
         elif k == "cortes":
             for cod, vv in v.items():
                 out[f"corte_{cod}"] = vv
+        elif k == "listas":
+            # Columnas estables (verdadero/falso por lista) para que una hoja no cambie de forma.
+            presentes = {p["codigo"]: p for p in v}
+            for cod in PADRONES:
+                out[cod] = cod in presentes
+            out["deuda_coactiva_monto"] = (presentes.get("deuda_coactiva") or {}).get("monto_deuda")
+            out["listas"] = "; ".join(p["nombre"] for p in v)
+            out["listas_riesgo"] = any(p["tipo"] == "riesgo" for p in v)
         elif isinstance(v, dict):
             for kk, vv in v.items():
                 if not isinstance(vv, (list, dict)):
@@ -383,7 +461,11 @@ _EJ_RUC = {"ruc": "20607011274", "encontrado": True, "razon_social": "INVERSIONE
                                "emision": "2026-09-03", "firme": "2026-09-18", "publicacion": "2026-09-30"},
                       "contador": None, "negocio_nuevo": None},
            "anexos": {"total": 0}, "datos_al": "2026-10-10",
-           "cortes": {"ssco": "2026-09-30", "contador": "2026-09-17", "negocio_nuevo": "2026-08-31"}}
+           "listas": [{"codigo": "deuda_coactiva", "nombre": "Deuda en cobranza coactiva", "tipo": "riesgo",
+                         "desde": None, "historico": False, "monto_deuda": 152340.0},
+                        {"codigo": "agente_retencion", "nombre": "Agente de retención del IGV", "tipo": "info",
+                         "desde": "2019-02-01", "historico": False, "resolucion": "RS 000123-2019"}],
+           "cortes": {"ssco": "2026-09-30", "contador": "2026-09-17", "negocio_nuevo": "2026-08-31", "listas": "2026-10-19"}}
 _RESP_COMUNES = {
     401: {"description": "Llave inválida", "content": _EJ_ERROR("llave_invalida", "Falta la llave o no es válida.")},
     403: {"description": "Llave revocada o sin alcance", "content": _EJ_ERROR("llave_revocada", "Esta llave está revocada o suspendida.")},
@@ -399,9 +481,9 @@ _RESP_COMUNES = {
     422: {"description": "RUC mal formado (no consume)", "content": _EJ_ERROR("ruc_invalido", "Un RUC tiene 11 dígitos y empieza en 10, 15, 17 o 20.")},
     **_RESP_COMUNES})
 async def ruc(ruc: str, request: Request, anexos: int = 0, formato: str = ""):
-    """Estado, condición de domicilio, distrito, domicilio y marcas (SSCO con sus fechas,
-    contador, negocio nuevo) de un RUC. `?anexos=1` agrega los locales anexos (hasta 100) y
-    `?formato=plano` devuelve todo en un solo nivel."""
+    """Estado, condición de domicilio, distrito, domicilio, marcas (SSCO con sus fechas,
+    contador, negocio nuevo) y listas públicas de un RUC. `?anexos=1` agrega los locales
+    anexos (hasta 100) y `?formato=plano` devuelve todo en un solo nivel."""
     t0 = time.monotonic()
     llave = await autenticar(request)
     if "ruc" not in llave["alcances"]:
@@ -428,7 +510,8 @@ async def ruc(ruc: str, request: Request, anexos: int = 0, formato: str = ""):
         await bitacora(request, llave, "ruc", 1, 404, t0)
         raise ErrorApi(404, "ruc_no_encontrado", "Ese RUC no figura en nuestros datos.", _cab_cuota(cuota), ruc=ruc,
                        datos_al=datos["datos_al"])
-    out = _ruc_json(f, llave, datos, bool(anexos))
+    pad, corte_pad = await padrones_de([ruc])
+    out = _ruc_json(f, llave, datos, bool(anexos), pad[ruc] if pad is not None else None, corte_pad)
     await bitacora(request, llave, "ruc", 1, 200, t0)
     return JSONResponse(_plano(out) if formato == "plano" else out, headers=cab)
 
@@ -494,16 +577,22 @@ async def ruc_lote(cuerpo: Lote, request: Request, formato: str = ""):
         await bitacora(request, llave, "ruc", 0, e.http, t0)
         raise
     datos = await V.consultar(validos, iso=True, anexos_max=0)
+    pad, corte_pad = await padrones_de([f["ruc"] for f in datos["filas"] if f["encontrado"]] or ["-"])
     resultados = []
     for f in datos["filas"]:
-        r = _ruc_json(f, llave, datos, False) if f["encontrado"] else {"ruc": f["ruc"], "encontrado": False}
+        r = (_ruc_json(f, llave, datos, False, pad.get(f["ruc"], []) if pad is not None else None, corte_pad)
+             if f["encontrado"] else {"ruc": f["ruc"], "encontrado": False})
         resultados.append(_plano(r) if formato == "plano" else r)
     encontrados = [f for f in datos["filas"] if f["encontrado"]]
     out = {"resultados": resultados, "no_validos": no_validos,
            "resumen": {"solicitados": len(cuerpo.rucs), "validos": len(validos), "encontrados": len(encontrados),
                        "no_encontrados": len(validos) - len(encontrados),
-                       "con_alerta": sum(1 for f in encontrados if f["semaforo"] == "rojo")},
+                       "con_alerta": sum(1 for f in encontrados if f["semaforo"] == "rojo"),
+                       **({"con_riesgo_listas": sum(1 for f in encontrados if any(
+                           p["tipo"] == "riesgo" for p in pad.get(f["ruc"], [])))} if pad is not None else {})},
            "datos_al": datos["datos_al"], "cortes": {c["codigo"]: c["corte"] for c in datos["columnas"]}}
+    if pad is not None:
+        out["cortes"]["listas"] = corte_pad
     await bitacora(request, llave, "ruc", len(validos), 200, t0)
     return JSONResponse(out, headers={**SIN_CACHE, **_cab_cuota(cuota)})
 

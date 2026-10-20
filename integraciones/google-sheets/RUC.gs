@@ -21,7 +21,7 @@
 var PSP_API = 'https://club.perusistemas.pro/api/v1';
 var PSP_CACHE_SEG = 21600;   // 6 horas
 var PSP_LOTE = 100;          // RUC por consulta de lote
-var PSP_VERSION = '1.0';
+var PSP_VERSION = '1.1';
 
 // Nombre que usas en la hoja → { campo de la API (formato plano), encabezado }
 var PSP_CAMPOS = {
@@ -45,6 +45,14 @@ var PSP_CAMPOS = {
   negocio_nuevo:          { api: 'negocio_nuevo',          titulo: 'Negocio nuevo' },
   negocio_nuevo_inscrito: { api: 'negocio_nuevo_inscrito', titulo: 'Inscrito el' },
   anexos:                 { api: 'anexos_total',           titulo: 'Locales anexos' },
+  listas:                 { api: 'listas',                 titulo: 'Listas' },
+  riesgo:                 { api: 'listas_riesgo',          titulo: 'Riesgo en listas' },
+  retencion:              { api: 'agente_retencion',       titulo: 'Agente de retención' },
+  buen_contribuyente:     { api: 'buen_contribuyente',     titulo: 'Buen contribuyente' },
+  percepcion:             { api: 'percepcion_venta_interna', titulo: 'Agente de percepción' },
+  coactiva:               { api: 'deuda_coactiva',         titulo: 'Deuda coactiva' },
+  coactiva_monto:         { api: 'deuda_coactiva_monto',   titulo: 'Deuda coactiva (S/)' },
+  exportador:             { api: 'exportador_servicios',   titulo: 'Exportador de servicios' },
   datos_al:               { api: 'datos_al',               titulo: 'Datos al' }
 };
 var PSP_POR_DEFECTO = ['razon_social', 'estado', 'condicion', 'ssco', 'distrito'];
