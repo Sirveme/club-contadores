@@ -201,4 +201,14 @@
         <br><small>SSCO desde ${esc(x.desde || "—")} · ${esc(x.resolucion || "")}</small>
         <ul>${(x.representantes || []).map((p) => `<li>${esc(p.nombre)} · <span class="mono">${esc(p.tipo)} ${esc(p.doc)}</span></li>`).join("")}</ul></div>`).join("");
   });
+
+  // ?ruc=20XXXXXXXXX (p. ej. "Ver más" de la extensión Ficha RUC): lo escribe y lo verifica solo.
+  // Un RUC siempre es libre (sin cuenta). Luego se limpia la URL: el RUC no queda en la barra.
+  const pedido = new URLSearchParams(location.search).get("ruc");
+  if (pedido && /^(10|15|17|20)\d{9}$/.test(pedido)) {
+    $("rucs").value = pedido;
+    contar();
+    history.replaceState(null, "", location.pathname);
+    $("fVer").requestSubmit();
+  }
 })();
