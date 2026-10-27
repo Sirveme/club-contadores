@@ -1,7 +1,7 @@
 // Conversor SIRE · Excel con estilo (ExcelJS, MIT, servido desde nuestro propio servidor).
 // Se arma en el navegador: el archivo no sale del equipo. Dos versiones: oscura (pantalla, la de la
 // casa) y clara para imprimir (sin rellenos oscuros).
-import * as M from "./motor.js?v=2";
+import * as M from "./motor.js?v=3";
 
 const RUTA_EXCELJS = "/static/vendor/exceljs/4.4.0/exceljs.min.js";
 let cargando = null;

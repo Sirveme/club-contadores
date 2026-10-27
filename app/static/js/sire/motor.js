@@ -139,7 +139,7 @@ export function parsear(texto, estructura) {
   if (entidades) avisos.push({ tipo: "limpieza", msg: `${entidades} texto${entidades === 1 ? "" : "s"} con códigos HTML (como «&amp;») se corrigieron a su carácter («&»).` });
   if (espacios) avisos.push({ tipo: "limpieza", msg: `${espacios} dato${espacios === 1 ? "" : "s"} con espacios sobrantes al inicio o al final se limpiaron.` });
   const variantes = [...new Set(filas.map(f => f.c[2]).filter(Boolean))];
-  if (variantes.length > 1) avisos.push({ tipo: "generador", msg: `El nombre del generador aparece de ${variantes.length} formas distintas (es normal en la propuesta): ${variantes.join(" · ")}.` });
+  if (variantes.length > 1) avisos.push({ tipo: "generador", variantes, msg: `El nombre del generador aparece de ${variantes.length} formas distintas (es normal en la propuesta): ${variantes.join(" · ")}.` });
   return { filas, avisos, conCabecera, columnas: primera.length };
 }
 

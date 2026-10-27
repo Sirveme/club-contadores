@@ -3,7 +3,7 @@
 {% block titulo %}Conversor SIRE · Club de Contadores{% endblock %}
 {# Fuentes desde este mismo sitio: al cargar esta pagina no sale ninguna peticion a terceros. #}
 {% block fuentes %}<link rel="stylesheet" href="/static/fonts/plex/plex.css?v=1">{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=2">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=3">{% endblock %}
 {% block contenido %}
   <section class="fx" aria-label="Fórmula">
     <div class="ref">A1</div>
@@ -23,7 +23,7 @@
       </label>
       <div class="sire-privacidad">
         <span class="chip-sem verde"><s class="sem verde"></s>Modo local</span>
-        <span>Tu archivo se procesa <b>en tu equipo</b>: ninguna cifra sale de él.</span>
+        <span>Tu archivo se procesa <b>en tu equipo</b>: ninguna cifra sale de él. Para mostrar la actividad solo consultamos el RUC del generador, sin montos ni fechas; no guardamos qué RUC consultas.</span>
         <span class="faint" title="Disponible más adelante con la suscripción">Modo servidor · pronto</span>
       </div>
       <div id="msg" aria-live="polite"></div>
@@ -32,8 +32,9 @@
 
   <div id="resultado" hidden>
     <section class="panel" aria-label="Resumen del archivo">
-      <header class="panel-cab"><b>Resumen</b><span id="resNombre"></span></header>
-      <div class="panel-cuerpo"><dl class="sire-datos" id="resDatos"></dl></div>
+      <header class="panel-cab"><b>Resumen</b><span id="resNombre"></span>
+        <button type="button" class="sire-masc" id="bMascara" aria-pressed="false" title="Oculta RUC y razones sociales en pantalla, para grabar o compartir pantalla. El Excel no cambia.">Enmascarar</button></header>
+      <div class="panel-cuerpo"><dl class="sire-datos" id="resDatos"></dl><div id="actividad" class="sire-actividad" aria-live="polite"></div></div>
     </section>
 
     <section class="panel" id="pCorr" aria-label="Correcciones" hidden>
@@ -70,7 +71,7 @@
     </section>
 
     <section class="panel" aria-label="Descargar">
-      <header class="panel-cab"><b>Descargar</b><span>Se arma aquí mismo, en tu equipo</span></header>
+      <header class="panel-cab"><b>Descargar en Excel</b><span>Se arma aquí mismo, en tu equipo</span></header>
       <div class="panel-cuerpo sire-descargas">
         <button type="button" class="btn-ver" id="bExcel">Descargar Excel</button>
         <button type="button" class="btn-sec" id="bImprimir">Versión para imprimir (clara)</button>
@@ -78,6 +79,11 @@
       </div>
     </section>
   </div>
+
+  <dialog id="ficha" class="sire-ficha" aria-labelledby="fichaTit">
+    <header><b id="fichaTit">Ficha del sector y del contribuyente</b><button type="button" class="btn-sec" id="fichaCerrar">Cerrar</button></header>
+    <div id="fichaCuerpo"></div>
+  </dialog>
 {% endblock %}
-{% block estado %}<span>Procesado en tu equipo · nada se envía</span><span id="estadoTxt">Listo</span>{% endblock %}
-{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=2" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}
+{% block estado %}<span>Procesado en tu equipo · ninguna cifra se envía</span><span id="estadoTxt">Listo</span>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=3" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}

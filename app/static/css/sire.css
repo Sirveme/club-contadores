@@ -44,3 +44,32 @@
 .sire-perfil { padding: 6px 0; border-bottom: 0; }
 .sire-perfil > span { color: var(--muted); margin-right: 4px; }
 .sire-fund { display: block; margin-top: 4px; color: var(--faint); font-size: .86em; }
+
+/* Ajustes tecnicos de lectura: colapsados */
+.sire-tecnicos summary { cursor: pointer; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 4px 0; }
+.sire-tecnicos ol { margin: 6px 0 0; padding-left: 22px; color: var(--muted); }
+/* Actividad del generador y su ficha */
+.sire-actividad { margin-top: 10px; }
+.sire-chip { all: unset; cursor: pointer; display: inline-flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--lv-gratis) 55%, var(--grid)); background: var(--cell-2); }
+.sire-chip small { color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-size: .78em; }
+.sire-chip:hover, .sire-chip:focus-visible { border-color: var(--accent); outline: none; }
+.sire-chip.riesgo { border-color: color-mix(in srgb, var(--sem-rojo) 60%, var(--grid)); }
+.sire-ficha { max-width: min(680px, calc(100vw - 32px)); width: 100%; padding: 0; border: 1px solid var(--grid); background: var(--cell); color: var(--fg); }
+.sire-ficha::backdrop { background: rgb(0 0 0 / .6); }
+.sire-ficha > header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--grid); background: var(--cell-2); }
+#fichaCuerpo { padding: 12px 14px; display: grid; gap: 10px; }
+.sire-marcas { display: grid; gap: 8px; }
+.sire-marca { padding: 8px 10px; border: 1px solid var(--grid); border-left: 3px solid var(--lv-gratis); background: var(--bg); }
+.sire-marca.riesgo { border-left-color: var(--sem-rojo); }
+.sire-marca.historico { opacity: .7; border-left-color: var(--grid); }
+.sire-marca ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+.sire-sector { margin-left: 8px; padding: 1px 7px; font-size: .82em; border: 1px solid var(--grid); color: var(--muted); }
+.sire-pronto { padding: 8px 10px; border: 1px dashed var(--grid); }
+/* Modo video: RUC y razones sociales tapados a la vista; el dato real sigue en la pagina */
+.sire-masc { all: unset; cursor: pointer; margin-left: auto; padding: 2px 8px; font-size: .82em; color: var(--faint); border: 1px solid transparent; }
+.sire-masc:hover, .sire-masc:focus-visible { color: var(--fg); border-color: var(--grid); }
+.sire-masc[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); }
+.puntos { display: none; }
+[data-mascara] .tapa { display: none; }
+[data-mascara] .puntos { display: inline; letter-spacing: .02em; }

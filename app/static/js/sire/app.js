@@ -1,6 +1,6 @@
 // Conversor SIRE · pantalla (modo local). Lee el archivo EN EL NAVEGADOR: no se sube a ninguna parte.
 // Los textos del archivo se pintan siempre con textContent (nunca como HTML).
-import * as M from "./motor.js?v=2";
+import * as M from "./motor.js?v=3";
 
 const $ = id => document.getElementById(id);
 const CAP = JSON.parse(document.currentScript?.dataset.capacidades || document.querySelector("script[data-capacidades]")?.dataset.capacidades || "{}");
@@ -13,9 +13,25 @@ function el(tag, props = {}, ...hijos) {
     if (k === "class") e.className = v; else if (k === "texto") e.textContent = v;
     else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
   }
-  for (const h of hijos.flat()) if (h !== null && h !== undefined && h !== false && h !== "") e.append(h);
+  for (const h of hijos.flat(Infinity)) if (h !== null && h !== undefined && h !== false && h !== "") e.append(h);
   return e;
 }
+// --- Modo video: enmascara RUC y razones sociales SOLO a la vista (CSS); el dato real sigue ahi ------
+const tapa = (real, puntos) => [el("span", { class: "tapa", texto: real }), el("span", { class: "puntos", "aria-hidden": "true", texto: puntos })];
+const R = ruc => !ruc ? "" : el("span", { class: "m" }, ruc.slice(0, 2), tapa(ruc.slice(2), "•".repeat(Math.max(0, ruc.length - 2))));
+const N = nom => !nom ? "" : el("span", { class: "m" }, nom.slice(0, 2), tapa(nom.slice(2), "•".repeat(Math.min(12, Math.max(0, nom.length - 2)))));
+const conRucs = texto => String(texto).split(/(?<!\d)(\d{11})(?!\d)/).map((x, i) => i % 2 ? R(x) : x);   // RUC dentro de un texto
+const CAMPOS_RUC = new Set([1, 13]), CAMPOS_NOMBRE = new Set([2, 14]), CAMPOS_CAR = new Set([4, 37]);
+const valorCampo = (n, v) => !v ? "—" : CAMPOS_RUC.has(n) ? R(v) : CAMPOS_NOMBRE.has(n) ? N(v) : CAMPOS_CAR.has(n) && /^\d{11}/.test(v) ? [R(v.slice(0, 11)), v.slice(11)] : v;
+const MASC = "sire.mascara";
+function mascara(on) {
+  document.documentElement.toggleAttribute("data-mascara", on);
+  $("bMascara").setAttribute("aria-pressed", String(on));
+  try { if (on) localStorage.setItem(MASC, "1"); else localStorage.removeItem(MASC); } catch (_) { /* sin almacenamiento */ }
+}
+let mascaraInicial = false;
+try { mascaraInicial = localStorage.getItem(MASC) === "1"; } catch (_) { /* nada */ }
+
 const msg = (texto, tipo = "info") => $("msg").replaceChildren(el("div", { class: "msg " + tipo, texto }));
 const nombreCampo = n => (spec.estructuras.rce_propuesta.campos.find(c => c.n === n) || {}).nombre || `Campo ${n}`;
 const montoTxt = v => { const c = M.centimos(v || "0"); return c === null ? (v || "") : M.soles(c); };
@@ -76,15 +92,16 @@ function pintar() {
   $("resultado").hidden = false;
   const f0 = estado.filas[0]?.c || {};
   const errores = estado.hallazgos.filter(h => h.nivel === "error").length, adv = estado.hallazgos.length - errores;
-  $("fxVal").replaceChildren(el("span", { class: "q", texto: "=" }), `SIRE(${estado.propuesta.nombre}; compras)`);
-  $("resNombre").textContent = estado.propuesta.origen !== estado.propuesta.nombre ? `${estado.propuesta.origen} → ${estado.propuesta.nombre}` : estado.propuesta.nombre;
-  const dato = (dt, dd, clase = "") => el("div", {}, el("dt", { texto: dt }), el("dd", { class: clase, texto: dd }));
+  $("fxVal").replaceChildren(el("span", { class: "q", texto: "=" }), "SIRE(", conRucs(estado.propuesta.nombre), "; compras)");
+  $("resNombre").replaceChildren(...conRucs(estado.propuesta.origen !== estado.propuesta.nombre ? `${estado.propuesta.origen} → ${estado.propuesta.nombre}` : estado.propuesta.nombre));
+  const dato = (dt, dd, clase = "") => el("div", {}, el("dt", { texto: dt }), el("dd", { class: clase }, dd));
   $("resDatos").replaceChildren(
-    dato("RUC del generador", f0[1] || "—", "mono"), dato("Periodo", f0[3] ? `${f0[3].slice(4)}/${f0[3].slice(0, 4)}` : "—", "mono"),
+    dato("RUC del generador", f0[1] ? R(f0[1]) : "—", "mono"), dato("Periodo", f0[3] ? `${f0[3].slice(4)}/${f0[3].slice(0, 4)}` : "—", "mono"),
     dato("Comprobantes", String(estado.filas.length), "mono"),
     dato("Errores", String(errores), errores ? "rojo" : "verde"), dato("Advertencias", String(adv), adv ? "amarillo" : "verde"),
     dato("Codificación", estado.propuesta.codificacion), dato("Monedas", estado.totales.monedas.join(", ") || "—"));
   pintarCorrecciones();
+  pintarActividad(f0[1]);
   pintarTotales();
   pintar621();
   pintarDetalle();
@@ -107,7 +124,16 @@ function pintarCorrecciones() {
   const raros = estado.comas.filter(h => h.sugerido == null);
   if (raros.length) bloques.push(el("div", { class: "msg err", texto: `${raros.length} monto(s) con un formato que no reconocemos (por ejemplo «${raros[0].valor}» en la fila ${raros[0].fila}): corrígelos en el Excel.` }));
   if (estado.corregidas) bloques.push(el("div", { class: "msg info", texto: `Corregiste ${estado.corregidas} monto(s) de coma a punto.` }));
-  for (const a of estado.avisos) bloques.push(el("div", { class: "msg info", texto: a.msg }));
+  // Avisos contables (p. ej. tipo 30): a la vista. Ajustes tecnicos de lectura: colapsados.
+  const TECNICOS = new Set(["limpieza", "generador", "estructura"]);
+  for (const a of estado.avisos.filter(a => !TECNICOS.has(a.tipo))) bloques.push(el("div", { class: "msg info" }, conRucs(a.msg)));
+  const tec = estado.avisos.filter(a => TECNICOS.has(a.tipo)), s = tec.length === 1 ? "" : "s";
+  if (tec.length) bloques.push(el("details", { class: "sire-tecnicos" },
+    el("summary", {}, el("span", { class: "chip-sem verde" }, el("s", { class: "sem verde" }), `✓ ${tec.length} ajuste${s} técnico${s} aplicado${s}`),
+      el("span", { class: "faint", texto: " · de lectura del archivo, no contables" })),
+    el("ol", {}, tec.map(a => el("li", {}, a.tipo === "generador" && a.variantes
+      ? [`El nombre del generador aparece de ${a.variantes.length} formas distintas (es normal en la propuesta): `, a.variantes.flatMap((v, i) => i ? [" · ", N(v)] : [N(v)]), "."]
+      : a.msg)))));
   $("pCorr").hidden = !bloques.length;
   $("corr").replaceChildren(el("div", { class: "sire-corr" }, bloques));
 }
@@ -132,6 +158,44 @@ function pintarTotales() {
           el("ul", {}, c.diferencias.slice(0, 8).map(d => el("li", { texto: `${d.tipo} · ${d.campo}: resumen ${d.centimos ? M.soles(d.resumen) : d.resumen}, archivo ${d.centimos ? M.soles(d.nuestro) : d.nuestro}` })))));
   } catch (e) { caja.replaceChildren(el("div", { class: "msg err sire-cuadre", texto: e.message })); }
 }
+
+// --- Actividad / marcas del generador ---------------------------------------------------------------
+// Lo unico que sale del navegador: el RUC del generador (sin montos ni fechas). No se guarda cual fue.
+const actividades = new Map();
+async function pintarActividad(ruc) {
+  const caja = $("actividad");
+  if (!ruc || !M.rucValido(ruc)) { caja.replaceChildren(); return; }
+  if (!actividades.has(ruc)) {
+    caja.replaceChildren(el("span", { class: "faint", texto: "Buscando la actividad del generador…" }));
+    actividades.set(ruc, fetch("/api/sire/actividad", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ruc }), cache: "no-store" })
+      .then(r => r.json()).catch(() => ({ ok: false })));
+  }
+  const d = await actividades.get(ruc);
+  if (estado?.filas[0]?.c[1] !== ruc) return;                     // ya cargaron otro archivo
+  if (!d.ok) { caja.replaceChildren(el("span", { class: "faint", texto: "No pudimos ver la actividad del generador ahora." })); actividades.delete(ruc); return; }
+  const vigentes = d.marcas.filter(m => !m.historico);
+  const etiquetas = [...d.sectores, ...vigentes.filter(m => !m.sector).map(m => m.nombre)];
+  caja.replaceChildren(el("button", { type: "button", class: "sire-chip" + (vigentes.some(m => m.tipo === "riesgo") ? " riesgo" : ""), onclick: () => abrirFicha(d, ruc) },
+    el("small", { texto: "Actividad / marcas detectadas" }), el("b", { texto: etiquetas.length ? etiquetas.join(" · ") : "Ninguna marca especial" }),
+    el("span", { class: "faint", texto: "Ver ficha →" })));
+}
+function abrirFicha(d, ruc) {
+  const fecha = iso => iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "";
+  const grupo = m => el("div", { class: "sire-marca" + (m.tipo === "riesgo" ? " riesgo" : "") + (m.historico ? " historico" : "") },
+    el("div", {}, el("b", { texto: m.nombre }), m.sector ? el("span", { class: "sire-sector", texto: m.sector }) : null,
+      m.desde ? el("span", { class: "faint", texto: ` · desde ${fecha(m.desde)}` }) : null, m.historico ? el("span", { class: "faint", texto: " · lista antigua" }) : null),
+    m.notas.length ? el("ul", {}, m.notas.map(n => el("li", { texto: n }))) : null);
+  $("fichaCuerpo").replaceChildren(
+    el("p", { class: "faint" }, "RUC del generador ", el("span", { class: "mono" }, R(ruc)), d.datos_al ? ` · datos al ${d.datos_al}` : ""),
+    d.marcas.length ? el("div", { class: "sire-marcas" }, d.marcas.map(grupo)) : el("p", { texto: "No figura en ninguna de las listas que revisamos: sin particularidades especiales que mostrar." }),
+    el("div", { class: "sire-pronto" }, el("b", { texto: "Correcciones automáticas de tu sector" }), el("span", { class: "faint", texto: " — pronto" })),
+    el("p", { class: "faint", texto: "Texto informativo: no reemplaza tu revisión. Solo consultamos el RUC, sin montos ni fechas; no guardamos qué RUC consultas." }));
+  $("ficha").showModal();
+}
+$("fichaCerrar").addEventListener("click", () => $("ficha").close());
+$("ficha").addEventListener("click", e => { if (e.target === $("ficha")) $("ficha").close(); });
+$("bMascara").addEventListener("click", () => mascara(!document.documentElement.hasAttribute("data-mascara")));
+mascara(mascaraInicial);
 
 // --- Destino de las compras y casillas del 621 ------------------------------------------------------
 // El perfil solo vive en este navegador (comodidad): no se envía a ninguna parte.
@@ -182,7 +246,7 @@ function pintarDetalle() {
     cuerpo.push(el("tr", { class: "fila " + nv, tabindex: "0", title: "Ver todos los campos", onclick: () => { abierta = abierta === f.n ? null : f.n; pintarDetalle(); },
         onkeydown: ev => { if (ev.key === "Enter") { abierta = abierta === f.n ? null : f.n; pintarDetalle(); } } },
       el("td", { class: "n", texto: String(f.n) }), el("td", { class: "mono", texto: c[7] }), el("td", { class: "mono", texto: `${c[8]}-${c[10]}` }),
-      el("td", { class: "mono", texto: c[5] }), el("td", {}, el("span", { class: "mono", texto: c[13] }), " ", c[14]),
+      el("td", { class: "mono", texto: c[5] }), el("td", {}, el("span", { class: "mono" }, R(c[13])), " ", N(c[14])),
       el("td", { class: "num", texto: M.soles(bi) }), el("td", { class: "num", texto: M.soles(igv) }), el("td", { class: "num", texto: montoTxt(c[21]) }),
       el("td", { class: "num", texto: montoTxt(c[25]) }), el("td", { class: "mono", texto: c[26] }),
       el("td", { class: "obs" }, e ? el("span", { class: "e", texto: `${e} error${e === 1 ? "" : "es"}` }) : null, e && a ? " · " : null,
@@ -202,9 +266,9 @@ function detalleFila(f, hs) {
   const malos = new Map(hs.map(h => [h.campo, h.nivel]));
   const est = spec.estructuras.rce_propuesta;
   const visibles = est.campos.filter(c => !c.libre || f.c[c.n]);
-  return el("div", {}, hs.length ? el("ul", {}, hs.map(h => el("li", { class: h.nivel === "error" ? "e" : "a", texto: `${h.nivel === "error" ? "Error" : "Advertencia"} · ${h.msg}` }))) : null,
+  return el("div", {}, hs.length ? el("ul", {}, hs.map(h => el("li", { class: h.nivel === "error" ? "e" : "a" }, `${h.nivel === "error" ? "Error" : "Advertencia"} · `, conRucs(h.msg)))) : null,
     el("div", { class: "sire-campos" }, visibles.map(c => el("div", { class: malos.get(c.n) === "error" ? "mal" : malos.get(c.n) ? "ojo" : "" },
-      el("small", { texto: `${c.n} · ${c.nombre}` }), f.c[c.n] || "—"))));
+      el("small", { texto: `${c.n} · ${c.nombre}` }), valorCampo(c.n, f.c[c.n])))));
 }
 
 document.querySelectorAll(".ver-filtros button[data-f]").forEach(b => b.addEventListener("click", () => { filtro = b.dataset.f; pagina = 0; abierta = null; pintarDetalle(); }));
@@ -214,7 +278,7 @@ async function descargar(imprimir) {
   const b1 = $("bExcel"), b2 = $("bImprimir");
   b1.disabled = b2.disabled = true; $("descMsg").textContent = "Armando el Excel en tu equipo…";
   try {
-    const { generarExcel } = await import("./excel.js?v=2");
+    const { generarExcel } = await import("./excel.js?v=3");
     const blob = await generarExcel({ ...estado, perfil }, spec, { imprimir });
     const base = estado.propuesta.nombre.replace(/\.(txt|zip)$/i, "");
     const a = el("a", { href: URL.createObjectURL(blob), download: `${base}${imprimir ? "-imprimir" : ""}.xlsx` });
