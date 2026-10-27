@@ -499,6 +499,11 @@ async def club_entrar(request: Request, rol: str = "", ref: str = "", sig: str =
         "anpd_url": ANPD_REGISTRO_URL, "psp_whatsapp": PSP_WHATSAPP})
 
 
+def _sire_tarjeta() -> dict | None:
+    from . import sire
+    return sire.tarjeta_tablero()
+
+
 def _verificador_tarjeta() -> dict | None:
     from . import verificador
     return verificador.tarjeta_tablero()
@@ -563,7 +568,7 @@ async def club_tablero(request: Request, t: str = ""):
                                "distrito": (s or {}).get("distrito") or "tu distrito",
                                "mes_dato": nn["mes_dato"] if nn else "cada mes"},
                               con_sesion=bool(s), entrar=entrar, cta_entrar=como_entrar(),
-                              encender=_verificador_tarjeta())
+                              encender={**(_verificador_tarjeta() or {}), **(_sire_tarjeta() or {})})
     total = sum(len(c["herramientas"]) for c in secciones)
     ubic = ""
     if s:

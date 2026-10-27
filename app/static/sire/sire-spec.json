@@ -1,0 +1,1820 @@
+{
+ "version": "2026-10-27",
+ "normas": [
+  "RS 112-2021/SUNAT",
+  "RS 040-2022/SUNAT",
+  "RS 138-2023/SUNAT"
+ ],
+ "nota": "Una sola fuente de verdad del Conversor SIRE. Reglas condicionales en JSON Logic (subconjunto).",
+ "tablas": {
+  "t1": {
+   "0": "Doc. tributario no domiciliado sin RUC",
+   "1": "DNI",
+   "4": "Carnet de extranjería",
+   "6": "RUC",
+   "7": "Pasaporte",
+   "A": "Cédula diplomática de identidad",
+   "B": "Doc. de identidad del país de residencia (no domiciliado)",
+   "C": "Tax Identification Number (TIN)",
+   "D": "Identification Number (IN)",
+   "E": "Tarjeta Andina de Migración (TAM)",
+   "F": "Permiso Temporal de Permanencia (PTP)"
+  },
+  "t2": {
+   "AED": "AED",
+   "AFN": "AFN",
+   "ALL": "ALL",
+   "AMD": "AMD",
+   "ANG": "ANG",
+   "AOA": "AOA",
+   "ARS": "ARS",
+   "AUD": "AUD",
+   "AWG": "AWG",
+   "AZN": "AZN",
+   "BAM": "BAM",
+   "BBD": "BBD",
+   "BDT": "BDT",
+   "BGN": "BGN",
+   "BHD": "BHD",
+   "BIF": "BIF",
+   "BMD": "BMD",
+   "BND": "BND",
+   "BOB": "BOB",
+   "BOV": "BOV",
+   "BRL": "BRL",
+   "BSD": "BSD",
+   "BTN": "BTN",
+   "BWP": "BWP",
+   "BYN": "BYN",
+   "BZD": "BZD",
+   "CAD": "CAD",
+   "CDF": "CDF",
+   "CHE": "CHE",
+   "CHF": "CHF",
+   "CHW": "CHW",
+   "CLF": "CLF",
+   "CLP": "CLP",
+   "CNY": "CNY",
+   "COP": "COP",
+   "COU": "COU",
+   "CRC": "CRC",
+   "CUC": "CUC",
+   "CUP": "CUP",
+   "CVE": "CVE",
+   "CZK": "CZK",
+   "DJF": "DJF",
+   "DKK": "DKK",
+   "DOP": "DOP",
+   "DZD": "DZD",
+   "EGP": "EGP",
+   "ERN": "ERN",
+   "ETB": "ETB",
+   "EUR": "EUR",
+   "FJD": "FJD",
+   "FKP": "FKP",
+   "GBP": "GBP",
+   "GEL": "GEL",
+   "GHS": "GHS",
+   "GIP": "GIP",
+   "GMD": "GMD",
+   "GNF": "GNF",
+   "GTQ": "GTQ",
+   "GYD": "GYD",
+   "HKD": "HKD",
+   "HNL": "HNL",
+   "HRK": "HRK",
+   "HTG": "HTG",
+   "HUF": "HUF",
+   "IDR": "IDR",
+   "ILS": "ILS",
+   "INR": "INR",
+   "IQD": "IQD",
+   "IRR": "IRR",
+   "ISK": "ISK",
+   "JMD": "JMD",
+   "JOD": "JOD",
+   "JPY": "JPY",
+   "KES": "KES",
+   "KGS": "KGS",
+   "KHR": "KHR",
+   "KMF": "KMF",
+   "KPW": "KPW",
+   "KRW": "KRW",
+   "KWD": "KWD",
+   "KYD": "KYD",
+   "KZT": "KZT",
+   "LAK": "LAK",
+   "LBP": "LBP",
+   "LKR": "LKR",
+   "LRD": "LRD",
+   "LSL": "LSL",
+   "LYD": "LYD",
+   "MAD": "MAD",
+   "MDL": "MDL",
+   "MGA": "MGA",
+   "MKD": "MKD",
+   "MMK": "MMK",
+   "MNT": "MNT",
+   "MOP": "MOP",
+   "MRU": "MRU",
+   "MUR": "MUR",
+   "MVR": "MVR",
+   "MWK": "MWK",
+   "MXN": "MXN",
+   "MXV": "MXV",
+   "MYR": "MYR",
+   "MZN": "MZN",
+   "NAD": "NAD",
+   "NGN": "NGN",
+   "NIO": "NIO",
+   "NOK": "NOK",
+   "NPR": "NPR",
+   "NZD": "NZD",
+   "OMR": "OMR",
+   "PAB": "PAB",
+   "PEN": "PEN",
+   "PGK": "PGK",
+   "PHP": "PHP",
+   "PKR": "PKR",
+   "PLN": "PLN",
+   "PYG": "PYG",
+   "QAR": "QAR",
+   "RON": "RON",
+   "RSD": "RSD",
+   "RUB": "RUB",
+   "RWF": "RWF",
+   "SAR": "SAR",
+   "SBD": "SBD",
+   "SCR": "SCR",
+   "SDG": "SDG",
+   "SEK": "SEK",
+   "SGD": "SGD",
+   "SHP": "SHP",
+   "SLL": "SLL",
+   "SOS": "SOS",
+   "SRD": "SRD",
+   "SSP": "SSP",
+   "STN": "STN",
+   "SVC": "SVC",
+   "SYP": "SYP",
+   "SZL": "SZL",
+   "THB": "THB",
+   "TJS": "TJS",
+   "TMT": "TMT",
+   "TND": "TND",
+   "TOP": "TOP",
+   "TRY": "TRY",
+   "TTD": "TTD",
+   "TWD": "TWD",
+   "TZS": "TZS",
+   "UAH": "UAH",
+   "UGX": "UGX",
+   "USD": "USD",
+   "USN": "USN",
+   "UYI": "UYI",
+   "UYU": "UYU",
+   "UYW": "UYW",
+   "UZS": "UZS",
+   "VES": "VES",
+   "VND": "VND",
+   "VUV": "VUV",
+   "WST": "WST",
+   "XAF": "XAF",
+   "XAG": "XAG",
+   "XAU": "XAU",
+   "XBA": "XBA",
+   "XBB": "XBB",
+   "XBC": "XBC",
+   "XCD": "XCD",
+   "XDR": "XDR",
+   "XOF": "XOF",
+   "XPF": "XPF",
+   "XPT": "XPT",
+   "XSU": "XSU",
+   "XTS": "XTS",
+   "XUA": "XUA",
+   "XXX": "XXX",
+   "YER": "YER",
+   "ZAR": "ZAR",
+   "ZMW": "ZMW",
+   "ZWL": "ZWL"
+  },
+  "t11": {
+   "00": "Otros",
+   "01": "Factura",
+   "02": "Recibo por honorarios",
+   "03": "Boleta de venta",
+   "04": "Liquidación de compra",
+   "05": "Boleto de transporte aéreo",
+   "06": "Carta de porte aéreo",
+   "07": "Nota de crédito",
+   "08": "Nota de débito",
+   "10": "Recibo por arrendamiento (Form. 1683)",
+   "11": "Póliza de bolsa de valores / productos",
+   "12": "Ticket o cinta de máquina registradora",
+   "13": "Documento de entidad del sistema financiero (SBS)",
+   "14": "Recibo de servicios públicos (luz, agua, telecomunicaciones)",
+   "15": "Boleto de transporte urbano o ferroviario",
+   "16": "Boleto de viaje interprovincial",
+   "17": "Documento de la Iglesia Católica por arrendamiento",
+   "18": "Documento de AFP o EPS",
+   "19": "Boleto o entrada a espectáculos",
+   "21": "Conocimiento de embarque (carga marítima)",
+   "22": "Formulario 820 - operaciones no habituales",
+   "23": "Póliza de adjudicación por remate",
+   "24": "Certificado de pago de regalías (Perupetro)",
+   "25": "Documento de atribución",
+   "27": "Formato de aportes al SCTR",
+   "28": "Documento por servicios aeroportuarios",
+   "29": "Documento de COFOPRI",
+   "30": "Documento de adquirente en sistemas de pago con tarjeta",
+   "32": "Documento de recaudadoras de la Garantía de Red Principal",
+   "34": "Documento del operador",
+   "35": "Documento del partícipe",
+   "36": "Recibo de distribución de gas natural / recibo electrónico SP",
+   "37": "Documento de revisiones técnicas vehiculares",
+   "42": "Documento de emisores de tarjetas de crédito propias",
+   "43": "Boleto de aviación no regular",
+   "44": "Billetes de lotería, rifas y apuestas",
+   "45": "Documento de centros educativos y culturales",
+   "46": "Formulario de declaración - pago o boleta de pago de tributos internos",
+   "48": "Comprobante de operaciones - Ley 29972",
+   "50": "DAM - importación definitiva",
+   "51": "Póliza o DUI fraccionada",
+   "52": "Despacho simplificado - importación simplificada",
+   "53": "Declaración de mensajería o courier",
+   "54": "Liquidación de cobranza",
+   "55": "BVME para transporte ferroviario",
+   "56": "Comprobante de pago SEAE",
+   "64": "Documento por servicios complementarios de transporte aéreo",
+   "87": "Nota de crédito especial",
+   "88": "Nota de débito especial",
+   "89": "Nota de ajuste de operaciones - Ley 29972",
+   "91": "Comprobante emitido por el sujeto no domiciliado",
+   "96": "Exceso de crédito fiscal por retiro de bienes",
+   "97": "Nota de crédito - no domiciliado",
+   "98": "Nota de débito - no domiciliado"
+  },
+  "t11_propuesta": [
+   "01",
+   "07",
+   "08",
+   "23",
+   "30",
+   "34",
+   "42",
+   "50",
+   "52",
+   "53",
+   "54"
+  ],
+  "t11_rce": [
+   "00",
+   "01",
+   "02",
+   "03",
+   "04",
+   "05",
+   "06",
+   "07",
+   "08",
+   "10",
+   "11",
+   "12",
+   "13",
+   "14",
+   "15",
+   "16",
+   "17",
+   "18",
+   "19",
+   "21",
+   "22",
+   "23",
+   "24",
+   "25",
+   "27",
+   "28",
+   "29",
+   "30",
+   "32",
+   "34",
+   "35",
+   "36",
+   "37",
+   "42",
+   "43",
+   "44",
+   "45",
+   "46",
+   "48",
+   "50",
+   "51",
+   "52",
+   "53",
+   "54",
+   "55",
+   "56",
+   "64",
+   "87",
+   "88",
+   "89",
+   "96"
+  ],
+  "t23": {
+   "1": "Mercadería, materia prima, suministro, envases y embalajes",
+   "2": "Activo fijo",
+   "3": "Otros activos no considerados en el numeral 2",
+   "4": "Gastos de educación, recreación, salud, culturales, representación, capacitación, viaje, mantenimiento de vehículos y premios",
+   "5": "Otros gastos no incluidos en el numeral 4"
+  }
+ },
+ "estructuras": {
+  "rce_propuesta": {
+   "nombre": "Propuesta del Registro de Compras (RCE)",
+   "anexo": "Anexo 8, RS 040-2022 (ajustado por RS 138-2023)",
+   "campos_minimos": 41,
+   "campos": [
+    {
+     "n": 1,
+     "id": "ruc",
+     "nombre": "RUC del generador",
+     "cabecera": "RUC",
+     "tipo": "ruc",
+     "long": 11,
+     "obligatorio": true
+    },
+    {
+     "n": 2,
+     "id": "razon_generador",
+     "nombre": "Razón social del generador",
+     "cabecera": "Apellidos y Nombres o Razón social",
+     "tipo": "texto",
+     "long": 1500,
+     "obligatorio": true
+    },
+    {
+     "n": 3,
+     "id": "periodo",
+     "nombre": "Periodo",
+     "cabecera": "Periodo",
+     "tipo": "periodo",
+     "long": 6,
+     "obligatorio": true
+    },
+    {
+     "n": 4,
+     "id": "car",
+     "nombre": "CAR",
+     "cabecera": "CAR SUNAT",
+     "tipo": "texto",
+     "long": 27
+    },
+    {
+     "n": 5,
+     "id": "fecha_emision",
+     "nombre": "Fecha de emisión",
+     "cabecera": "Fecha de emisión",
+     "tipo": "fecha",
+     "long": 10,
+     "obligatorio": true
+    },
+    {
+     "n": 6,
+     "id": "fecha_vcto",
+     "nombre": "Fecha de vencimiento o pago",
+     "cabecera": "Fecha Vcto/Pago",
+     "tipo": "fecha",
+     "long": 10,
+     "obligatorio_si": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "14",
+        "46",
+        "50",
+        "51",
+        "52",
+        "53",
+        "54"
+       ]
+      ]
+     }
+    },
+    {
+     "n": 7,
+     "id": "tipo_cp",
+     "nombre": "Tipo de comprobante",
+     "cabecera": "Tipo CP/Doc.",
+     "tipo": "codigo",
+     "long": 2,
+     "tabla": "t11",
+     "obligatorio": true
+    },
+    {
+     "n": 8,
+     "id": "serie",
+     "nombre": "Serie",
+     "cabecera": "Serie del CDP",
+     "tipo": "texto",
+     "long": 20
+    },
+    {
+     "n": 9,
+     "id": "anio_dam",
+     "nombre": "Año DAM/DSI",
+     "cabecera": "Año",
+     "tipo": "entero",
+     "long": 4,
+     "obligatorio_si": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "50",
+        "51",
+        "52",
+        "53",
+        "54"
+       ]
+      ]
+     }
+    },
+    {
+     "n": 10,
+     "id": "numero",
+     "nombre": "Número",
+     "cabecera": "Nro CP o Doc. Nro Inicial (Rango)",
+     "tipo": "texto",
+     "long": 20,
+     "obligatorio_si": {
+      "!": {
+       "in": [
+        {
+         "var": "c7"
+        },
+        [
+         "00"
+        ]
+       ]
+      }
+     }
+    },
+    {
+     "n": 11,
+     "id": "numero_final",
+     "nombre": "Número final (rango)",
+     "cabecera": "Nro Final (Rango)",
+     "tipo": "texto",
+     "long": 20
+    },
+    {
+     "n": 12,
+     "id": "tipo_doc_prov",
+     "nombre": "Tipo de documento del proveedor",
+     "cabecera": "Tipo Doc Identidad",
+     "tipo": "codigo",
+     "long": 1,
+     "tabla": "t1",
+     "obligatorio_si": {
+      "and": [
+       {
+        "!": {
+         "in": [
+          {
+           "var": "c7"
+          },
+          [
+           "00"
+          ]
+         ]
+        }
+       },
+       {
+        "==": [
+         {
+          "var": "c11"
+         },
+         ""
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "n": 13,
+     "id": "doc_prov",
+     "nombre": "Documento del proveedor",
+     "cabecera": "Nro Doc Identidad",
+     "tipo": "texto",
+     "long": 15,
+     "obligatorio_si": {
+      "and": [
+       {
+        "!": {
+         "in": [
+          {
+           "var": "c7"
+          },
+          [
+           "00"
+          ]
+         ]
+        }
+       },
+       {
+        "==": [
+         {
+          "var": "c11"
+         },
+         ""
+        ]
+       }
+      ]
+     },
+     "ruc_si": {
+      "==": [
+       {
+        "var": "c12"
+       },
+       "6"
+      ]
+     }
+    },
+    {
+     "n": 14,
+     "id": "razon_prov",
+     "nombre": "Razón social del proveedor",
+     "cabecera": "Apellidos Nombres/ Razón  Social",
+     "tipo": "texto",
+     "long": 1500,
+     "obligatorio_si": {
+      "and": [
+       {
+        "!": {
+         "in": [
+          {
+           "var": "c7"
+          },
+          [
+           "00"
+          ]
+         ]
+        }
+       },
+       {
+        "==": [
+         {
+          "var": "c11"
+         },
+         ""
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "n": 15,
+     "id": "bi_dg",
+     "nombre": "Base imponible (destino gravado)",
+     "cabecera": "BI Gravado DG",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 16,
+     "id": "igv_dg",
+     "nombre": "IGV (destino gravado)",
+     "cabecera": "IGV / IPM DG",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 17,
+     "id": "bi_dgng",
+     "nombre": "Base imponible (gravado y no gravado)",
+     "cabecera": "BI Gravado DGNG",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 18,
+     "id": "igv_dgng",
+     "nombre": "IGV (gravado y no gravado)",
+     "cabecera": "IGV / IPM DGNG",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 19,
+     "id": "bi_dng",
+     "nombre": "Base imponible (destino no gravado)",
+     "cabecera": "BI Gravado DNG",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 20,
+     "id": "igv_dng",
+     "nombre": "IGV (destino no gravado)",
+     "cabecera": "IGV / IPM DNG",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 21,
+     "id": "no_gravadas",
+     "nombre": "Adquisiciones no gravadas",
+     "cabecera": "Valor Adq. NG",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 22,
+     "id": "isc",
+     "nombre": "ISC",
+     "cabecera": "ISC",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 23,
+     "id": "icbper",
+     "nombre": "ICBPER",
+     "cabecera": "ICBPER",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 24,
+     "id": "otros",
+     "nombre": "Otros tributos y cargos",
+     "cabecera": "Otros Trib/ Cargos",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 25,
+     "id": "total",
+     "nombre": "Importe total",
+     "cabecera": "Total CP",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 26,
+     "id": "moneda",
+     "nombre": "Moneda",
+     "cabecera": "Moneda",
+     "tipo": "codigo",
+     "long": 3,
+     "tabla": "t2",
+     "obligatorio": true
+    },
+    {
+     "n": 27,
+     "id": "tc",
+     "nombre": "Tipo de cambio",
+     "cabecera": "Tipo de Cambio",
+     "tipo": "tc",
+     "long": [
+      1,
+      3
+     ],
+     "obligatorio_si": {
+      "!=": [
+       {
+        "var": "c26"
+       },
+       "PEN"
+      ]
+     }
+    },
+    {
+     "n": 28,
+     "id": "mod_fecha",
+     "nombre": "Fecha del documento modificado",
+     "cabecera": "Fecha Emisión Doc Modificado",
+     "tipo": "fecha",
+     "long": 10,
+     "obligatorio_si": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "07",
+        "08",
+        "87",
+        "88"
+       ]
+      ]
+     }
+    },
+    {
+     "n": 29,
+     "id": "mod_tipo",
+     "nombre": "Tipo del documento modificado",
+     "cabecera": "Tipo CP Modificado",
+     "tipo": "codigo",
+     "long": 2,
+     "tabla": "t11",
+     "obligatorio_si": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "07",
+        "08",
+        "87",
+        "88"
+       ]
+      ]
+     }
+    },
+    {
+     "n": 30,
+     "id": "mod_serie",
+     "nombre": "Serie del documento modificado",
+     "cabecera": "Serie CP Modificado",
+     "tipo": "texto",
+     "long": 20,
+     "obligatorio_si": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "07",
+        "08",
+        "87",
+        "88"
+       ]
+      ]
+     }
+    },
+    {
+     "n": 31,
+     "id": "mod_dam",
+     "nombre": "Código DAM/DSI del documento modificado",
+     "cabecera": "COD. DAM O DSI",
+     "tipo": "texto",
+     "long": 3,
+     "obligatorio_si": {
+      "in": [
+       {
+        "var": "c29"
+       },
+       [
+        "50",
+        "52"
+       ]
+      ]
+     }
+    },
+    {
+     "n": 32,
+     "id": "mod_numero",
+     "nombre": "Número del documento modificado",
+     "cabecera": "Nro CP Modificado",
+     "tipo": "texto",
+     "long": 20,
+     "obligatorio_si": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "07",
+        "08",
+        "87",
+        "88"
+       ]
+      ]
+     }
+    },
+    {
+     "n": 33,
+     "id": "clasif",
+     "nombre": "Clasificación de bienes y servicios",
+     "cabecera": "Clasif de Bss y Sss",
+     "tipo": "codigo",
+     "long": 1,
+     "tabla": "t23"
+    },
+    {
+     "n": 34,
+     "id": "proyecto",
+     "nombre": "Contrato o proyecto (operadores)",
+     "cabecera": "ID Proyecto Operadores",
+     "tipo": "texto",
+     "long": 50,
+     "obligatorio_si": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "25"
+       ]
+      ]
+     }
+    },
+    {
+     "n": 35,
+     "id": "porc_part",
+     "nombre": "% de participación",
+     "cabecera": "PorcPart",
+     "tipo": "monto",
+     "long": [
+      2,
+      2
+     ]
+    },
+    {
+     "n": 36,
+     "id": "imb",
+     "nombre": "Impuesto Ley 31053",
+     "cabecera": "IMB",
+     "tipo": "monto",
+     "long": [
+      12,
+      2
+     ]
+    },
+    {
+     "n": 37,
+     "id": "car_orig",
+     "nombre": "CAR de origen / indicador",
+     "cabecera": "CAR Orig/ Ind E o I",
+     "tipo": "texto",
+     "long": 27
+    },
+    {
+     "n": 38,
+     "id": "detraccion",
+     "nombre": "Detracción",
+     "cabecera": "Detracción",
+     "tipo": "texto",
+     "long": 1,
+     "informativo": true
+    },
+    {
+     "n": 39,
+     "id": "tipo_nota",
+     "nombre": "Tipo de nota",
+     "cabecera": "Tipo de Nota",
+     "tipo": "texto",
+     "long": 2,
+     "informativo": true
+    },
+    {
+     "n": 40,
+     "id": "estado_cp",
+     "nombre": "Estado del comprobante",
+     "cabecera": "Est. Comp.",
+     "tipo": "texto",
+     "long": 1,
+     "informativo": true
+    },
+    {
+     "n": 41,
+     "id": "inconsistencias",
+     "nombre": "Inconsistencias",
+     "cabecera": "Incal",
+     "tipo": "texto",
+     "long": 20,
+     "informativo": true
+    },
+    {
+     "n": 42,
+     "id": "libre1",
+     "nombre": "Libre 1",
+     "cabecera": "CLU1",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 43,
+     "id": "libre2",
+     "nombre": "Libre 2",
+     "cabecera": "CLU2",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 44,
+     "id": "libre3",
+     "nombre": "Libre 3",
+     "cabecera": "CLU3",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 45,
+     "id": "libre4",
+     "nombre": "Libre 4",
+     "cabecera": "CLU4",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 46,
+     "id": "libre5",
+     "nombre": "Libre 5",
+     "cabecera": "CLU5",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 47,
+     "id": "libre6",
+     "nombre": "Libre 6",
+     "cabecera": "CLU6",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 48,
+     "id": "libre7",
+     "nombre": "Libre 7",
+     "cabecera": "CLU7",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 49,
+     "id": "libre8",
+     "nombre": "Libre 8",
+     "cabecera": "CLU8",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 50,
+     "id": "libre9",
+     "nombre": "Libre 9",
+     "cabecera": "CLU9",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 51,
+     "id": "libre10",
+     "nombre": "Libre 10",
+     "cabecera": "CLU10",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 52,
+     "id": "libre11",
+     "nombre": "Libre 11",
+     "cabecera": "CLU11",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 53,
+     "id": "libre12",
+     "nombre": "Libre 12",
+     "cabecera": "CLU12",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 54,
+     "id": "libre13",
+     "nombre": "Libre 13",
+     "cabecera": "CLU13",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 55,
+     "id": "libre14",
+     "nombre": "Libre 14",
+     "cabecera": "CLU14",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 56,
+     "id": "libre15",
+     "nombre": "Libre 15",
+     "cabecera": "CLU15",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 57,
+     "id": "libre16",
+     "nombre": "Libre 16",
+     "cabecera": "CLU16",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 58,
+     "id": "libre17",
+     "nombre": "Libre 17",
+     "cabecera": "CLU17",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 59,
+     "id": "libre18",
+     "nombre": "Libre 18",
+     "cabecera": "CLU18",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 60,
+     "id": "libre19",
+     "nombre": "Libre 19",
+     "cabecera": "CLU19",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 61,
+     "id": "libre20",
+     "nombre": "Libre 20",
+     "cabecera": "CLU20",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 62,
+     "id": "libre21",
+     "nombre": "Libre 21",
+     "cabecera": "CLU21",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 63,
+     "id": "libre22",
+     "nombre": "Libre 22",
+     "cabecera": "CLU22",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 64,
+     "id": "libre23",
+     "nombre": "Libre 23",
+     "cabecera": "CLU23",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 65,
+     "id": "libre24",
+     "nombre": "Libre 24",
+     "cabecera": "CLU24",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 66,
+     "id": "libre25",
+     "nombre": "Libre 25",
+     "cabecera": "CLU25",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 67,
+     "id": "libre26",
+     "nombre": "Libre 26",
+     "cabecera": "CLU26",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 68,
+     "id": "libre27",
+     "nombre": "Libre 27",
+     "cabecera": "CLU27",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 69,
+     "id": "libre28",
+     "nombre": "Libre 28",
+     "cabecera": "CLU28",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 70,
+     "id": "libre29",
+     "nombre": "Libre 29",
+     "cabecera": "CLU29",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 71,
+     "id": "libre30",
+     "nombre": "Libre 30",
+     "cabecera": "CLU30",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 72,
+     "id": "libre31",
+     "nombre": "Libre 31",
+     "cabecera": "CLU31",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 73,
+     "id": "libre32",
+     "nombre": "Libre 32",
+     "cabecera": "CLU32",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 74,
+     "id": "libre33",
+     "nombre": "Libre 33",
+     "cabecera": "CLU33",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 75,
+     "id": "libre34",
+     "nombre": "Libre 34",
+     "cabecera": "CLU34",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 76,
+     "id": "libre35",
+     "nombre": "Libre 35",
+     "cabecera": "CLU35",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 77,
+     "id": "libre36",
+     "nombre": "Libre 36",
+     "cabecera": "CLU36",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 78,
+     "id": "libre37",
+     "nombre": "Libre 37",
+     "cabecera": "CLU37",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 79,
+     "id": "libre38",
+     "nombre": "Libre 38",
+     "cabecera": "CLU38",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    },
+    {
+     "n": 80,
+     "id": "libre39",
+     "nombre": "Libre 39",
+     "cabecera": "CLU39",
+     "tipo": "texto",
+     "long": 200,
+     "libre": true
+    }
+   ],
+   "reglas": [
+    {
+     "id": "igv_15",
+     "nivel": "advertencia",
+     "campos": [
+      15,
+      16
+     ],
+     "cuando": {
+      "!=": [
+       {
+        "var": "m15"
+       },
+       0
+      ]
+     },
+     "debe": {
+      "<=": [
+       {
+        "abs": {
+         "-": [
+          {
+           "var": "m16"
+          },
+          {
+           "*": [
+            {
+             "var": "m15"
+            },
+            0.18
+           ]
+          }
+         ]
+        }
+       },
+       1
+      ]
+     },
+     "msg": "El IGV (campo 16) no es el 18% de la base (campo 15). Si aplica una tasa reducida, está bien."
+    },
+    {
+     "id": "igv_17",
+     "nivel": "advertencia",
+     "campos": [
+      17,
+      18
+     ],
+     "cuando": {
+      "!=": [
+       {
+        "var": "m17"
+       },
+       0
+      ]
+     },
+     "debe": {
+      "<=": [
+       {
+        "abs": {
+         "-": [
+          {
+           "var": "m18"
+          },
+          {
+           "*": [
+            {
+             "var": "m17"
+            },
+            0.18
+           ]
+          }
+         ]
+        }
+       },
+       1
+      ]
+     },
+     "msg": "El IGV (campo 18) no es el 18% de la base (campo 17). Si aplica una tasa reducida, está bien."
+    },
+    {
+     "id": "igv_19",
+     "nivel": "advertencia",
+     "campos": [
+      19,
+      20
+     ],
+     "cuando": {
+      "!=": [
+       {
+        "var": "m19"
+       },
+       0
+      ]
+     },
+     "debe": {
+      "<=": [
+       {
+        "abs": {
+         "-": [
+          {
+           "var": "m20"
+          },
+          {
+           "*": [
+            {
+             "var": "m19"
+            },
+            0.18
+           ]
+          }
+         ]
+        }
+       },
+       1
+      ]
+     },
+     "msg": "El IGV (campo 20) no es el 18% de la base (campo 19). Si aplica una tasa reducida, está bien."
+    },
+    {
+     "id": "signo_15",
+     "nivel": "error",
+     "campos": [
+      15,
+      16
+     ],
+     "cuando": {
+      "and": [
+       {
+        "!=": [
+         {
+          "var": "m15"
+         },
+         0
+        ]
+       },
+       {
+        "!=": [
+         {
+          "var": "m16"
+         },
+         0
+        ]
+       }
+      ]
+     },
+     "debe": {
+      ">": [
+       {
+        "*": [
+         {
+          "var": "m15"
+         },
+         {
+          "var": "m16"
+         }
+        ]
+       },
+       0
+      ]
+     },
+     "msg": "La base (campo 15) y su IGV (campo 16) deben tener el mismo signo."
+    },
+    {
+     "id": "signo_17",
+     "nivel": "error",
+     "campos": [
+      17,
+      18
+     ],
+     "cuando": {
+      "and": [
+       {
+        "!=": [
+         {
+          "var": "m17"
+         },
+         0
+        ]
+       },
+       {
+        "!=": [
+         {
+          "var": "m18"
+         },
+         0
+        ]
+       }
+      ]
+     },
+     "debe": {
+      ">": [
+       {
+        "*": [
+         {
+          "var": "m17"
+         },
+         {
+          "var": "m18"
+         }
+        ]
+       },
+       0
+      ]
+     },
+     "msg": "La base (campo 17) y su IGV (campo 18) deben tener el mismo signo."
+    },
+    {
+     "id": "signo_19",
+     "nivel": "error",
+     "campos": [
+      19,
+      20
+     ],
+     "cuando": {
+      "and": [
+       {
+        "!=": [
+         {
+          "var": "m19"
+         },
+         0
+        ]
+       },
+       {
+        "!=": [
+         {
+          "var": "m20"
+         },
+         0
+        ]
+       }
+      ]
+     },
+     "debe": {
+      ">": [
+       {
+        "*": [
+         {
+          "var": "m19"
+         },
+         {
+          "var": "m20"
+         }
+        ]
+       },
+       0
+      ]
+     },
+     "msg": "La base (campo 19) y su IGV (campo 20) deben tener el mismo signo."
+    },
+    {
+     "id": "total",
+     "nivel": "advertencia",
+     "campos": [
+      25
+     ],
+     "cuando": {
+      "==": [
+       {
+        "var": "m36"
+       },
+       0
+      ]
+     },
+     "debe": {
+      "<=": [
+       {
+        "abs": {
+         "-": [
+          {
+           "var": "m25"
+          },
+          {
+           "+": [
+            {
+             "var": "m15"
+            },
+            {
+             "var": "m16"
+            },
+            {
+             "var": "m17"
+            },
+            {
+             "var": "m18"
+            },
+            {
+             "var": "m19"
+            },
+            {
+             "var": "m20"
+            },
+            {
+             "var": "m21"
+            },
+            {
+             "var": "m22"
+            },
+            {
+             "var": "m23"
+            },
+            {
+             "var": "m24"
+            }
+           ]
+          }
+         ]
+        }
+       },
+       1
+      ]
+     },
+     "msg": "El importe total (campo 25) no es la suma de bases, IGV, no gravadas, ISC, ICBPER y otros (diferencia mayor a S/ 1)."
+    },
+    {
+     "id": "rce_tipo",
+     "nivel": "error",
+     "campos": [
+      7
+     ],
+     "cuando": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "91",
+        "97",
+        "98"
+       ]
+      ]
+     },
+     "debe": false,
+     "msg": "Ese tipo de comprobante (91, 97 o 98) no va en el Registro de Compras: corresponde a no domiciliados."
+    },
+    {
+     "id": "anio_dam",
+     "nivel": "error",
+     "campos": [
+      9
+     ],
+     "cuando": {
+      "!=": [
+       {
+        "var": "c9"
+       },
+       ""
+      ]
+     },
+     "debe": {
+      "and": [
+       {
+        ">": [
+         {
+          "num": {
+           "var": "c9"
+          }
+         },
+         1981
+        ]
+       },
+       {
+        "<=": [
+         {
+          "num": {
+           "var": "c9"
+          }
+         },
+         {
+          "num": {
+           "substr": [
+            {
+             "var": "c3"
+            },
+            0,
+            4
+           ]
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "msg": "El año de la DAM/DSI debe ser mayor a 1981 y no posterior al año del periodo."
+    },
+    {
+     "id": "vcto_mes_sig",
+     "nivel": "error",
+     "campos": [
+      6
+     ],
+     "cuando": {
+      "and": [
+       {
+        "in": [
+         {
+          "var": "c7"
+         },
+         [
+          "14"
+         ]
+        ]
+       },
+       {
+        "!=": [
+         {
+          "var": "c6"
+         },
+         ""
+        ]
+       }
+      ]
+     },
+     "debe": {
+      "<=": [
+       {
+        "aaaamm": {
+         "var": "c6"
+        }
+       },
+       {
+        "mes_siguiente": {
+         "var": "c3"
+        }
+       }
+      ]
+     },
+     "msg": "En recibos de servicios públicos (14) la fecha de vencimiento o pago no puede pasar del mes siguiente al periodo."
+    },
+    {
+     "id": "emision_periodo",
+     "nivel": "error",
+     "campos": [
+      5
+     ],
+     "cuando": {
+      "!=": [
+       {
+        "var": "c5"
+       },
+       ""
+      ]
+     },
+     "debe": {
+      "<=": [
+       {
+        "aaaamm": {
+         "var": "c5"
+        }
+       },
+       {
+        "num": {
+         "var": "c3"
+        }
+       }
+      ]
+     },
+     "msg": "La fecha de emisión no puede ser posterior al periodo."
+    }
+   ],
+   "series": {
+    "01": "^(E001|F[A-Z0-9]{3}|\\d{4})$",
+    "03": "^(EB01|B[A-Z0-9]{3}|\\d{4})$",
+    "07": "^(E001|EB01|F[A-Z0-9]{3}|B[A-Z0-9]{3}|S[A-Z0-9]{3}|\\d{4})$",
+    "08": "^(E001|EB01|F[A-Z0-9]{3}|B[A-Z0-9]{3}|S[A-Z0-9]{3}|\\d{4})$",
+    "04": "^(E001|L[A-Z0-9]{3}|\\d{4})$",
+    "02": "^(E001|\\d{4})$",
+    "50": "^\\d{3}$",
+    "51": "^\\d{3}$",
+    "52": "^\\d{3}$",
+    "53": "^\\d{3}$",
+    "54": "^\\d{3}$"
+   },
+   "numeros": {
+    "01": "^0*[1-9]\\d{0,7}$",
+    "03": "^0*[1-9]\\d{0,7}$",
+    "04": "^0*[1-9]\\d{0,7}$",
+    "07": "^0*[1-9]\\d{0,7}$",
+    "08": "^0*[1-9]\\d{0,7}$",
+    "06": "^0*[1-9]\\d{0,7}$",
+    "34": "^0*[1-9]\\d{0,7}$",
+    "35": "^0*[1-9]\\d{0,7}$",
+    "36": "^0*[1-9]\\d{0,7}$"
+   },
+   "montos_cuadre": [
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+   ],
+   "totales": [
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25
+   ]
+  },
+  "rce_resumen": {
+   "nombre": "Resumen de la propuesta RCE",
+   "cabecera": [
+    "Tipo de Documento",
+    "Total Documentos",
+    "BI Gravado DG",
+    "IGV / IPM DG",
+    "BI Gravado DGNG",
+    "IGV / IPM DGNG",
+    "BI Gravado DNG",
+    "IGV / IPM DNG",
+    "Valor Adq. NG",
+    "ISC",
+    "ICBPER",
+    "Otros Trib/ Cargos",
+    "Total CP"
+   ],
+   "campos_detalle": [
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25
+   ]
+  }
+ }
+}

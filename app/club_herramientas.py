@@ -154,7 +154,9 @@ def armar_tablero(valores: dict, con_sesion: bool = True, entrar: str = "/entrar
     por_id: dict[str, dict] = {}
     secciones = []
     for n in NIVELES:
-        hs = [{**h, **(encender or {}).get(h["id"], {})} for h in HERRAMIENTAS if h["nivel"] == n["id"]]
+        # El nivel se toma DESPUES de encender: una herramienta puede cambiar de nivel (p. ej. el
+        # Conversor SIRE pasa de premium a gratis al abrirse).
+        hs = [x for x in ({**h, **(encender or {}).get(h["id"], {})} for h in HERRAMIENTAS) if x["nivel"] == n["id"]]
         hs.sort(key=lambda h: 0 if h["estado"] == "activa" else 1)   # estable
         for h in hs:
             for k in ("sub", "ben", "url"):

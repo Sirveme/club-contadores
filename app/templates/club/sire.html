@@ -1,0 +1,71 @@
+{% extends "club/base.html" %}
+{% set hoja = "sire" %}
+{% block titulo %}Conversor SIRE · Club de Contadores{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=1">{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Fórmula">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val" id="fxVal"><span class="q">=</span>SIRE(propuesta; compras)</div>
+  </section>
+
+  <section class="panel" aria-label="Subir la propuesta" style="--lv: var(--lv-gratis)">
+    <header class="panel-cab"><b style="color:var(--lv-gratis)">Conversor SIRE · Compras</b>
+      <span>Gratis · sin cuenta · lee la propuesta del Registro de Compras y la vuelve un Excel legible</span></header>
+    <div class="panel-cuerpo">
+      <label class="sire-zona" id="zona" for="archivo" tabindex="0">
+        <input type="file" id="archivo" accept=".zip,.txt" multiple hidden>
+        <b>Arrastra aquí la propuesta que descargaste del SIRE</b>
+        <span>El ZIP tal cual, o el TXT. Si también tienes el TXT del <i>resumen</i>, súbelo junto: comprobamos que los totales cuadren.</span>
+        <span class="btn-ver" aria-hidden="true">Elegir archivo</span>
+      </label>
+      <div class="sire-privacidad">
+        <span class="chip-sem verde"><s class="sem verde"></s>Modo local</span>
+        <span>Tu archivo se procesa <b>en tu equipo</b>: ninguna cifra sale de él.</span>
+        <span class="faint" title="Disponible más adelante con la suscripción">Modo servidor · pronto</span>
+      </div>
+      <div id="msg" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <div id="resultado" hidden>
+    <section class="panel" aria-label="Resumen del archivo">
+      <header class="panel-cab"><b>Resumen</b><span id="resNombre"></span></header>
+      <div class="panel-cuerpo"><dl class="sire-datos" id="resDatos"></dl></div>
+    </section>
+
+    <section class="panel" id="pCorr" aria-label="Correcciones" hidden>
+      <header class="panel-cab"><b>Correcciones</b><span>Lo que encontramos al leer el archivo</span></header>
+      <div class="panel-cuerpo" id="corr"></div>
+    </section>
+
+    <section class="panel" aria-label="Totales">
+      <header class="panel-cab"><b>Totales por tipo de comprobante</b><span id="totNota"></span></header>
+      <div class="panel-cuerpo"><div class="tabla-wrap"><table class="tabla sire-tot" id="tot"></table></div><div id="cuadre"></div></div>
+    </section>
+
+    <section class="panel" aria-label="Comprobantes">
+      <header class="panel-cab"><b>Comprobantes</b><span id="detNota"></span></header>
+      <div class="panel-cuerpo">
+        <div class="ver-filtros" role="group" aria-label="Filtrar">
+          <button type="button" data-f="todos" aria-pressed="true">Todos <span id="nTodos"></span></button>
+          <button type="button" data-f="error" aria-pressed="false"><s class="sem rojo"></s>Con errores <span id="nErr"></span></button>
+          <button type="button" data-f="advertencia" aria-pressed="false"><s class="sem amarillo"></s>Con advertencias <span id="nAdv"></span></button>
+        </div>
+        <div class="tabla-wrap"><table class="tabla sire-det" id="det"></table></div>
+        <div class="sire-pag" id="pag"></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Descargar">
+      <header class="panel-cab"><b>Descargar</b><span>Se arma aquí mismo, en tu equipo</span></header>
+      <div class="panel-cuerpo sire-descargas">
+        <button type="button" class="btn-ver" id="bExcel">Descargar Excel</button>
+        <button type="button" class="btn-sec" id="bImprimir">Versión para imprimir (clara)</button>
+        <span class="faint" id="descMsg" aria-live="polite"></span>
+      </div>
+    </section>
+  </div>
+{% endblock %}
+{% block estado %}<span>Procesado en tu equipo · nada se envía</span><span id="estadoTxt">Listo</span>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=1" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}

@@ -36,6 +36,7 @@ from . import identidad  # noqa: E402  (identidad por persona/DNI: /api/id/...)
 from . import verificador  # noqa: E402  (Verificador multi-padron: /verificador)
 from . import api_v1  # noqa: E402  (API propia con llave: /api/v1/...)
 from . import panel_llaves  # noqa: E402  (panel admin de llaves de la API)
+from . import sire  # noqa: E402  (Conversor SIRE: /sire, modo local)
 
 SITE_BASE = os.getenv("SITE_BASE", "https://observatorio.perusistemas.pro").rstrip("/")
 # URL del registro ante la ANPD (placeholder editable hasta tener el archivo).
@@ -130,6 +131,7 @@ async def proteger_panel(request: Request, call_next):
     return await call_next(request)
 app.include_router(identidad.router)
 app.include_router(verificador.router)
+app.include_router(sire.router)
 app.include_router(panel_llaves.router)   # /panel/llaves (protegido por proteger_panel)
 app.mount("/api/v1", api_v1.app)   # API publica con llave (cerrada hasta API_ABIERTA=1)
 app.add_exception_handler(identidad._Rechazo, identidad.manejar_rechazo)
