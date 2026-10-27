@@ -27,3 +27,10 @@ zClaude-*.md
 zClub*.md
 zEstadisticas-*.md
 INFORME-*.md
+# Muestras reales del SIRE (propuestas, resumenes, reemplazos: datos de clientes, banco ANPD): nunca
+# al repo. Guardarlas en muestras-reales/ (ignorada). Las pruebas usan archivos sinteticos (tests_js/).
+muestras-reales/
+/*.txt
+/*.TXT
+!/requirements.txt
+LE[0-9]*

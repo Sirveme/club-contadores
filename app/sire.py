@@ -20,9 +20,10 @@ from . import club
 
 router = APIRouter()
 ABIERTO = os.getenv("SIRE_ABIERTO", "0").strip() == "1"
-# El navegador solo puede conectarse a este mismo sitio: ni el archivo ni nada sale a terceros.
+# El navegador solo puede conectarse a este mismo sitio: ni el archivo ni nada sale a terceros (las
+# fuentes tambien se sirven desde aqui: app/static/fonts/plex/).
 CSP = ("default-src 'self'; connect-src 'self'; img-src 'self' data: blob:; "
-       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; "
+       "style-src 'self' 'unsafe-inline'; font-src 'self'; "
        "script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
 
 

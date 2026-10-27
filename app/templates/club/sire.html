@@ -1,6 +1,8 @@
 {% extends "club/base.html" %}
 {% set hoja = "sire" %}
 {% block titulo %}Conversor SIRE · Club de Contadores{% endblock %}
+{# Fuentes desde este mismo sitio: al cargar esta pagina no sale ninguna peticion a terceros. #}
+{% block fuentes %}<link rel="stylesheet" href="/static/fonts/plex/plex.css?v=1">{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=1">{% endblock %}
 {% block contenido %}
   <section class="fx" aria-label="Fórmula">
