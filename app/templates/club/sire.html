@@ -3,7 +3,7 @@
 {% block titulo %}Conversor SIRE · Club de Contadores{% endblock %}
 {# Fuentes desde este mismo sitio: al cargar esta pagina no sale ninguna peticion a terceros. #}
 {% block fuentes %}<link rel="stylesheet" href="/static/fonts/plex/plex.css?v=1">{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=1">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=2">{% endblock %}
 {% block contenido %}
   <section class="fx" aria-label="Fórmula">
     <div class="ref">A1</div>
@@ -46,6 +46,16 @@
       <div class="panel-cuerpo"><div class="tabla-wrap"><table class="tabla sire-tot" id="tot"></table></div><div id="cuadre"></div></div>
     </section>
 
+    <section class="panel" aria-label="Destino y Formulario 621">
+      <header class="panel-cab"><b>Destino y Formulario 621</b><span>Lo que tu registro precarga en la declaración · referencial</span></header>
+      <div class="panel-cuerpo sire-621">
+        <div id="perfil"></div>
+        <div id="destino" class="sire-corr"></div>
+        <div class="tabla-wrap"><table class="tabla sire-tot" id="f621"></table></div>
+        <p class="faint" id="f621Nota"></p>
+      </div>
+    </section>
+
     <section class="panel" aria-label="Comprobantes">
       <header class="panel-cab"><b>Comprobantes</b><span id="detNota"></span></header>
       <div class="panel-cuerpo">
@@ -70,4 +80,4 @@
   </div>
 {% endblock %}
 {% block estado %}<span>Procesado en tu equipo · nada se envía</span><span id="estadoTxt">Listo</span>{% endblock %}
-{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=1" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=2" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}

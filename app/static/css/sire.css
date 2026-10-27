@@ -40,3 +40,7 @@
 .sire-pag { display: flex; gap: 8px; align-items: center; padding: 8px 0 0; color: var(--muted); }
 .sire-descargas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .sire-cuadre { margin-top: 10px; }
+.sire-621 { display: grid; gap: 10px; }
+.sire-perfil { padding: 6px 0; border-bottom: 0; }
+.sire-perfil > span { color: var(--muted); margin-right: 4px; }
+.sire-fund { display: block; margin-top: 4px; color: var(--faint); font-size: .86em; }

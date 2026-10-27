@@ -73,6 +73,36 @@ export function propuestaConErrores() {
   return [CABECERA.join("|"), ...filas.map(fila)].join("\n") + "\n";
 }
 
+// --- Casos del mercado (comunidad contable, 10/2026), con datos ficticios ---------------------------
+const doc = filas => [CABECERA.join("|"), ...filas.map(fila)].join("\n") + "\n";
+export const ADQUIRENTE = ruc("2077777777");      // empresa adquirente de tarjetas (ficticia)
+
+// Caso 1: comprobantes tipo 30 (POS): comision + IGV; numero largo; uno con serie y numero malos.
+export function casoPOS() {
+  const pos = (n, extra = {}) => base(n, { 7: "30", 8: "F701", 10: `2026070000${n}`, 13: ADQUIRENTE, 14: "PASARELA DE PAGOS FICTICIA S.A.C.",
+    15: "25.00", 16: "4.50", 25: "29.50", ...extra });
+  return doc([pos(1), pos(2, { 15: "40.00", 16: "7.20", 25: "47.20" }), base(3, { 15: "100.00", 16: "18.00", 25: "118.00" }),
+    pos(4, { 8: "F-01", 10: "ABC123" })]);
+}
+// Caso 2: libreria (vende libros exonerados): compra de libros exonerada (campo 21), una compra gravada
+// usada solo para esas ventas (DNG, 19-20) y otra gravada de uso general (DG).
+export function casoLibros() {
+  return doc([
+    base(1, { 14: "EDITORIAL FICTICIA S.A.C.", 21: "500.00", 25: "500.00" }),
+    base(2, { 19: "100.00", 20: "18.00", 25: "118.00" }),
+    base(3, { 15: "50.00", 16: "9.00", 25: "59.00" }),
+  ]);
+}
+// Caso 3: exportador con todo en destino gravado (como lo propone el SIRE) y una importacion (DAM 50).
+export function casoExportador(extra = {}) {
+  return doc([
+    base(1, { 15: "1000.00", 16: "180.00", 25: "1180.00" }),
+    base(2, { 15: "200.00", 16: "36.00", 25: "236.00", ...extra }),
+    base(3, { 7: "50", 8: "118", 9: "2026", 10: "0012345", 6: "20/07/2026", 15: "3000.00", 16: "540.00", 25: "3540.00" }),
+    base(4, { 15: "100.00", 16: "18.00", 25: "118.00", 26: "USD", 27: "3.750" }),
+  ]);
+}
+
 // ZIP minimo (un archivo, deflate) como el que entrega el portal.
 export function zip(nombre, texto) {
   const datos = Buffer.from(texto, "utf8"), comp = deflateRawSync(datos), n = Buffer.from(nombre, "utf8");

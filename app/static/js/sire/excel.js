@@ -1,7 +1,7 @@
 // Conversor SIRE · Excel con estilo (ExcelJS, MIT, servido desde nuestro propio servidor).
 // Se arma en el navegador: el archivo no sale del equipo. Dos versiones: oscura (pantalla, la de la
 // casa) y clara para imprimir (sin rellenos oscuros).
-import * as M from "./motor.js?v=1";
+import * as M from "./motor.js?v=2";
 
 const RUTA_EXCELJS = "/static/vendor/exceljs/4.4.0/exceljs.min.js";
 let cargando = null;
@@ -90,6 +90,19 @@ export async function generarExcel(estado, spec, { imprimir = false } = {}) {
     try { const r = M.compararResumen(estado.resumen.texto, t, spec); texto = r.cuadra ? "✓ Cuadra con el resumen descargado (comprobantes y montos iguales)." : `✗ No cuadra con el resumen: ${r.diferencias.length} diferencia(s).`; }
     catch (e) { texto = e.message; }
     wt.addRow([]); const r = wt.addRow([texto]); estilar(r.getCell(1), P, { bold: true });
+  }
+  // Casillas del Formulario 621 (referencial) y avisos de destino segun el perfil que marco en pantalla
+  const k = M.casillas621(estado.filas, spec), con = k.casillas.filter(c => c.centimos !== 0);
+  if (con.length) {
+    wt.addRow([]);
+    wt.addRow(["Formulario 621 (referencial)", "Casilla", "Viene del campo", "Monto"]).eachCell(c => estilar(c, P, { cab: true }));
+    for (const c of con) wt.addRow([c.nombre, c.c, `${c.campo}${c.origen === "importaciones" ? " (importaciones)" : ""}`, c.centimos / 100])
+      .eachCell((x, i) => estilar(x, P, { num: i === 4 ? "#,##0.00" : i === 2 ? "0" : null }));
+  }
+  for (const a of M.avisosDestino(estado.filas, spec, estado.perfil || {})) {
+    wt.addRow([]);
+    estilar(wt.addRow([(a.nivel === "advertencia" ? "⚠ " : "") + a.msg]).getCell(1), P, { bold: a.nivel === "advertencia" });
+    if (a.fundamento) estilar(wt.addRow(["Fundamento: " + a.fundamento]).getCell(1), P, {});
   }
   wt.columns.forEach((col, i) => { col.width = i === 0 ? 46 : 16; });
 

@@ -145,3 +145,37 @@ Anexo 3 (reemplazo) y Anexo 2 (propuesta) comparten los campos 1–33. En la pro
 Tabla 1 tipo de documento de identidad · Tabla 2 moneda · Tabla 3 tipos de CP (RVIE) · Tabla 11 tipos de CP (RCE,
 con la marca de qué tipos admite cada campo) · Tabla 4 códigos de aduana · Tabla 5/12 reglas generales por tipo
 (longitudes de serie y número) · Tabla 23 clasificación de bienes y servicios.
+
+## Casos del mercado (comunidad contable, 10/2026) — casos de prueba en `tests_js/sire/`
+Datos ficticios en `fixtures.mjs` (`casoPOS`, `casoLibros`, `casoExportador`).
+
+**Caso 1 · Tipo 30 (adquirentes de tarjetas, POS).** Tabla 11: va en RCE; serie alfanumérica hasta 20
+(al complementar: F si es electrónico, otra letra si es físico; al reemplazar: alfanumérico); número
+numérico mayor a cero hasta 20. Admite rango (campo 11) solo sin crédito fiscal. Puede complementar la
+propuesta si es electrónico y su emisión es anterior al periodo; "de contar con información que no se
+permita complementar deberá reemplazar la propuesta" (Anexo 8, rubro 2). Fase 1: se lee, se valida y se
+avisa. Fase 4: corregir en el Excel y devolver el TXT de reemplazo (Anexo 11).
+
+**Caso 2 · Exoneradas (venta de libros).** En compras: adquisiciones exoneradas e inafectas → campo 21
+"Valor Adq. NG" (casilla 120; importadas 122). Compras gravadas usadas solo para ventas exoneradas →
+campos 19-20 DNG (casilla 113, sin crédito fiscal). Campo 36 IMB: beneficio editorial (Ley 31053, art. 30;
+nota 10). Las "casillas 19 y 20" del caso son, en VENTAS (RVIE), los campos 19 Exonerado y 20 Inafecto
+(→ casilla 105 del 621; fase 5).
+
+**Caso 3 · Exportador, casilla 107 vs 110.** Destino de la adquisición = campo de base en el RCE:
+
+| RCE | Destino | 621 internas | 621 importaciones (tipos 50-54) |
+|---|---|---|---|
+| 15-16 DG | Exclusivo a gravadas y/o exportación | 107 / 108 | 114 / 115 |
+| 17-18 DGNG | Gravadas y/o exportación **y** no gravadas (prorrata, casilla 173) | 110 / 111 | 116 / 117 |
+| 19-20 DNG | Solo no gravadas (sin crédito fiscal) | 113 | 119 |
+| 21 NG | Adquisiciones no gravadas | 120 | 122 |
+
+Las exportaciones cuentan como gravadas (campos 15-20: "gravadas y/o de exportación"; coeficiente 173 =
+(gravadas + exportaciones) / (gravadas + exportaciones + no gravadas)). Ser exportador NO lleva por sí
+solo a la 110: solo si la compra sirve también a ventas no gravadas. El SIRE pone todo en 15-16 por
+defecto; **nota 5 del Anexo 8**: se puede reubicar en 17-18 o 19-20, con 15+17+19 y 16+18+20 iguales a lo
+propuesto (±1). No hace falta "papeles de trabajo": se corrige en la propuesta o en el reemplazo.
+Fase 1: casillas del 621 (referencial) + avisos según dos preguntas de perfil (no se adivina sin perfil).
+Fase 4: reubicar por comprobante y generar el TXT.
+Fuente de las casillas: Ayuda del Formulario 621 (SUNAT), casillas 107-122 y 173.

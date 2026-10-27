@@ -5,6 +5,93 @@
   "RS 040-2022/SUNAT",
   "RS 138-2023/SUNAT"
  ],
+ "formulario621": {
+  "importaciones": [
+   "50",
+   "51",
+   "52",
+   "53",
+   "54"
+  ],
+  "casillas": [
+   {
+    "c": 107,
+    "campo": 15,
+    "origen": "internas",
+    "nombre": "Compras netas destinadas a ventas gravadas (base)"
+   },
+   {
+    "c": 108,
+    "campo": 16,
+    "origen": "internas",
+    "nombre": "IGV de esas compras",
+    "igv": true
+   },
+   {
+    "c": 110,
+    "campo": 17,
+    "origen": "internas",
+    "nombre": "Compras netas destinadas a ventas gravadas y no gravadas (base)"
+   },
+   {
+    "c": 111,
+    "campo": 18,
+    "origen": "internas",
+    "nombre": "IGV de esas compras (se prorratea con el coeficiente, casilla 173)",
+    "igv": true
+   },
+   {
+    "c": 113,
+    "campo": 19,
+    "origen": "internas",
+    "nombre": "Compras netas destinadas a ventas no gravadas (base, sin crédito fiscal)"
+   },
+   {
+    "c": 114,
+    "campo": 15,
+    "origen": "importaciones",
+    "nombre": "Importaciones destinadas a ventas gravadas (base)"
+   },
+   {
+    "c": 115,
+    "campo": 16,
+    "origen": "importaciones",
+    "nombre": "IGV de esas importaciones",
+    "igv": true
+   },
+   {
+    "c": 116,
+    "campo": 17,
+    "origen": "importaciones",
+    "nombre": "Importaciones destinadas a ventas gravadas y no gravadas (base)"
+   },
+   {
+    "c": 117,
+    "campo": 18,
+    "origen": "importaciones",
+    "nombre": "IGV de esas importaciones (se prorratea)",
+    "igv": true
+   },
+   {
+    "c": 119,
+    "campo": 19,
+    "origen": "importaciones",
+    "nombre": "Importaciones destinadas a ventas no gravadas (base)"
+   },
+   {
+    "c": 120,
+    "campo": 21,
+    "origen": "internas",
+    "nombre": "Compras internas no gravadas (exoneradas e inafectas)"
+   },
+   {
+    "c": 122,
+    "campo": 21,
+    "origen": "importaciones",
+    "nombre": "Importaciones no gravadas"
+   }
+  ]
+ },
  "nota": "Una sola fuente de verdad del Conversor SIRE. Reglas condicionales en JSON Logic (subconjunto).",
  "tablas": {
   "t1": {
@@ -1733,6 +1820,110 @@
       ]
      },
      "msg": "La fecha de emisión no puede ser posterior al periodo."
+    },
+    {
+     "id": "rango",
+     "nivel": "error",
+     "campos": [
+      11
+     ],
+     "cuando": {
+      "!=": [
+       {
+        "var": "c11"
+       },
+       ""
+      ]
+     },
+     "debe": {
+      "and": [
+       {
+        "in": [
+         {
+          "var": "c7"
+         },
+         [
+          "00",
+          "03",
+          "05",
+          "06",
+          "07",
+          "08",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16",
+          "18",
+          "19",
+          "23",
+          "28",
+          "30",
+          "34",
+          "35",
+          "36",
+          "37",
+          "44",
+          "45",
+          "55",
+          "56",
+          "87",
+          "88"
+         ]
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m15"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m16"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m17"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m18"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m19"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m20"
+         },
+         0
+        ]
+       }
+      ]
+     },
+     "msg": "El número final (rango) solo se usa para anotar en forma consolidada operaciones que no dan derecho a crédito fiscal: bases e IGV deben ir en 0.00 y el tipo de comprobante debe admitirlo."
     }
    ],
    "series": {
@@ -1746,7 +1937,8 @@
     "51": "^\\d{3}$",
     "52": "^\\d{3}$",
     "53": "^\\d{3}$",
-    "54": "^\\d{3}$"
+    "54": "^\\d{3}$",
+    "30": "^[A-Z0-9]{1,20}$"
    },
    "numeros": {
     "01": "^0*[1-9]\\d{0,7}$",
@@ -1757,7 +1949,8 @@
     "06": "^0*[1-9]\\d{0,7}$",
     "34": "^0*[1-9]\\d{0,7}$",
     "35": "^0*[1-9]\\d{0,7}$",
-    "36": "^0*[1-9]\\d{0,7}$"
+    "36": "^0*[1-9]\\d{0,7}$",
+    "30": "^0*[1-9]\\d{0,19}$"
    },
    "montos_cuadre": [
     15,

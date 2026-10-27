@@ -227,7 +227,7 @@ export function validar(filas, spec, estructuraId = "rce_propuesta") {
     if (est.series[tipo] && c[8] && !new RegExp(est.series[tipo]).test(c[8]))
       add(f.n, 8, "error", "serie", `La serie «${c[8]}» no corresponde a un comprobante tipo ${tipo}.`);
     if (est.numeros[tipo] && c[10] && !new RegExp(est.numeros[tipo]).test(c[10]))
-      add(f.n, 10, "error", "numero", `El número «${c[10]}» debe ser numérico, mayor a cero y de hasta 8 dígitos.`);
+      add(f.n, 10, "error", "numero", `El número «${c[10]}» debe ser numérico, mayor a cero y de hasta ${Number((est.numeros[tipo].match(/\\d\{0,(\d+)\}/) || [, 7])[1]) + 1} dígitos.`);
     // Reglas de la estructura (JSON Logic)
     for (const r of est.reglas) {
       let aplica = false;
@@ -282,10 +282,52 @@ export function compararResumen(textoResumen, tot, spec) {
   return { cuadra: dif.length === 0, diferencias: dif, filas: filasLeidas };
 }
 
+// --- Casillas del Formulario 621 que se precargan desde el registro (referencial) ---------------------
+// Montos en soles: lo que no esta en PEN se convierte con el tipo de cambio del propio comprobante.
+export function casillas621(filas, spec) {
+  const F = spec.formulario621, imp = new Set(F.importaciones);
+  const suma = Object.fromEntries(F.casillas.map(k => [k.c, 0]));
+  let convertidos = 0;
+  for (const f of filas) {
+    const origen = imp.has(f.c[7]) ? "importaciones" : "internas";
+    const pen = !f.c[26] || f.c[26] === "PEN", tc = pen ? 1 : Number(f.c[27]) || 0;
+    if (!pen) convertidos++;
+    for (const k of F.casillas) if (k.origen === origen) suma[k.c] += Math.round((centimos(f.c[k.campo] || "0") ?? 0) * tc);
+  }
+  return { casillas: F.casillas.map(k => ({ ...k, centimos: suma[k.c] })), convertidos };
+}
+
+// --- Destino de las adquisiciones: avisos con fundamento ----------------------------------------------
+// perfil.noGravadas: "si" | "no" | null (¿ventas no gravadas en los ultimos 12 meses, sin exportaciones?)
+// perfil.exporta: true | false | null. Nada se corrige solo: el contador decide (y en la fase 4, el TXT).
+const NOTA5 = "Anexo 8 de la RS 040-2022/SUNAT, nota 5: la base e IGV que el SIRE pone por defecto en los campos 15 y 16 se pueden reubicar en los campos 17-18 o 19-20, siempre que 15+17+19 y 16+18+20 sigan sumando lo propuesto (±1).";
+export function avisosDestino(filas, spec, perfil = {}) {
+  const t = totales(filas, spec).total.montos, out = [];
+  const dg = t[15] + t[16], dgng = t[17] + t[18], dng = t[19] + t[20];
+  const imb = filas.reduce((s, f) => s + (centimos(f.c[36] || "0") ?? 0), 0);      // campo 36: no va en los totales
+  if (perfil.noGravadas === "si" && dg !== 0 && dgng === 0 && dng === 0)
+    out.push({ nivel: "advertencia", id: "todo_dg", msg: "Todas tus compras gravadas están como destino gravado exclusivo (casilla 107). Si en los últimos 12 meses tuviste ventas no gravadas, revisa el destino de cada compra: las que sirven a la vez a ventas gravadas (o exportaciones) y a no gravadas van en los campos 17-18 (casilla 110, el IGV se prorratea con el coeficiente de la casilla 173), y las que sirven solo a no gravadas en 19-20 (casilla 113, sin crédito fiscal).", fundamento: NOTA5 + " Formulario 621: casillas 107, 110, 113 y 173; Reglamento de la Ley del IGV, artículo 6." });
+  if (perfil.noGravadas === "no" && (dgng !== 0 || dng !== 0))
+    out.push({ nivel: "advertencia", id: "dgng_sin_ng", msg: "Tienes compras como destino gravado y no gravado (campos 17-20, casillas 110 o 113), pero indicaste que no tuviste ventas no gravadas. Si solo vendes gravado o exportas, esas compras van como destino gravado (campos 15-16, casilla 107) con todo su crédito fiscal.", fundamento: NOTA5 + " Formulario 621: la casilla 110 se usa si tuviste ventas no gravadas en los últimos 12 meses." });
+  if (perfil.exporta)
+    out.push({ nivel: "info", id: "exportador", msg: "Para el destino de tus compras, las exportaciones cuentan como operaciones gravadas: lo que usas para exportar va como destino gravado (casilla 107) y da crédito fiscal o saldo a favor del exportador. Solo pasa a «gravado y no gravado» (casilla 110) si la misma compra sirve también a ventas no gravadas; entonces se prorratea con el coeficiente (casilla 173 = gravadas + exportaciones, entre gravadas + exportaciones + no gravadas).", fundamento: "Anexo 8 de la RS 040-2022/SUNAT, campos 15 a 20 («gravadas y/o de exportación»); Ayuda del Formulario 621, casillas 107, 110 y 173." });
+  if (t[21] !== 0)
+    out.push({ nivel: "info", id: "no_gravadas", msg: `Tienes ${soles(t[21])} en adquisiciones no gravadas (exoneradas más inafectas, campo 21 → casilla 120 o 122 si es importación). No llevan IGV ni dan crédito fiscal. Si además vendes exonerado (por ejemplo, libros), las compras gravadas que usas solo para esas ventas van en los campos 19-20 (casilla 113).`, fundamento: "Anexo 8 de la RS 040-2022/SUNAT, campo 21 («Exoneradas más Inafectas») y campos 19-20." });
+  if (imb !== 0)
+    out.push({ nivel: "info", id: "ley31053", msg: `Hay ${soles(imb)} en «Impuesto materia de beneficio Ley 31053» (campo 36): es el beneficio de la actividad editorial; el contribuyente lo completa.`, fundamento: "Anexo 8 de la RS 040-2022/SUNAT, campo 36 y nota 10 (artículo 30 de la Ley 31053)." });
+  return out;
+}
+
+// Avisos de lectura por tipo de comprobante (no son errores).
+function avisosTipo(filas) {
+  const pos = filas.filter(f => f.c[7] === "30").length;
+  return pos ? [{ msg: `Hay ${pos} comprobante${pos === 1 ? "" : "s"} tipo 30 (adquirentes de tarjetas, los del POS). La base e IGV se pueden reubicar entre destinos dentro de la propuesta; si otro dato del comprobante viene mal, la norma pide reemplazar la propuesta con el TXT del Anexo 11 (llega en la fase 4: lo corriges en el Excel y te devolvemos el TXT).`, tipo: "30" }] : [];
+}
+
 // Todo de una vez: lo que usa la pantalla.
 export function procesar(texto, spec, estructuraId = "rce_propuesta") {
   const est = spec.estructuras[estructuraId];
   const p = parsear(texto, est);
   const comas = detectarComas(p.filas, est);
-  return { ...p, comas, hallazgos: validar(p.filas, spec, estructuraId), totales: totales(p.filas, spec, estructuraId) };
+  return { ...p, avisos: [...p.avisos, ...avisosTipo(p.filas)], comas, hallazgos: validar(p.filas, spec, estructuraId), totales: totales(p.filas, spec, estructuraId) };
 }

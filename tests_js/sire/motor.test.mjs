@@ -94,6 +94,62 @@ test("archivo equivocado: mensaje claro", () => {
   assert.throws(() => M.procesar("   \n", spec), /vacío/);
 });
 
+// --- Casos del mercado -----------------------------------------------------------------------------
+const casilla = (r, c) => r.casillas.find(k => k.c === c).centimos;
+
+test("caso 1 · tipo 30 (POS): se lee, se valida con sus reglas y se avisa cómo se corrige", () => {
+  const r = M.procesar(F.casoPOS(), spec);
+  assert.equal(r.filas.length, 4);
+  assert.equal(r.filas[0].c[7], "30");
+  assert.deepEqual(r.hallazgos.filter(h => h.fila <= 3), []);                  // numero de 14 digitos: valido para el 30
+  assert.ok(reglas(r, 4).includes("error:serie:8") && reglas(r, 4).includes("error:numero:10"));
+  assert.match(r.hallazgos.find(h => h.regla === "numero").msg, /hasta 20 dígitos/);
+  assert.ok(r.avisos.some(a => a.tipo === "30" && /reemplazar la propuesta/.test(a.msg)));
+  const g = r.totales.porTipo.find(x => x.tipo === "30");
+  assert.equal(g.n, 3); assert.equal(g.montos[15], 6500 + 2500); assert.equal(g.montos[16], 1170 + 450);
+  assert.equal(casilla(M.casillas621(r.filas, spec), 107), 2500 + 4000 + 10000 + 2500);
+});
+
+test("caso 2 · exoneradas (libros): campo 21 -> casilla 120; gravadas solo para exoneradas -> 19-20 (casilla 113)", () => {
+  const r = M.procesar(F.casoLibros(), spec);
+  assert.deepEqual(r.hallazgos, []);
+  assert.deepEqual(r.totales.conMonto, [15, 16, 19, 20, 21, 25]);
+  const k = M.casillas621(r.filas, spec);
+  assert.equal(casilla(k, 120), 50000); assert.equal(casilla(k, 113), 10000); assert.equal(casilla(k, 107), 5000);
+  const av = M.avisosDestino(r.filas, spec, { noGravadas: "si" });
+  assert.ok(av.some(a => a.id === "no_gravadas" && /casilla 120/.test(a.msg)));
+  assert.ok(!av.some(a => a.id === "todo_dg"));                                  // ya usa destino no gravado
+});
+
+test("caso 3 · exportador: casillas 107/114 y aviso de destino según su perfil, con fundamento", () => {
+  const r = M.procesar(F.casoExportador(), spec);
+  assert.deepEqual(r.hallazgos, []);
+  const k = M.casillas621(r.filas, spec);
+  assert.equal(casilla(k, 107), 100000 + 20000 + 37500);                        // USD 100 x 3.750
+  assert.equal(casilla(k, 114), 300000); assert.equal(casilla(k, 115), 54000);   // la DAM va a importaciones
+  assert.equal(k.convertidos, 1);
+  const ids = p => M.avisosDestino(r.filas, spec, p).map(a => a.id);
+  assert.deepEqual(ids({ noGravadas: "si", exporta: true }), ["todo_dg", "exportador"]);
+  assert.deepEqual(ids({ noGravadas: "no", exporta: true }), ["exportador"]); // solo exporta y vende gravado: 107 esta bien
+  assert.deepEqual(ids({}), []);                                                 // sin perfil no se adivina nada
+  assert.match(M.avisosDestino(r.filas, spec, { noGravadas: "si" })[0].fundamento, /nota 5/);
+  // Si ya reubico en 17-18 (casilla 110) pero no tiene ventas no gravadas: aviso al reves.
+  const mixto = M.procesar(F.casoExportador({ 15: "0.00", 16: "0.00", 17: "200.00", 18: "36.00" }), spec);
+  assert.equal(casilla(M.casillas621(mixto.filas, spec), 110), 20000);
+  assert.deepEqual(M.avisosDestino(mixto.filas, spec, { noGravadas: "no" }).map(a => a.id), ["dgng_sin_ng"]);
+});
+
+test("campo 11 (rango): solo para consolidar operaciones sin crédito fiscal", () => {
+  const r = M.procesar([F.CABECERA.join("|"), F.fila({ 1: F.GENERADOR, 2: "X", 3: "202607", 5: "01/07/2026", 7: "01", 8: "F001", 10: "1", 11: "9",
+    15: "10.00", 16: "1.80", 25: "11.80", 26: "PEN", 27: "1.000" })].join("\n"), spec);
+  assert.ok(reglas(r, 1).includes("error:rango:11"));
+});
+
+// Siguen en sus fases (ver docs/sire/estructura-campos.md, "Casos del mercado").
+test.todo("fase 4 · caso 1: corregir un tipo 30 en el Excel y devolverlo en el TXT de reemplazo (Anexo 11)");
+test.todo("fase 4 · caso 3: reubicar 15-16 -> 17-18 / 19-20 por comprobante y generar el TXT (15+17+19 = propuesto ±1)");
+test.todo("fase 5 · caso 2 en ventas: Exonerado (campo 19) e Inafecto (campo 20) del RVIE -> casilla 105 / 109");
+
 test("JSON Logic: operaciones del spec", () => {
   assert.equal(M.ev({ in: [{ var: "c7" }, ["14", "46"]] }, { c7: "14" }), true);
   assert.equal(M.ev({ mes_siguiente: { var: "c3" } }, { c3: "202612" }), 202701);

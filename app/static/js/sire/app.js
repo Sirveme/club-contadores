@@ -1,6 +1,6 @@
 // Conversor SIRE · pantalla (modo local). Lee el archivo EN EL NAVEGADOR: no se sube a ninguna parte.
 // Los textos del archivo se pintan siempre con textContent (nunca como HTML).
-import * as M from "./motor.js?v=1";
+import * as M from "./motor.js?v=2";
 
 const $ = id => document.getElementById(id);
 const CAP = JSON.parse(document.currentScript?.dataset.capacidades || document.querySelector("script[data-capacidades]")?.dataset.capacidades || "{}");
@@ -21,7 +21,7 @@ const nombreCampo = n => (spec.estructuras.rce_propuesta.campos.find(c => c.n ==
 const montoTxt = v => { const c = M.centimos(v || "0"); return c === null ? (v || "") : M.soles(c); };
 
 async function cargarSpec() {
-  if (!spec) spec = await (await fetch("/static/sire/sire-spec.json?v=1", { cache: "no-cache" })).json();
+  if (!spec) spec = await (await fetch("/static/sire/sire-spec.json?v=2", { cache: "no-cache" })).json();
   return spec;
 }
 
@@ -86,6 +86,7 @@ function pintar() {
     dato("Codificación", estado.propuesta.codificacion), dato("Monedas", estado.totales.monedas.join(", ") || "—"));
   pintarCorrecciones();
   pintarTotales();
+  pintar621();
   pintarDetalle();
 }
 
@@ -132,12 +133,40 @@ function pintarTotales() {
   } catch (e) { caja.replaceChildren(el("div", { class: "msg err sire-cuadre", texto: e.message })); }
 }
 
+// --- Destino de las compras y casillas del 621 ------------------------------------------------------
+// El perfil solo vive en este navegador (comodidad): no se envía a ninguna parte.
+let perfil = {};
+try { perfil = JSON.parse(localStorage.getItem("sire.perfil") || "{}") || {}; } catch (_) { perfil = {}; }
+const PREGUNTAS = [
+  { k: "noGravadas", q: "¿En los últimos 12 meses tuviste ventas no gravadas (exoneradas o inafectas, sin contar exportaciones)?", op: [["si", "Sí"], ["no", "No"]] },
+  { k: "exporta", q: "¿Exportas?", op: [[true, "Sí"], [false, "No"]] },
+];
+function pintar621() {
+  $("perfil").replaceChildren(...PREGUNTAS.map(p => el("div", { class: "ver-filtros sire-perfil" }, el("span", { texto: p.q }),
+    p.op.map(([v, t]) => el("button", { type: "button", "data-p": p.k, "aria-pressed": String(perfil[p.k] === v), texto: t, onclick: () => {
+      perfil[p.k] = perfil[p.k] === v ? null : v;
+      try { localStorage.setItem("sire.perfil", JSON.stringify(perfil)); } catch (_) { /* sin almacenamiento: igual funciona */ }
+      pintar621(); } })))));
+  const av = M.avisosDestino(estado.filas, spec, perfil);
+  $("destino").replaceChildren(...(av.length ? av : [{ nivel: "info", msg: perfil.noGravadas == null
+    ? "Responde la primera pregunta y revisamos si el destino de tus compras (casillas 107, 110 o 113) calza con tu caso." : "El destino de tus compras calza con lo que indicaste." }])
+    .map(a => el("div", { class: "msg " + (a.nivel === "advertencia" ? "err" : "info") }, el("span", { texto: a.msg }),
+      a.fundamento ? el("small", { class: "sire-fund", texto: "Fundamento: " + a.fundamento }) : null)));
+  const k = M.casillas621(estado.filas, spec), con = k.casillas.filter(c => c.centimos !== 0);
+  $("f621").replaceChildren(el("thead", {}, el("tr", {}, el("th", { class: "num", texto: "Casilla" }), el("th", { texto: "Concepto" }),
+    el("th", { texto: "Viene del campo" }), el("th", { class: "num", texto: "Monto" }))),
+    el("tbody", {}, (con.length ? con : k.casillas.slice(0, 1)).map(c => el("tr", {}, el("td", { class: "num", texto: String(c.c) }), el("td", { texto: c.nombre }),
+      el("td", { class: "mono", texto: `${c.campo}${c.origen === "importaciones" ? " (importaciones)" : ""}` }), el("td", { class: "num", texto: M.soles(c.centimos) })))));
+  $("f621Nota").textContent = "El Formulario 621 precarga estas casillas desde tu registro y son editables; el IGV de las casillas 108, 111, 115 y 117 lo recalcula el formulario con la tasa." +
+    (k.convertidos ? ` ${k.convertidos} comprobante(s) en otra moneda se convirtieron con su propio tipo de cambio.` : "");
+}
+
 function pintarDetalle() {
   const pf = porFila();
   const nivel = n => { const hs = pf.get(n) || []; return hs.some(h => h.nivel === "error") ? "error" : hs.length ? "advertencia" : ""; };
   const todas = estado.filas, conErr = todas.filter(f => nivel(f.n) === "error"), conAdv = todas.filter(f => nivel(f.n) === "advertencia");
   $("nTodos").textContent = todas.length; $("nErr").textContent = conErr.length; $("nAdv").textContent = conAdv.length;
-  document.querySelectorAll(".ver-filtros button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.f === filtro)));
+  document.querySelectorAll(".ver-filtros button[data-f]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.f === filtro)));
   const lista = filtro === "error" ? conErr : filtro === "advertencia" ? conAdv : todas;
   const paginas = Math.max(1, Math.ceil(lista.length / POR_PAGINA));
   pagina = Math.min(pagina, paginas - 1);
@@ -178,15 +207,15 @@ function detalleFila(f, hs) {
       el("small", { texto: `${c.n} · ${c.nombre}` }), f.c[c.n] || "—"))));
 }
 
-document.querySelectorAll(".ver-filtros button").forEach(b => b.addEventListener("click", () => { filtro = b.dataset.f; pagina = 0; abierta = null; pintarDetalle(); }));
+document.querySelectorAll(".ver-filtros button[data-f]").forEach(b => b.addEventListener("click", () => { filtro = b.dataset.f; pagina = 0; abierta = null; pintarDetalle(); }));
 
 // --- Excel (ExcelJS se carga recien al descargar) ----------------------------------------------------
 async function descargar(imprimir) {
   const b1 = $("bExcel"), b2 = $("bImprimir");
   b1.disabled = b2.disabled = true; $("descMsg").textContent = "Armando el Excel en tu equipo…";
   try {
-    const { generarExcel } = await import("./excel.js?v=1");
-    const blob = await generarExcel(estado, spec, { imprimir });
+    const { generarExcel } = await import("./excel.js?v=2");
+    const blob = await generarExcel({ ...estado, perfil }, spec, { imprimir });
     const base = estado.propuesta.nombre.replace(/\.(txt|zip)$/i, "");
     const a = el("a", { href: URL.createObjectURL(blob), download: `${base}${imprimir ? "-imprimir" : ""}.xlsx` });
     document.body.append(a); a.click(); a.remove();
