@@ -3,7 +3,7 @@
 {% block titulo %}Conversor SIRE · Club de Contadores{% endblock %}
 {# Fuentes desde este mismo sitio: al cargar esta pagina no sale ninguna peticion a terceros. #}
 {% block fuentes %}<link rel="stylesheet" href="/static/fonts/plex/plex.css?v=1">{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=3">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=4">{% endblock %}
 {% block contenido %}
   <section class="fx" aria-label="Fórmula">
     <div class="ref">A1</div>
@@ -15,7 +15,7 @@
     <header class="panel-cab"><b style="color:var(--lv-gratis)">Conversor SIRE · Compras</b>
       <span>Gratis · sin cuenta · lee la propuesta del Registro de Compras y la vuelve un Excel legible</span></header>
     <div class="panel-cuerpo">
-      <label class="sire-zona" id="zona" for="archivo" tabindex="0">
+      <label class="sire-zona inicio" id="zona" for="archivo" tabindex="0">
         <input type="file" id="archivo" accept=".zip,.txt" multiple hidden>
         <b>Arrastra aquí la propuesta que descargaste del SIRE</b>
         <span>El ZIP tal cual, o el TXT. Si también tienes el TXT del <i>resumen</i>, súbelo junto: comprobamos que los totales cuadren.</span>
@@ -31,24 +31,26 @@
   </section>
 
   <div id="resultado" hidden>
-    <section class="panel" aria-label="Resumen del archivo">
+    <div id="actividad" class="sire-actividad" aria-live="polite"></div>
+
+    <section class="panel sire-lee" aria-label="Resumen del archivo">
       <header class="panel-cab"><b>Resumen</b><span id="resNombre"></span>
         <button type="button" class="sire-masc" id="bMascara" aria-pressed="false" title="Oculta RUC y razones sociales en pantalla, para grabar o compartir pantalla. El Excel no cambia.">Enmascarar</button></header>
-      <div class="panel-cuerpo"><dl class="sire-datos" id="resDatos"></dl><div id="actividad" class="sire-actividad" aria-live="polite"></div></div>
+      <div class="panel-cuerpo"><dl class="sire-datos" id="resDatos"></dl></div>
     </section>
 
-    <section class="panel" id="pCorr" aria-label="Correcciones" hidden>
-      <header class="panel-cab"><b>Correcciones</b><span>Lo que encontramos al leer el archivo</span></header>
+    <section class="panel sire-lee" id="pCorr" aria-label="Correcciones" hidden>
+      <header class="panel-cab"><b>Correcciones</b><span>Lo que encontramos al leer el archivo</span><em class="sire-tag" id="tagCorr" hidden></em></header>
       <div class="panel-cuerpo" id="corr"></div>
     </section>
 
-    <section class="panel" aria-label="Totales">
+    <section class="panel sire-lee" aria-label="Totales">
       <header class="panel-cab"><b>Totales por tipo de comprobante</b><span id="totNota"></span></header>
       <div class="panel-cuerpo"><div class="tabla-wrap"><table class="tabla sire-tot" id="tot"></table></div><div id="cuadre"></div></div>
     </section>
 
-    <section class="panel" aria-label="Destino y Formulario 621">
-      <header class="panel-cab"><b>Destino y Formulario 621</b><span>Lo que tu registro precarga en la declaración · referencial</span></header>
+    <section class="panel sire-actua" aria-label="Destino y Formulario 621">
+      <header class="panel-cab"><b>Destino y Formulario 621</b><span>Lo que tu registro precarga en la declaración · referencial</span><em class="sire-tag">Tú decides</em></header>
       <div class="panel-cuerpo sire-621">
         <div id="perfil"></div>
         <div id="destino" class="sire-corr"></div>
@@ -57,8 +59,8 @@
       </div>
     </section>
 
-    <section class="panel" aria-label="Comprobantes">
-      <header class="panel-cab"><b>Comprobantes</b><span id="detNota"></span></header>
+    <section class="panel sire-lee" id="pDet" aria-label="Comprobantes">
+      <header class="panel-cab"><b>Comprobantes</b><span id="detNota"></span><em class="sire-tag" id="tagDet" hidden></em></header>
       <div class="panel-cuerpo">
         <div class="ver-filtros" role="group" aria-label="Filtrar">
           <button type="button" data-f="todos" aria-pressed="true">Todos <span id="nTodos"></span></button>
@@ -70,7 +72,7 @@
       </div>
     </section>
 
-    <section class="panel" aria-label="Descargar">
+    <section class="panel sire-lee" aria-label="Descargar">
       <header class="panel-cab"><b>Descargar en Excel</b><span>Se arma aquí mismo, en tu equipo</span></header>
       <div class="panel-cuerpo sire-descargas">
         <button type="button" class="btn-ver" id="bExcel">Descargar Excel</button>
@@ -86,4 +88,4 @@
   </dialog>
 {% endblock %}
 {% block estado %}<span>Procesado en tu equipo · ninguna cifra se envía</span><span id="estadoTxt">Listo</span>{% endblock %}
-{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=3" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=4" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}

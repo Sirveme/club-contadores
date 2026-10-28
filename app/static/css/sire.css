@@ -1,5 +1,5 @@
 /* Conversor SIRE: solo lo propio; lo demas viene de club.css (hoja de calculo del Club). */
-#resultado { display: grid; gap: 12px; }
+#resultado { display: grid; gap: 22px; }
 .sire-zona { display: grid; gap: 6px; justify-items: start; padding: 18px; border: 1px dashed color-mix(in srgb, var(--lv-gratis) 55%, var(--grid));
   background: var(--bg); cursor: pointer; }
 .sire-zona b { font-size: 1.08em; }
@@ -73,3 +73,48 @@
 .puntos { display: none; }
 [data-mascara] .tapa { display: none; }
 [data-mascara] .puntos { display: inline; letter-spacing: .02em; }
+
+/* ===== Jerarquia por funcion =====
+   Naranja = "aca actuas" (Destino 621; Comprobantes o Correcciones con algo por corregir).
+   Gris = solo lectura. Los avisos de estado (verde/rojo/ambar) quedan como estan. */
+:root { --sire-actua: #f5a623; }
+.sire-lee > .panel-cab, .sire-actua > .panel-cab { position: relative; padding-left: 15px; }
+.sire-lee > .panel-cab::before, .sire-actua > .panel-cab::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--faint); }
+.sire-actua { border-color: color-mix(in srgb, var(--sire-actua) 38%, var(--grid)); background: color-mix(in srgb, var(--sire-actua) 4%, var(--cell)); }
+.sire-actua > .panel-cab { background: color-mix(in srgb, var(--sire-actua) 9%, var(--cell-2)); }
+.sire-actua > .panel-cab::before { background: var(--sire-actua); }
+.sire-tag { margin-left: auto; font-style: normal; font-weight: 600; font-size: .8em; text-transform: uppercase; letter-spacing: .08em; white-space: nowrap;
+  padding: 1px 8px; color: color-mix(in srgb, var(--sire-actua) 82%, var(--fg)); border: 1px solid color-mix(in srgb, var(--sire-actua) 55%, transparent);
+  background: color-mix(in srgb, var(--sire-actua) 13%, transparent); }
+.sire-tag[hidden] { display: none; }
+#resultado > .sire-actividad { margin-top: 0; }
+
+/* ===== Guia: donde empezar y siguiente paso ===== */
+@keyframes sire-halo { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lv-gratis) 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--lv-gratis) 0%, transparent); } }
+@keyframes sire-resalte { 0%, 55% { outline-color: var(--sire-actua); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sire-actua) 22%, transparent); }
+  100% { outline-color: transparent; box-shadow: 0 0 0 4px transparent; } }
+.sire-zona.inicio .btn-ver { animation: sire-halo 2.4s ease-out infinite; }
+/* .ver-filtros button usa all:unset: hace falta la misma especificidad para que el resalte se vea */
+.sire-guia, .ver-filtros button.sire-guia { outline: 2px solid transparent; outline-offset: 3px; animation: sire-resalte 2.6s ease-out 1 forwards; }
+
+/* ===== Feedback de clic, en toda la pagina del conversor =====
+   :active se hunde un poco; :focus-visible deja un anillo claro para teclado. */
+.btn-ver, .btn-sec, .ver-filtros button, .sire-chip, .sire-masc, .sire-tecnicos summary, .sire-zona, .rail button, .top a, .pie-hoja a {
+  transition: transform .06s, filter .06s, background-color .12s, border-color .12s; }
+.btn-ver:active:not(:disabled), .btn-sec:active:not(:disabled), .ver-filtros button:active, .sire-chip:active, .sire-masc:active { transform: translateY(1px); filter: brightness(.86); }
+.btn-sec:active:not(:disabled), .ver-filtros button:active, .sire-chip:active { background: var(--sel); }
+.ver-filtros button:hover { color: var(--fg); border-color: color-mix(in srgb, var(--accent) 55%, var(--grid)); }
+.sire-tecnicos summary:hover { color: var(--fg); }
+.sire-tecnicos summary:active, .sire-zona:active { filter: brightness(.9); }
+.rail button:active { background: var(--sel); filter: brightness(.86); }
+.sire-det tr.fila:active td:not(.n) { background: color-mix(in srgb, var(--accent) 22%, var(--cell)); }
+.btn-ver:focus-visible, .btn-sec:focus-visible, .ver-filtros button:focus-visible, .sire-chip:focus-visible, .sire-masc:focus-visible,
+.sire-tecnicos summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sire-det tr.fila:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sire-det tr.fila:focus-visible td:not(.n) { background: var(--sel); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sire-zona.inicio .btn-ver, .sire-guia, .ver-filtros button.sire-guia { animation: none; }
+  .sire-guia, .ver-filtros button.sire-guia { outline-color: transparent; }
+}

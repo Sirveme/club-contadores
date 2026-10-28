@@ -65,6 +65,7 @@ async function leer(archivos) {
     $("msg").replaceChildren();
   } catch (e) {
     $("resultado").hidden = true;
+    zona.classList.add("inicio");
     msg(e.message || "No pudimos leer el archivo.", "err");
   } finally { $("estadoTxt").textContent = "Listo"; }
 }
@@ -88,8 +89,30 @@ function porFila() {
   return m;
 }
 
+// --- Jerarquia: naranja = "aca actuas"; gris = solo lectura -------------------------------------------
+function accion(seccion, tag, texto) {
+  $(seccion).classList.toggle("sire-actua", !!texto);
+  $(seccion).classList.toggle("sire-lee", !texto);
+  $(tag).hidden = !texto; $(tag).textContent = texto || "";
+}
+// Guia: el siguiente paso se resalta un momento, la primera vez que se ve en pantalla (no permanente).
+let guiaObs = null;
+function guiar(objetivo) {
+  guiaObs?.disconnect(); guiaObs = null;
+  document.querySelectorAll(".sire-guia").forEach(x => x.classList.remove("sire-guia"));
+  if (!objetivo || !("IntersectionObserver" in window)) return;
+  guiaObs = new IntersectionObserver(([e]) => {
+    if (!e.isIntersecting) return;
+    guiaObs.disconnect(); guiaObs = null;
+    objetivo.classList.add("sire-guia");
+    objetivo.addEventListener("animationend", () => objetivo.classList.remove("sire-guia"), { once: true });
+  }, { threshold: 0.6 });
+  guiaObs.observe(objetivo);
+}
+
 function pintar() {
   $("resultado").hidden = false;
+  zona.classList.remove("inicio");
   const f0 = estado.filas[0]?.c || {};
   const errores = estado.hallazgos.filter(h => h.nivel === "error").length, adv = estado.hallazgos.length - errores;
   $("fxVal").replaceChildren(el("span", { class: "q", texto: "=" }), "SIRE(", conRucs(estado.propuesta.nombre), "; compras)");
@@ -105,6 +128,7 @@ function pintar() {
   pintarTotales();
   pintar621();
   pintarDetalle();
+  guiar(errores ? document.querySelector('.ver-filtros button[data-f="error"]') : perfil.noGravadas == null ? $("perfil") : null);
 }
 
 function pintarCorrecciones() {
@@ -134,6 +158,7 @@ function pintarCorrecciones() {
     el("ol", {}, tec.map(a => el("li", {}, a.tipo === "generador" && a.variantes
       ? [`El nombre del generador aparece de ${a.variantes.length} formas distintas (es normal en la propuesta): `, a.variantes.flatMap((v, i) => i ? [" · ", N(v)] : [N(v)]), "."]
       : a.msg)))));
+  accion("pCorr", "tagCorr", comas.length ? `${comas.length} por corregir` : "");
   $("pCorr").hidden = !bloques.length;
   $("corr").replaceChildren(el("div", { class: "sire-corr" }, bloques));
 }
@@ -230,6 +255,7 @@ function pintarDetalle() {
   const nivel = n => { const hs = pf.get(n) || []; return hs.some(h => h.nivel === "error") ? "error" : hs.length ? "advertencia" : ""; };
   const todas = estado.filas, conErr = todas.filter(f => nivel(f.n) === "error"), conAdv = todas.filter(f => nivel(f.n) === "advertencia");
   $("nTodos").textContent = todas.length; $("nErr").textContent = conErr.length; $("nAdv").textContent = conAdv.length;
+  accion("pDet", "tagDet", conErr.length ? `${conErr.length} por corregir` : "");
   document.querySelectorAll(".ver-filtros button[data-f]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.f === filtro)));
   const lista = filtro === "error" ? conErr : filtro === "advertencia" ? conAdv : todas;
   const paginas = Math.max(1, Math.ceil(lista.length / POR_PAGINA));
