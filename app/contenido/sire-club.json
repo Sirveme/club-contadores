@@ -1,0 +1,126 @@
+{
+  "_ayuda": [
+    "Contenido editable de la landing de venta del Conversor SIRE (contadores.perusistemas.pro/sire-club).",
+    "Edita los textos entre comillas y deja intactas las claves (lo que va antes de los dos puntos).",
+    "Para agregar un testimonio o una pregunta, copia un bloque { ... } completo, pégalo después de una coma y cambia el texto. La grilla y el acordeón se acomodan solos.",
+    "Si el archivo queda mal escrito (una coma de más o de menos), la página sigue mostrando la última versión buena: revisa el registro del servidor.",
+    "Números: se muestra el MAYOR entre el valor de aquí y el conteo real de contadores inscritos en el Club (no se suman, para no contar dos veces a quien ya estaba en la lista). Así la barra avanza sola cuando crece el Club, y nunca muestra más de lo que hay.",
+    "En las ciudades, 'ubigeo' es el prefijo con el que se cuentan los inscritos reales: 1601 = provincia de Maynas (Iquitos), 1501 = provincia de Lima.",
+    "cta.destino: 'whatsapp' por ahora. Cuando esté PagoOK, cambia a 'pago' y pon en cta.pago_url la dirección, con {plan} donde va el plan (pro, premium o club)."
+  ],
+
+  "numeros": {
+    "lista": 45,
+    "tope": 300,
+    "ciudades": [
+      {"nombre": "Iquitos", "n": 13, "ubigeo": "1601"},
+      {"nombre": "Lima", "n": 24, "ubigeo": "1501"}
+    ]
+  },
+
+  "cta": {
+    "destino": "whatsapp",
+    "pago_url": "",
+    "mensajes": {
+      "club": "Hola, quiero unirme al Club de Contadores Modernos (Conversor SIRE).",
+      "pro": "Hola, quiero el plan Pro del Club de Contadores Modernos (Conversor SIRE).",
+      "premium": "Hola, quiero el plan Premium del Club de Contadores Modernos."
+    }
+  },
+
+  "demo": {
+    "_ayuda": "tipo: '' (muestra el recuadro de reserva), 'imagen' o 'video' (archivo en app/static/img/, p. ej. /static/img/sire-demo.mp4) o 'youtube' (en src va solo el código del video, p. ej. dQw4w9WgXcQ).",
+    "tipo": "",
+    "src": "",
+    "poster": "",
+    "alt": "Demostración del Conversor SIRE: subir el TXT, ver la tabla, corregir y descargar"
+  },
+
+  "calculadora": {
+    "minutos_con_herramienta": 5
+  },
+
+  "caja": [
+    {"nombre": "Conversor SIRE", "detalle": "hasta 25 RUCs"},
+    {"nombre": "alerta.pe", "detalle": "vigila el buzón SUNAT, hasta 25 RUCs"},
+    {"nombre": "Verificador de comprobantes", "detalle": "ilimitado"},
+    {"nombre": "Alertas de vencimiento", "detalle": "hasta 25 RUCs"},
+    {"nombre": "Facturalo.pro", "detalle": "emite tus facturas gratis"},
+    {"nombre": "Consultas RUC", "detalle": "30 por día, cualquier filtro"},
+    {"nombre": "Nuevos Negocios", "detalle": "2 distritos de tu zona"},
+    {"nombre": "Tu mini-web avanzada", "detalle": "de estudio"}
+  ],
+
+  "planes": [
+    {
+      "id": "pro",
+      "nombre": "Pro",
+      "para": "Contadores y estudios pequeños",
+      "mes": 15,
+      "anio": 150,
+      "ahorro": 30,
+      "destacado": "EL MÁS ELEGIDO",
+      "incluye": [
+        "SIRE y alerta.pe: hasta 25 RUCs",
+        "Alertas de vencimiento: 25 RUCs",
+        "Nuevos Negocios: 2 distritos",
+        "Consultas RUC: 30 por día",
+        "Verificador ilimitado + Facturalo + mini-web avanzada"
+      ],
+      "boton": "Quiero el plan Pro →"
+    },
+    {
+      "id": "premium",
+      "nombre": "Premium",
+      "para": "Estudios medianos y grandes",
+      "mes": 35,
+      "anio": 350,
+      "ahorro": 70,
+      "destacado": "",
+      "incluye": [
+        "SIRE y alerta.pe: hasta 50 RUCs",
+        "Alertas de vencimiento: 50 RUCs",
+        "Nuevos Negocios: 5 distritos",
+        "Consultas RUC: 30 por día",
+        "Verificador ilimitado + Facturalo + web premium"
+      ],
+      "boton": "Quiero el plan Premium →"
+    }
+  ],
+
+  "testimonios": [
+    {
+      "texto": "Definitivamente voy a usar tu herramienta. Si lo que vi en el video es tal cual, es muy, muy útil.",
+      "nombre": "Cecilia Rodríguez Mauri",
+      "rol": "Contadora · Lima"
+    },
+    {
+      "texto": "Sí me ayuda tu herramienta, la probé con dos contribuyentes.",
+      "nombre": "Ricardo Montalván",
+      "rol": "Contador · Iquitos"
+    }
+  ],
+
+  "faq": [
+    {
+      "pregunta": "¿Qué archivos del SIRE acepta?",
+      "respuesta": "La propuesta del Registro de Compras: el ZIP o el TXT, tal como lo descargas del portal. También el Excel del conversor ya corregido, o filas pegadas desde tu propio Excel. El Registro de Ventas viene más adelante."
+    },
+    {
+      "pregunta": "¿Mis datos salen de mi equipo?",
+      "respuesta": "No. Tu archivo se procesa en tu propio navegador: ninguna cifra sale de tu equipo. Para mostrar la actividad del contribuyente solo consultamos su RUC, sin montos ni fechas, y no guardamos qué RUC consultas."
+    },
+    {
+      "pregunta": "¿Corrige los errores por mí?",
+      "respuesta": "Te marca cada error con el porqué (según la norma) y te deja corregirlo en la misma pantalla. Lo que corrige solo es lo técnico, como las comas en los montos; las decisiones contables las tomas tú."
+    },
+    {
+      "pregunta": "¿Me garantiza que SUNAT acepte el archivo?",
+      "respuesta": "No prometemos eso. Armamos el TXT con el formato y las validaciones de las propias resoluciones de SUNAT, para que salga correcto. La presentación la haces tú en el portal."
+    },
+    {
+      "pregunta": "¿Cómo pago y puedo cancelar?",
+      "respuesta": "Pago mensual o anual. Por ahora te atendemos por WhatsApp: eliges tu plan y te indicamos cómo pagar. Puedes cancelar cuando quieras; sin letra chica."
+    }
+  ]
+}

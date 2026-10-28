@@ -1,0 +1,206 @@
+<!doctype html>
+{# Landing de VENTA del Conversor SIRE. Los textos que cambian seguido (testimonios, FAQ, planes,
+   numeros, destino de los botones, demo) vienen de app/contenido/sire-club.json: ver app/sire_venta.py. #}
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>El SIRE, resuelto · Club de Contadores Modernos</title>
+<meta name="description" content="Convierte, revisa y corrige el SIRE de Compras en un solo lugar: TXT a Excel legible, errores marcados con el porqué y el TXT de reemplazo listo. Desde S/ 15 al mes.">
+<meta property="og:title" content="El SIRE, resuelto. En minutos, no en horas.">
+<meta property="og:description" content="Conversor SIRE + toda la caja de herramientas del Club de Contadores Modernos. Desde S/ 15 al mes.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0a0e14">
+<link rel="stylesheet" href="/static/fonts/venta/venta.css?v=1">
+<link rel="stylesheet" href="/static/css/sire-venta.css?v=1">
+</head>
+<body>
+
+{% set marq %}🟢 <b>{{ num.total }} contadores</b> ya están en la lista{% for x in num.ciudades %} &nbsp;·&nbsp; {{ x.nombre }} <b>{{ x.n }}</b>{% endfor %} &nbsp;·&nbsp; y sumando en todo el Perú &nbsp;·&nbsp; <b>Sé de los primeros</b> 🚀 &nbsp;·&nbsp; {% endset %}
+<div class="marq" aria-label="{{ num.total }} contadores ya están en la lista"><span aria-hidden="true">{{ marq }}{{ marq }}</span></div>
+
+<div class="wrap">
+
+  <!-- 0b. CUPOS: inscritos y tope vienen de app/contenido/sire-club.json (y del conteo real del Club) -->
+  <section class="cupos" aria-label="Cupos de fundador">
+    {% if num.lleno %}
+      <div class="eyebrow">Cupos de fundador</div>
+      <div class="cupos-t">Se llenaron los <span>{{ num.tope }}</span> cupos de fundador</div>
+      <div class="cupos-sub">Escríbenos igual: te avisamos cuando se abran más.</div>
+    {% else %}
+      <div class="eyebrow">🔥 Cupos de fundador limitados</div>
+      <div class="cupos-t">Solo para los <span>{{ num.tope }} primeros</span> contadores</div>
+      <div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="{{ num.tope }}" aria-valuenow="{{ num.total }}"
+           aria-valuetext="{{ num.total }} de {{ num.tope }}, quedan {{ num.quedan }} cupos">
+        <i style="width: {{ num.pct }}%"></i>
+        <b>{{ num.total }} de {{ num.tope }} · quedan {{ num.quedan }} cupos</b>
+      </div>
+      <div class="cupos-sub">Entra ahora al precio de fundador, antes de que se llene.</div>
+    {% endif %}
+  </section>
+
+  <!-- 1. HERO -->
+  <section class="hero">
+    <span class="reto">¿Contador moderno… o contador "a la antigua"?</span>
+    <h1>El SIRE, resuelto.<br><span class="g">En minutos, no en horas.</span></h1>
+    <p class="sub">Convierte, revisa y corrige tu SIRE en un solo lugar — con el respaldo de quien conoce SUNAT por dentro.</p>
+    <div class="hero-benes">
+      <span><span class="c">✓</span> TXT → Excel legible</span>
+      <span><span class="c">✓</span> Corriges y vuelves a TXT</span>
+      <span><span class="c">✓</span> Valida con las reglas de SUNAT</span>
+    </div>
+    <div class="cta-wrap" id="ctaHero"><a class="cta-btn" href="{{ cta('club') }}" target="_blank" rel="noopener">Quiero simplificar mi trabajo contable →</a></div>
+
+    {# DEMO: la pieza de Duilio. Se cambia en "demo" de app/contenido/sire-club.json (imagen, video o youtube). #}
+    {% set d = c.demo or {} %}
+    {% if d.tipo == "imagen" and d.src %}
+      <div class="demo"><img src="{{ d.src }}" alt="{{ d.alt }}" loading="lazy"></div>
+    {% elif d.tipo == "video" and d.src %}
+      <div class="demo"><video src="{{ d.src }}" {% if d.poster %}poster="{{ d.poster }}"{% endif %} controls playsinline preload="metadata" aria-label="{{ d.alt }}"></video></div>
+    {% elif d.tipo == "youtube" and d.src %}
+      <div class="demo yt"><iframe src="https://www.youtube-nocookie.com/embed/{{ d.src }}" title="{{ d.alt }}" loading="lazy"
+        allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+    {% else %}
+      <div class="mockup" data-demo="reserva">
+        <div class="big">[ AQUÍ VA TU MOCKUP / VIDEO ]</div>
+        <div>Demostración real del flujo:<br>subir TXT → ver tabla → corregir → descargar<br>(la produces tú)</div>
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- 2. ANTES / DESPUÉS -->
+  <section>
+    <h2 class="sec">El trabajo que desaparece</h2>
+    <p class="sec-sub">Lo mismo que hoy te quita la noche, en una sola herramienta.</p>
+    <div class="ad">
+      <div class="col antes">
+        <h3>😣 Antes</h3>
+        <ul>
+          <li>Descargar el TXT y pelear para leerlo</li>
+          <li>Pasarlo a Excel a mano, columna por columna</li>
+          <li>Cazar los errores uno por uno</li>
+          <li>Rearmar el TXT cuidando cada pipe «|»</li>
+          <li>Rezar para que SUNAT no lo rebote</li>
+        </ul>
+      </div>
+      <div class="col despues">
+        <h3>😎 Con el Conversor</h3>
+        <ul>
+          <li>Subes el TXT y lo ves legible al instante</li>
+          <li>Los errores salen marcados, con el porqué</li>
+          <li>Corriges en la misma pantalla</li>
+          <li>Descargas el TXT listo, con el formato correcto</li>
+          <li>Y pronto, ver si un proveedor es riesgoso</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. CALCULADORA: sin valores puestos; el resultado sale solo de lo que ingresa la persona -->
+  <section>
+    <h2 class="sec">¿Cuánto tiempo recuperas?</h2>
+    <p class="sec-sub">Pon tus propios números. Sin cuentos.</p>
+    <div class="calc" id="calc" data-min-herramienta="{{ c.calculadora.minutos_con_herramienta }}">
+      <div class="row"><label for="cli">Clientes a los que les haces el SIRE cada mes</label><input id="cli" type="number" inputmode="numeric" min="0" max="9999" placeholder="—"></div>
+      <div class="row"><label for="min">Minutos que te toma hoy, por cliente</label><input id="min" type="number" inputmode="numeric" min="0" max="9999" placeholder="—"></div>
+      <div class="res" aria-live="polite">
+        <div class="n" id="horas">—</div>
+        <div class="l" id="horasL">Ingresa tus dos números para ver el estimado</div>
+      </div>
+      <div class="nota">Cálculo referencial con los números que tú ingresas. Asume que con la herramienta te toma unos {{ c.calculadora.minutos_con_herramienta }} min por cliente.</div>
+    </div>
+  </section>
+
+  <!-- 4. CAJA DE HERRAMIENTAS -->
+  <section>
+    <div class="stack">
+      <div class="eyebrow">No pagas solo por un conversor</div>
+      <h2>Te llevas la caja de herramientas de tu estudio</h2>
+      <p class="lead">El Conversor SIRE entra al Club de Contadores Modernos. Cualquiera de estas herramientas, por sí sola, ya vale lo que pagas por todas juntas:</p>
+      <div class="lista">
+        {% for h in c.caja %}<div class="item"><span class="ch">✓</span><span><b>{{ h.nombre }}</b>{% if h.detalle %} — {{ h.detalle }}{% endif %}</span></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. PLANES -->
+  <section id="planes">
+    <h2 class="sec">Elige tu plan</h2>
+    <p class="sec-sub">El precio anual = pagas 10 meses, llevas 12.</p>
+    <div class="planes">
+      {% for p in c.planes %}
+      <div class="plan {{ 'pop' if p.destacado else 'alt' }}">
+        {% if p.destacado %}<div class="badge">{{ p.destacado }}</div>{% endif %}
+        <h3>{{ p.nombre }}</h3>
+        <div class="para">{{ p.para }}</div>
+        <div class="precio">S/ {{ p.mes }} <small>/ mes</small></div>
+        <div class="anual">o S/ {{ p.anio }} al año{% if p.ahorro %} (ahorras S/ {{ p.ahorro }}){% endif %}</div>
+        <ul>{% for i in p.incluye %}<li>{{ i }}</li>{% endfor %}</ul>
+        <a class="cta-btn" href="{{ cta(p.id) }}" target="_blank" rel="noopener">{{ p.boton }}</a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- 6. TESTIMONIOS (app/contenido/sire-club.json → "testimonios") -->
+  {% if c.testimonios %}
+  <section>
+    <h2 class="sec">Lo que dicen los primeros</h2>
+    <div class="testis">
+      {% for t in c.testimonios %}
+      <figure class="testi">
+        <blockquote class="q">"{{ t.texto }}"</blockquote>
+        <figcaption><div class="quien">{{ t.nombre }}</div>{% if t.rol %}<div class="donde">{{ t.rol }}</div>{% endif %}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- 7. FAQ (app/contenido/sire-club.json → "faq") -->
+  {% if c.faq %}
+  <section>
+    <h2 class="sec">Preguntas frecuentes</h2>
+    <div class="faq">
+      {% for f in c.faq %}<details><summary>{{ f.pregunta }}</summary><p>{{ f.respuesta }}</p></details>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- 8. CONFIANZA -->
+  <section>
+    <div class="confianza">
+      <img class="foto" src="{{ foto }}" alt="Duilio Restuccia" width="96" height="96">
+      <div class="txt">
+        <div class="nombre">Duilio Restuccia</div>
+        <div class="rol">ex-SUNAT · doy la cara</div>
+        <p>Trabajé en SUNAT, en RUC y Comprobantes. Estamos comprometidos con cuidar tu información contable, empresarial y tributaria — <b>sensible o no</b>: se construye siguiendo al pie de la letra las normas de SUNAT, sin atajos, y nuestra política de tratamiento de datos está comunicada al <b>Ministerio de Justicia del Perú</b>.</p>
+        <div class="emp">Perú Sistemas Pro · 20615446565 · <a href="{{ anpd_url }}" target="_blank" rel="noopener">Constancia INS-2026-778</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. CTA FINAL -->
+  <section>
+    <div class="final">
+      <h2>Reduce tu tiempo frente a la computadora</h2>
+      <p>Además atiende mejor y atrae más clientes. Sé de los primeros contadores modernos del Perú.</p>
+      <div class="cta-wrap"><a class="cta-btn" href="{{ cta('club') }}" target="_blank" rel="noopener">Únete al Club de Contadores Modernos →</a></div>
+    </div>
+  </section>
+
+  <footer>Perú Sistemas Pro · Soluciones tecnológicas desde la Amazonía · <a href="https://club.perusistemas.pro/privacidad">Privacidad</a></footer>
+
+</div>
+
+<!-- barra CTA fija: aparece al pasar el botón del inicio -->
+<div class="sticky oculta" id="sticky">
+  <div class="p"><span class="largo">Conversor SIRE + toda la caja de herramientas </span><small><span class="largo">· </span><span class="corto">Todo el Club </span>desde S/ {{ (c.planes | map(attribute='mes') | min) if c.planes else 15 }}/mes</small></div>
+  <a class="cta-btn" href="{{ cta('club') }}" target="_blank" rel="noopener">Únete ahora →</a>
+</div>
+
+<script src="/static/js/sire-venta.js?v=1" defer></script>
+</body>
+</html>
