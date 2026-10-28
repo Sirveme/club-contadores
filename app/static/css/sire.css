@@ -118,3 +118,29 @@
   .sire-zona.inicio .btn-ver, .sire-guia, .ver-filtros button.sire-guia { animation: none; }
   .sire-guia, .ver-filtros button.sire-guia { outline-color: transparent; }
 }
+
+/* ===== Fase 4: corregir en linea y TXT de reemplazo ===== */
+.btn-actua { all: unset; cursor: pointer; padding: 8px 16px; font-weight: 600; color: var(--bg); background: var(--sire-actua);
+  transition: transform .06s, filter .06s; }
+.btn-actua:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-actua:active:not(:disabled) { transform: translateY(1px); filter: brightness(.86); }
+.btn-actua:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn-actua:disabled, .btn-sec:disabled { opacity: .45; cursor: not-allowed; }
+.sire-in, .sire-txt input, .sire-txt select, .sire-desde-excel textarea { width: 100%; box-sizing: border-box; font: inherit; font-family: var(--mono);
+  color: var(--fg); background: var(--bg); border: 1px solid var(--grid); padding: 3px 6px; margin-top: 2px; }
+.sire-in:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--grid)); }
+.sire-in:focus, .sire-txt input:focus, .sire-txt select:focus, .sire-desde-excel textarea:focus { outline: none; border-color: var(--accent); background: var(--cell); }
+.sire-campos .editado { box-shadow: inset 3px 0 0 var(--sire-actua); }
+.sire-campos .editado small { color: color-mix(in srgb, var(--sire-actua) 80%, var(--fg)); }
+.sire-destino { padding: 8px 0; border-bottom: 0; }
+.sire-destino small { flex-basis: 100%; }
+.sire-txt { display: grid; gap: 10px; }
+.sire-razon { display: grid; gap: 2px; max-width: 640px; }
+.sire-razon > span:first-child { color: var(--muted); font-size: .9em; }
+.sire-txt select { width: auto; font-family: var(--sans); }
+.sire-desde-excel { margin-top: 10px; }
+.sire-desde-excel summary { cursor: pointer; color: var(--muted); }
+.sire-desde-excel summary:hover { color: var(--fg); }
+.sire-desde-excel[open] { display: grid; gap: 8px; }
+.sire-desde-excel textarea { min-height: 6em; resize: vertical; }
+[data-mascara] #razonMasc { display: block; padding: 3px 0; }

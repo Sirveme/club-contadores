@@ -1,6 +1,6 @@
 // Conversor SIRE · pantalla (modo local). Lee el archivo EN EL NAVEGADOR: no se sube a ninguna parte.
 // Los textos del archivo se pintan siempre con textContent (nunca como HTML).
-import * as M from "./motor.js?v=3";
+import * as M from "./motor.js?v=4";
 
 const $ = id => document.getElementById(id);
 const CAP = JSON.parse(document.currentScript?.dataset.capacidades || document.querySelector("script[data-capacidades]")?.dataset.capacidades || "{}");
@@ -37,7 +37,7 @@ const nombreCampo = n => (spec.estructuras.rce_propuesta.campos.find(c => c.n ==
 const montoTxt = v => { const c = M.centimos(v || "0"); return c === null ? (v || "") : M.soles(c); };
 
 async function cargarSpec() {
-  if (!spec) spec = await (await fetch("/static/sire/sire-spec.json?v=2", { cache: "no-cache" })).json();
+  if (!spec) spec = await (await fetch("/static/sire/sire-spec.json?v=3", { cache: "no-cache" })).json();
   return spec;
 }
 
@@ -47,6 +47,12 @@ async function leer(archivos) {
   try {
     await cargarSpec();
     let propuesta = null, resumen = null;
+    const excel = archivos.find(a => /\.xlsx$/i.test(a.name));
+    if (excel) {                                      // el Excel del conversor (corregido) o la plantilla llena
+      const { leerExcel } = await import("./excel.js?v=4");
+      const t = M.filasDeTabla(await leerExcel(await excel.arrayBuffer()), spec);
+      return cargarFilas(t.filas, t.avisos, { nombre: excel.name, origen: excel.name, codificacion: "Excel" });
+    }
     for (const a of archivos) {
       const bytes = new Uint8Array(await a.arrayBuffer());
       const piezas = /\.zip$/i.test(a.name) || (bytes[0] === 0x50 && bytes[1] === 0x4b) ? await M.descomprimir(bytes) : [{ nombre: a.name, data: bytes }];
@@ -59,7 +65,7 @@ async function leer(archivos) {
     }
     if (!propuesta) throw new Error(resumen ? "Ese es el resumen: sube también la propuesta (el ZIP o el TXT con el detalle)." : "No encontramos una propuesta en lo que subiste.");
     const r = M.procesar(propuesta.texto, spec);
-    estado = { ...r, propuesta, resumen, corregidas: 0 };
+    estado = { ...r, propuesta, resumen, corregidas: 0, editados: new Set(), reubicadas: 0 };
     filtro = "todos"; pagina = 0; abierta = null;
     pintar();
     $("msg").replaceChildren();
@@ -68,6 +74,33 @@ async function leer(archivos) {
     zona.classList.add("inicio");
     msg(e.message || "No pudimos leer el archivo.", "err");
   } finally { $("estadoTxt").textContent = "Listo"; }
+}
+// Filas que no vienen de la propuesta (Excel o tabla pegada): mismo motor, mismas reglas.
+function cargarFilas(filas, avisos, propuesta) {
+  estado = { ...M.desdeFilas(filas, spec, avisos), propuesta, resumen: null, corregidas: 0, editados: new Set(), reubicadas: 0 };
+  filtro = "todos"; pagina = 0; abierta = null;
+  pintar();
+  $("msg").replaceChildren();
+}
+$("bPegado").addEventListener("click", async () => {
+  try {
+    await cargarSpec();
+    const t = M.filasDeTabla(M.tablaDePegado($("pegado").value), spec);
+    cargarFilas(t.filas, t.avisos, { nombre: "tabla pegada", origen: "tabla pegada", codificacion: "Excel (pegado)" });
+  } catch (e) { $("resultado").hidden = true; msg(e.message || "No pudimos leer lo pegado.", "err"); }
+});
+$("bPlantilla").addEventListener("click", async () => {
+  try {
+    await cargarSpec();
+    const { generarExcel } = await import("./excel.js?v=4");
+    const vacio = { filas: [], hallazgos: [], avisos: [], totales: M.totales([], spec), propuesta: { nombre: "plantilla-compras-sire" }, perfil: {} };
+    bajar(await generarExcel(vacio, spec, { plantilla: true }), "plantilla-compras-sire.xlsx");
+  } catch (e) { msg("No pudimos armar la plantilla: " + (e.message || e), "err"); }
+});
+function bajar(blob, nombre) {
+  const a = el("a", { href: URL.createObjectURL(blob), download: nombre });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
 const zona = $("zona"), entrada = $("archivo");
@@ -110,7 +143,9 @@ function guiar(objetivo) {
   guiaObs.observe(objetivo);
 }
 
-function pintar() {
+// Repinta todo sin volver a guiar (despues de corregir, editar o reubicar).
+const refrescar = () => { recalcular(); pintar({ guia: false }); };
+function pintar({ guia = true } = {}) {
   $("resultado").hidden = false;
   zona.classList.remove("inicio");
   const f0 = estado.filas[0]?.c || {};
@@ -128,7 +163,8 @@ function pintar() {
   pintarTotales();
   pintar621();
   pintarDetalle();
-  guiar(errores ? document.querySelector('.ver-filtros button[data-f="error"]') : perfil.noGravadas == null ? $("perfil") : null);
+  pintarReemplazo();
+  if (guia) guiar(errores ? document.querySelector('.ver-filtros button[data-f="error"]') : perfil.noGravadas == null ? $("perfil") : null);
 }
 
 function pintarCorrecciones() {
@@ -141,7 +177,7 @@ function pintarCorrecciones() {
       "El formato pide punto decimal y sin separador de miles. ",
       dudosos ? `${dudosos} no se pudieron confirmar: revísalos después. ` : "",
       el("button", { type: "button", class: "btn-ver", texto: `Corregir ${comas.length === 1 ? "el monto" : `los ${comas.length} montos`}`, onclick: () => {
-        M.aplicarComas(estado.filas, comas); estado.corregidas += comas.length; recalcular(); pintar(); } }),
+        M.aplicarComas(estado.filas, comas); estado.corregidas += comas.length; refrescar(); } }),
       el("ul", {}, comas.slice(0, 5).map(h => el("li", {}, `Fila ${h.fila}, ${nombreCampo(h.campo)}: `, el("code", { texto: h.valor }), " → ", el("code", { texto: h.sugerido }),
         h.razon ? ` (${h.razon})` : "")))));
   }
@@ -281,20 +317,56 @@ function pintarDetalle() {
   }
   if (!vista.length) cuerpo.push(el("tr", {}, el("td", { colspan: "11", class: "faint", texto: filtro === "todos" ? "El archivo no trae comprobantes." : "Ninguno. ✓" })));
   $("det").replaceChildren(el("thead", {}, cab), el("tbody", {}, cuerpo));
-  $("detNota").textContent = "Toca una fila para ver todos sus campos";
+  $("detNota").textContent = "Toca una fila para ver todos sus campos y corregirlos";
   $("pag").replaceChildren(paginas > 1 ? [
     el("button", { type: "button", class: "btn-sec", texto: "← Anteriores", onclick: () => { pagina--; pintarDetalle(); }, ...(pagina === 0 ? { disabled: "" } : {}) }),
     el("span", { texto: `Página ${pagina + 1} de ${paginas}` }),
     el("button", { type: "button", class: "btn-sec", texto: "Siguientes →", onclick: () => { pagina++; pintarDetalle(); }, ...(pagina >= paginas - 1 ? { disabled: "" } : {}) })] : []);
 }
 
+// Campos que el contador corrige en linea. No: generador y periodo (uno solo para todo el TXT: la razon
+// social se fija en el panel del TXT), CAR (va vacio en el reemplazo) e informativos 38-41 (no se suben).
+const FIJOS = new Set([1, 2, 3, 4, 37]);
+const editable = c => !FIJOS.has(c.n) && !c.informativo;
+function editar(f, n, valor) {
+  const v = valor.trim();
+  if ((f.c[n] ?? "") === v) return;
+  f.c[n] = v; estado.editados.add(`${f.n}:${n}`);
+  setTimeout(() => {                                   // despues de que el foco pase al siguiente campo
+    const foco = document.activeElement?.dataset?.n;
+    refrescar();
+    if (foco) $("det").querySelector(`input[data-n="${foco}"]`)?.focus();
+  }, 0);
+}
+const DEST = [["dg", "Solo gravadas o exportación", "107", "114"], ["dgng", "Gravadas y no gravadas", "110", "116"], ["dng", "Solo no gravadas", "113", "119"]];
+function destinoFila(f) {
+  const actual = M.destinoDe(f.c);
+  if (!actual) return null;                            // sin base ni IGV: no hay nada que reubicar
+  const imp = spec.formulario621.importaciones.includes(f.c[7]);
+  return el("div", { class: "ver-filtros sire-destino", role: "group", "aria-label": "Destino de la adquisición" },
+    el("span", { texto: "Destino de la compra (base e IGV):" }),
+    DEST.map(([k, t, ci, cm]) => el("button", { type: "button", "data-d": k, "aria-pressed": String(actual === k), texto: `${t} · casilla ${imp ? cm : ci}`,
+      onclick: () => { if (actual === k) return; if (M.reubicar(f, k)) { estado.reubicadas++; for (let n = 15; n <= 20; n++) estado.editados.add(`${f.n}:${n}`); refrescar(); } } })),
+    el("small", { class: "faint", texto: actual === "mixto" ? "Hoy está repartido entre destinos: al elegir uno, todo pasa ahí." : "Las sumas de base e IGV no cambian (nota 5 del Anexo 8). Solo se mueve si tú lo eliges." }));
+}
 function detalleFila(f, hs) {
   const malos = new Map(hs.map(h => [h.campo, h.nivel]));
   const est = spec.estructuras.rce_propuesta;
   const visibles = est.campos.filter(c => !c.libre || f.c[c.n]);
+  const sensible = n => CAMPOS_RUC.has(n) || CAMPOS_NOMBRE.has(n);
+  const valor = c => {
+    if (!editable(c)) return valorCampo(c.n, f.c[c.n]);
+    const input = el("input", { type: "text", class: "sire-in" + (sensible(c.n) ? " tapa" : ""), "data-n": String(c.n),
+      "aria-label": `${c.n} · ${c.nombre}`, spellcheck: "false", autocomplete: "off", onchange: e => editar(f, c.n, e.target.value) });
+    input.value = f.c[c.n] ?? "";
+    return sensible(c.n) ? [el("span", { class: "puntos" }, valorCampo(c.n, f.c[c.n])), input] : input;   // modo video: se tapa
+  };
+  const corregido = n => estado.editados.has(`${f.n}:${n}`);
   return el("div", {}, hs.length ? el("ul", {}, hs.map(h => el("li", { class: h.nivel === "error" ? "e" : "a" }, `${h.nivel === "error" ? "Error" : "Advertencia"} · `, conRucs(h.msg)))) : null,
-    el("div", { class: "sire-campos" }, visibles.map(c => el("div", { class: malos.get(c.n) === "error" ? "mal" : malos.get(c.n) ? "ojo" : "" },
-      el("small", { texto: `${c.n} · ${c.nombre}` }), valorCampo(c.n, f.c[c.n])))));
+    destinoFila(f),
+    el("div", { class: "sire-campos" }, visibles.map(c => el("div", { class: [malos.get(c.n) === "error" ? "mal" : malos.get(c.n) ? "ojo" : "", corregido(c.n) ? "editado" : ""].join(" ").trim() },
+      el("small", { texto: `${c.n} · ${c.nombre}${corregido(c.n) ? " · corregido" : ""}` }), valor(c)))),
+    el("p", { class: "faint", texto: "Corrige aquí mismo: cada cambio se vuelve a validar con las reglas de la norma y pasa al Excel y al TXT de reemplazo." }));
 }
 
 document.querySelectorAll(".ver-filtros button[data-f]").forEach(b => b.addEventListener("click", () => { filtro = b.dataset.f; pagina = 0; abierta = null; pintarDetalle(); }));
@@ -304,16 +376,67 @@ async function descargar(imprimir) {
   const b1 = $("bExcel"), b2 = $("bImprimir");
   b1.disabled = b2.disabled = true; $("descMsg").textContent = "Armando el Excel en tu equipo…";
   try {
-    const { generarExcel } = await import("./excel.js?v=3");
+    const { generarExcel } = await import("./excel.js?v=4");
     const blob = await generarExcel({ ...estado, perfil }, spec, { imprimir });
-    const base = estado.propuesta.nombre.replace(/\.(txt|zip)$/i, "");
-    const a = el("a", { href: URL.createObjectURL(blob), download: `${base}${imprimir ? "-imprimir" : ""}.xlsx` });
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    const base = estado.propuesta.nombre.replace(/(-imprimir)?\.(txt|zip|xlsx)$/i, "");
+    bajar(blob, `${base}${imprimir ? "-imprimir" : ""}.xlsx`);
     $("descMsg").textContent = "Listo: revisa tus descargas.";
   } catch (e) { $("descMsg").textContent = "No pudimos armar el Excel: " + (e.message || e); }
   finally { b1.disabled = b2.disabled = false; }
 }
 $("bExcel").addEventListener("click", () => descargar(false));
+
+// --- TXT de reemplazo (Anexo 11): se arma en el navegador; nunca pasa por el servidor ---------------
+// La razon social del generador vive con cada archivo cargado (estado.razon): de entrada, la mas frecuente.
+function txtActual() {
+  if (estado.razon == null) estado.razon = M.razonGenerador(estado.filas);
+  return M.reemplazo(estado.filas, spec, { razon: estado.razon, moneda: $("monedaLibro").value });
+}
+function pintarReemplazo() {
+  const t = txtActual(), variantes = new Set(estado.filas.map(f => f.c[2]).filter(Boolean));
+  if ($("razonGen").value !== t.razon) $("razonGen").value = t.razon;
+  $("razonMasc").replaceChildren(N(t.razon));
+  $("razonNota").textContent = variantes.size > 1 ? `En el archivo aparece de ${variantes.size} formas; el TXT lleva una sola, la que quede aquí. Debe coincidir con la de la ficha RUC.` : "";
+  const sum = ns => ns.reduce((s, n) => s + (t.totales.total.montos[n] || 0), 0);
+  const dato = (dt, dd, clase = "mono") => el("div", {}, el("dt", { texto: dt }), el("dd", { class: clase, texto: dd }));
+  const e = t.bloqueos.length, a = t.advertencias.length;
+  $("txtDatos").replaceChildren(dato("Comprobantes", String(t.n)), dato("Base imponible (15+17+19)", M.soles(sum([15, 17, 19]))),
+    dato("IGV (16+18+20)", M.soles(sum([16, 18, 20]))), dato("No gravadas (21)", M.soles(sum([21]))), dato("Importe total (25)", M.soles(sum([25]))),
+    dato("Errores", String(e), e ? "rojo" : "verde"), dato("Advertencias", String(a), a ? "amarillo" : "verde"),
+    dato("Corregidos por ti", `${estado.editados.size} campo(s)${estado.reubicadas ? ` · ${estado.reubicadas} reubicado(s)` : ""}`, ""));
+  const varias = t.totales.monedas.length > 1;
+  $("txtEstado").replaceChildren(
+    e ? el("div", { class: "msg err" }, el("b", { texto: `${e} error${e === 1 ? "" : "es"} impide${e === 1 ? "" : "n"} armar un TXT válido. ` }),
+          "Corrígelos aquí, en Comprobantes, o en tu Excel y vuelve a subirlo. No entregamos un archivo que el SIRE vaya a rechazar. ",
+          el("button", { type: "button", class: "btn-sec", texto: "Ver los errores", onclick: verErrores }),
+          el("ul", {}, t.bloqueos.filter(h => h.regla === "reemplazo").slice(0, 5).map(h => el("li", {}, conRucs(h.msg)))))
+      : a ? el("div", { class: "msg info", texto: `Listo para generar. Hay ${a} advertencia${a === 1 ? "" : "s"}: no impiden subirlo, pero revísala${a === 1 ? "" : "s"} antes (filtro «Con advertencias»).` })
+      : el("div", { class: "msg info" }, el("span", { class: "chip-sem verde" }, el("s", { class: "sem verde" }), "Listo para generar"), " · sin errores ni advertencias."),
+    ...(varias ? [el("p", { class: "faint", texto: "Los montos se suman tal como están en cada comprobante (varias monedas, sin convertir), igual que el resumen del SIRE." })] : []),
+    ...t.ajustes.map(x => el("p", { class: "faint", texto: x })));
+  $("bZip").disabled = $("bTxt").disabled = !!e;
+  // LE + RUC + ...: el RUC va pegado a otros digitos, se tapa por posicion
+  $("txtNombre").replaceChildren("Nombre del archivo: ", el("span", { class: "mono" }, t.archivo.slice(0, 2), R(t.archivo.slice(2, 13)), t.archivo.slice(13)), " (dentro del ZIP del mismo nombre).");
+}
+function verErrores() {
+  filtro = "error"; pagina = 0; abierta = null; pintarDetalle();
+  $("pDet").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+// La razon social elegida pasa a todas las filas: una sola en pantalla, en el Excel y en el TXT.
+$("razonGen").addEventListener("change", e => {
+  estado.razon = e.target.value.trim();
+  for (const f of estado.filas) f.c[2] = estado.razon;
+  refrescar();
+});
+$("monedaLibro").addEventListener("change", () => pintarReemplazo());
+function bajarTxt(comoZip) {
+  const t = txtActual();
+  if (!t.texto) { pintarReemplazo(); return; }
+  const datos = new TextEncoder().encode(t.texto);                       // UTF-8, como la propuesta del portal
+  bajar(comoZip ? new Blob([M.zipear(t.archivo, datos)], { type: "application/zip" }) : new Blob([datos], { type: "text/plain" }), comoZip ? t.zip : t.archivo);
+  $("txtMsg").textContent = comoZip ? "Listo: sube ese ZIP en «Reemplazar propuesta»." : "Listo: es el TXT suelto (para revisarlo o pasarlo por el PVSIRE).";
+}
+$("bZip").addEventListener("click", () => bajarTxt(true));
+$("bTxt").addEventListener("click", () => bajarTxt(false));
 $("bImprimir").addEventListener("click", () => descargar(true));
 window.__sireCapacidades = CAP;                    // riesgo / servidor: se encienden desde el servidor (suscripcion)

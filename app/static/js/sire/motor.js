@@ -321,13 +321,136 @@ export function avisosDestino(filas, spec, perfil = {}) {
 // Avisos de lectura por tipo de comprobante (no son errores).
 function avisosTipo(filas) {
   const pos = filas.filter(f => f.c[7] === "30").length;
-  return pos ? [{ msg: `Hay ${pos} comprobante${pos === 1 ? "" : "s"} tipo 30 (adquirentes de tarjetas, los del POS). La base e IGV se pueden reubicar entre destinos dentro de la propuesta; si otro dato del comprobante viene mal, la norma pide reemplazar la propuesta con el TXT del Anexo 11 (llega en la fase 4: lo corriges en el Excel y te devolvemos el TXT).`, tipo: "30" }] : [];
+  return pos ? [{ msg: `Hay ${pos} comprobante${pos === 1 ? "" : "s"} tipo 30 (adquirentes de tarjetas, los del POS). La base e IGV se pueden reubicar entre destinos dentro de la propuesta; si otro dato del comprobante viene mal, la norma pide reemplazar la propuesta con el TXT del Anexo 11 (corrígelo en el detalle del comprobante o en el Excel, y genera el TXT de reemplazo al final de esta página).`, tipo: "30" }] : [];
 }
 
 // Todo de una vez: lo que usa la pantalla.
 export function procesar(texto, spec, estructuraId = "rce_propuesta") {
+  const p = parsear(texto, spec.estructuras[estructuraId]);
+  return { ...p, ...desdeFilas(p.filas, spec, p.avisos, estructuraId) };
+}
+// Lo mismo a partir de filas ya leidas (de la propuesta, de un Excel o de una tabla pegada).
+export function desdeFilas(filas, spec, avisos = [], estructuraId = "rce_propuesta") {
+  return { filas, avisos: [...avisos, ...avisosTipo(filas)], comas: detectarComas(filas, spec.estructuras[estructuraId]),
+    hallazgos: validar(filas, spec, estructuraId), totales: totales(filas, spec, estructuraId) };
+}
+
+// === Fase 4: de vuelta al SIRE ======================================================================
+// --- Destino de la adquisicion (nota 5 del Anexo 8): el contador mueve base e IGV entre 15-16 (DG),
+// 17-18 (DGNG) y 19-20 (DNG). Las sumas 15+17+19 y 16+18+20 no cambian. Nunca se hace solo.
+export const DESTINOS = { dg: [15, 16], dgng: [17, 18], dng: [19, 20] };
+const aMonto = c => `${c < 0 ? "-" : ""}${Math.trunc(Math.abs(c) / 100)}.${String(Math.abs(c) % 100).padStart(2, "0")}`;
+export function destinoDe(c) {
+  const con = Object.keys(DESTINOS).filter(k => DESTINOS[k].some(n => (centimos(c[n] || "0") ?? 0) !== 0));
+  return con.length === 1 ? con[0] : con.length ? "mixto" : null;
+}
+export function reubicar(fila, destino) {
+  if (!DESTINOS[destino]) return false;
+  const c = fila.c; let bi = 0, igv = 0;
+  for (const [b, i] of Object.values(DESTINOS)) {
+    const x = centimos(c[b] || "0"), y = centimos(c[i] || "0");
+    if (x === null || y === null) return false;                    // monto ilegible: primero se corrige
+    bi += x; igv += y;
+  }
+  for (const [k, [b, i]] of Object.entries(DESTINOS)) { c[b] = aMonto(k === destino ? bi : 0); c[i] = aMonto(k === destino ? igv : 0); }
+  return true;
+}
+
+// --- Filas desde una tabla (Excel del conversor, plantilla o filas pegadas desde otro Excel) ---------
+// La primera fila son los titulos: "15. Base imponible…" (Excel del conversor), el de la propuesta
+// ("BI Gravado DG") o el nombre del campo. Lo demas se ignora (p. ej. "Fila", "Observaciones").
+export function tablaDePegado(texto) {
+  return texto.replace(/^﻿/, "").split(/\r?\n/).filter(l => l.trim() !== "").map(l => l.split("\t"));
+}
+const dosDig = n => String(n).padStart(2, "0");
+function valorDeCelda(campo, v) {
+  if (v === null || v === undefined) return "";
+  if (v instanceof Date) return `${dosDig(v.getUTCDate())}/${dosDig(v.getUTCMonth() + 1)}/${v.getUTCFullYear()}`;
+  if (typeof v === "number") {
+    if (campo.tipo === "monto") return v.toFixed(2);
+    if (campo.tipo === "tc") return v.toFixed(3);
+    v = String(v);
+  }
+  v = String(v).trim();
+  if (campo.tipo === "codigo" && campo.long === 2 && /^\d$/.test(v)) v = "0" + v;      // Excel se come el 0 de "01"
+  return v;
+}
+export function filasDeTabla(matriz, spec, estructuraId = "rce_propuesta") {
   const est = spec.estructuras[estructuraId];
-  const p = parsear(texto, est);
-  const comas = detectarComas(p.filas, est);
-  return { ...p, avisos: [...p.avisos, ...avisosTipo(p.filas)], comas, hallazgos: validar(p.filas, spec, estructuraId), totales: totales(p.filas, spec, estructuraId) };
+  if (!matriz.length) throw new Error("La tabla está vacía.");
+  const col = new Map();                                            // columna -> campo
+  matriz[0].forEach((t, i) => {
+    const s = String(t ?? "").trim(), num = s.match(/^(\d{1,2})\.\s/);
+    const campo = num ? est.campos.find(c => c.n === Number(num[1]))
+      : est.campos.find(c => normal(c.cabecera) === normal(s) || normal(c.nombre) === normal(s));
+    if (campo && ![...col.values()].includes(campo)) col.set(i, campo);
+  });
+  const tiene = n => [...col.values()].some(c => c.n === n);
+  if (!tiene(1) || !tiene(7) || !tiene(25))
+    throw new Error("No reconocemos las columnas: la primera fila debe traer los títulos (como en el Excel del conversor: «1. RUC del generador», «7. Tipo de comprobante», «25. Importe total»…).");
+  const filas = [];
+  for (const r of matriz.slice(1)) {
+    const c = Object.fromEntries(est.campos.map(f => [f.n, ""]));
+    for (const [i, campo] of col) c[campo.n] = valorDeCelda(campo, r[i]);
+    if (est.campos.every(f => c[f.n] === "")) continue;            // fila vacia
+    filas.push({ n: filas.length + 1, c });
+  }
+  if (!filas.length) throw new Error("La tabla solo trae títulos: no hay comprobantes.");
+  const faltan = est.campos.filter(f => !f.libre && !f.informativo && !tiene(f.n));
+  const avisos = faltan.length ? [{ tipo: "estructura", msg: `Columnas que no vinieron (se toman vacías): ${faltan.map(f => `${f.n}. ${f.nombre}`).join(", ")}.` }] : [];
+  return { filas, avisos };
+}
+
+// --- TXT de reemplazo (Anexo 11) ---------------------------------------------------------------------
+// Antes de armarlo se re-valida con las mismas reglas: un error lo impide (no se entrega un archivo roto);
+// las advertencias solo se avisan. Montos ya vienen con punto y sin miles (si no, es error).
+const masFrecuente = xs => { const k = new Map(); for (const x of xs) if (x) k.set(x, (k.get(x) || 0) + 1); return [...k].sort((a, b) => b[1] - a[1])[0]?.[0] || ""; };
+export function razonGenerador(filas) { return masFrecuente(filas.map(f => f.c[2])); }
+export function reemplazo(filas, spec, { razon = null, oportunidad = "1", moneda = "1" } = {}) {
+  const est = spec.estructuras.rce_reemplazo, A = est.archivo, prohibido = new RegExp(est.texto_prohibido, "g");
+  const hallazgos = validar(filas, spec);
+  const bloqueos = hallazgos.filter(h => h.nivel === "error"), advertencias = hallazgos.filter(h => h.nivel !== "error");
+  const bloquea = (fila, campo, msg) => bloqueos.push({ fila, campo, nivel: "error", regla: "reemplazo", msg });
+  const ruc = filas[0]?.c[1] || "", periodo = filas[0]?.c[3] || "", nombre = String(razon ?? razonGenerador(filas)).trim();
+  if (!filas.length) bloquea(0, 0, "No hay comprobantes para armar el TXT.");
+  if (!nombre) bloquea(0, 2, "Falta la razón social del generador.");
+  else if (/[|]/.test(nombre)) bloquea(0, 2, "La razón social del generador no puede llevar «|».");
+  if (!A.oportunidad[oportunidad] || !A.moneda[moneda]) bloquea(0, 0, "Indicador de oportunidad o de moneda no válido.");
+  let limpiados = 0;
+  const lineas = filas.map(f => {
+    const c = f.c;
+    if (c[1] !== ruc) bloquea(f.n, 1, `Todo el TXT debe ser de un solo generador: esta fila es del RUC ${c[1]} y la primera del ${ruc}.`);
+    if (c[3] !== periodo) bloquea(f.n, 3, `Todo el TXT debe ser de un solo periodo: esta fila es del ${c[3]} y la primera del ${periodo}.`);
+    const v = est.campos.map(n => est.vacios.includes(n) ? "" : n === 2 ? nombre
+      : est.cero_si_vacio.includes(n) && !c[n] ? "0.00" : String(c[n] ?? ""));
+    v.forEach((x, i) => { if (x.includes("|")) bloquea(f.n, est.campos[i], `El campo ${est.campos[i]} lleva «|», que es el separador del archivo.`); });
+    let ultimo = 0;                                                  // campos libres: solo hasta el ultimo usado
+    for (let n = est.libres[0]; n <= est.libres[1]; n++) if (c[n]) ultimo = n;
+    for (let n = est.libres[0]; n <= ultimo; n++) {
+      const x = String(c[n] ?? ""), y = x.replace(prohibido, " ");
+      if (y !== x) limpiados++;
+      v.push(y);
+    }
+    return v.join("|") + "|";
+  });
+  const archivo = `${A.prefijo}${ruc}${periodo}00${A.libro}${A.cc}${oportunidad}${filas.length ? 1 : 0}${moneda}${A.g}${A.extension}`;
+  const ajustes = limpiados ? [`${limpiados} campo(s) de libre utilización llevaban «|», «/» o «\\» (no se aceptan): se cambiaron por un espacio.`] : [];
+  return { archivo, zip: archivo.replace(/\.TXT$/, A.comprimido), texto: bloqueos.length ? null : lineas.join("\n") + "\n",
+    bloqueos, advertencias, ajustes, razon: nombre, n: filas.length, totales: totales(filas, spec) };
+}
+
+// ZIP con el TXT adentro, sin comprimir (metodo "stored": cualquier lector lo abre). Mismo nombre que el TXT.
+const CRC = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+function crc32(b) { let c = 0xffffffff; for (const x of b) c = CRC[(c ^ x) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+export function zipear(nombre, datos) {
+  const n = new TextEncoder().encode(nombre), crc = crc32(datos), out = new Uint8Array(30 + n.length + datos.length + 46 + n.length + 22);
+  const dv = new DataView(out.buffer); let p = 0;
+  const u32 = v => { dv.setUint32(p, v, true); p += 4; }, u16 = v => { dv.setUint16(p, v, true); p += 2; }, bytes = b => { out.set(b, p); p += b.length; };
+  u32(0x04034b50); u16(20); u16(0x0800); u16(0); u16(0); u16(0x21); u32(crc); u32(datos.length); u32(datos.length); u16(n.length); u16(0); bytes(n); bytes(datos);
+  const central = p;
+  u32(0x02014b50); u16(20); u16(20); u16(0x0800); u16(0); u16(0); u16(0x21); u32(crc); u32(datos.length); u32(datos.length);
+  u16(n.length); u16(0); u16(0); u16(0); u16(0); u32(0); u32(0); bytes(n);
+  const largo = p - central;
+  u32(0x06054b50); u16(0); u16(0); u16(1); u16(1); u32(largo); u32(central); u16(0);
+  return out;
 }

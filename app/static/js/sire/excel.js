@@ -1,7 +1,8 @@
 // Conversor SIRE · Excel con estilo (ExcelJS, MIT, servido desde nuestro propio servidor).
 // Se arma en el navegador: el archivo no sale del equipo. Dos versiones: oscura (pantalla, la de la
-// casa) y clara para imprimir (sin rellenos oscuros).
-import * as M from "./motor.js?v=3";
+// casa) y clara para imprimir (sin rellenos oscuros). Tambien se lee de vuelta (Fase 4): el contador lo
+// corrige y lo sube, y el conversor arma el TXT de reemplazo.
+import * as M from "./motor.js?v=4";
 
 const RUTA_EXCELJS = "/static/vendor/exceljs/4.4.0/exceljs.min.js";
 let cargando = null;
@@ -33,7 +34,7 @@ function estilar(celda, P, { cab = false, fill = null, color = null, bold = fals
   if (num) { celda.numFmt = num; celda.alignment = { ...celda.alignment, horizontal: "right" }; }
 }
 
-export async function generarExcel(estado, spec, { imprimir = false } = {}) {
+export async function generarExcel(estado, spec, { imprimir = false, plantilla = false } = {}) {
   const ExcelJS = await cargarExcelJS();
   const P = imprimir ? CLARO : OSCURO;
   const est = spec.estructuras.rce_propuesta;
@@ -46,7 +47,9 @@ export async function generarExcel(estado, spec, { imprimir = false } = {}) {
   for (const h of estado.hallazgos) { if (!porFila.has(h.fila)) porFila.set(h.fila, []); porFila.get(h.fila).push(h); }
 
   // --- Hoja Compras: los campos con nombre (sin columnas libres vacias) -------------------------
-  const campos = est.campos.filter(c => !c.libre || estado.filas.some(f => f.c[c.n]));
+  // Plantilla: solo lo que se sube (sin CAR ni informativos 38-41, que pone el SIRE).
+  const campos = plantilla ? est.campos.filter(c => !c.libre && !c.informativo && c.n !== 4 && c.n !== 37)
+    : est.campos.filter(c => !c.libre || estado.filas.some(f => f.c[c.n]));
   const ws = wb.addWorksheet("Compras", { views: vista, properties: { tabColor: { argb: P.acento } } });
   const cab = ["Fila", ...campos.map(c => `${c.n}. ${c.nombre}`), "Observaciones"];
   ws.addRow(cab).eachCell(c => estilar(c, P, { cab: true }));
@@ -73,6 +76,20 @@ export async function generarExcel(estado, spec, { imprimir = false } = {}) {
     col.width = i === 0 ? 6 : i === cab.length - 1 ? 60 : c && c.tipo === "monto" ? 14 : c && /razon/.test(c.id) ? 36 : c && c.n === 4 ? 30 : 13;
   });
   ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cab.length } };
+  if (plantilla) {                                                 // columnas de texto: Excel no se come los ceros
+    campos.forEach((c, i) => { if (c.tipo !== "monto" && c.tipo !== "tc") ws.getColumn(i + 2).numFmt = "@"; });
+    const wi = wb.addWorksheet("Cómo llenarla", { views: [{ showGridLines: false }] });
+    [["Plantilla del Registro de Compras · Conversor SIRE"],
+     ["Una fila por comprobante, en la hoja «Compras». No cambies los títulos: el conversor ubica cada columna por ellos."],
+     ["RUC, serie, número, periodo (AAAAMM), tipos y fechas (DD/MM/AAAA) van como texto. Montos con punto decimal y sin separador de miles."],
+     ["La columna «Fila» y la de «Observaciones» se pueden dejar vacías."],
+     ["Cuando termines, sube este Excel al Conversor SIRE: lo validamos con las reglas de la norma y te devolvemos el TXT de reemplazo."],
+     ["Todo se procesa en tu equipo: el archivo y sus montos no se envían a ningún servidor."]]
+      .forEach((v, i) => estilar(wi.addRow(v).getCell(1), P, { bold: i === 0 }));
+    wi.getColumn(1).width = 120;
+    const b = await wb.xlsx.writeBuffer();
+    return new Blob([b], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
 
   // --- Hoja Totales ------------------------------------------------------------------------------
   const t = estado.totales, cols = t.conMonto.length ? t.conMonto : [25], variasMonedas = t.monedas.length > 1;
@@ -122,10 +139,29 @@ export async function generarExcel(estado, spec, { imprimir = false } = {}) {
   const wa = wb.addWorksheet("Acerca de", { views: [{ showGridLines: false }] });
   [["Conversor SIRE · Perú Sistemas Pro"], [`Archivo: ${estado.propuesta.nombre}`], [`Generado: ${new Date().toLocaleString("es-PE")}`],
    [`Estructura: ${est.nombre} (${est.anexo})`], ["Procesado en tu equipo: el archivo y sus montos no se enviaron a ningún servidor."],
-   [imprimir ? "Versión clara para imprimir." : "Versión oscura (pantalla). Para imprimir, usa «Versión para imprimir»."]]
+   [imprimir ? "Versión clara para imprimir." : "Versión oscura (pantalla). Para imprimir, usa «Versión para imprimir»."],
+   ["Para volver al SIRE: corrige en la hoja «Compras» (sin cambiar los títulos) y sube este Excel al conversor: te devuelve el TXT de reemplazo."]]
     .forEach((v, i) => estilar(wa.addRow(v).getCell(1), P, { bold: i === 0 }));
   wa.getColumn(1).width = 100;
 
   const buf = await wb.xlsx.writeBuffer();
   return new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+// --- De vuelta: la hoja «Compras» (o la primera) como tabla de valores simples --------------------
+const plano = v => v === null || v === undefined ? "" : v instanceof Date ? v
+  : typeof v === "object" ? (v.result !== undefined ? plano(v.result) : v.richText ? v.richText.map(x => x.text).join("") : v.text ?? "") : v;
+export async function leerExcel(buffer) {
+  const ExcelJS = await cargarExcelJS();
+  const wb = new ExcelJS.Workbook();
+  try { await wb.xlsx.load(buffer); } catch (_) { throw new Error("No pudimos abrir ese Excel (¿está dañado o protegido con clave?)."); }
+  const ws = wb.getWorksheet("Compras") || wb.worksheets[0];
+  if (!ws) throw new Error("El Excel no tiene hojas.");
+  const matriz = [];
+  ws.eachRow({ includeEmpty: false }, row => {
+    const v = [];
+    row.eachCell({ includeEmpty: true }, (celda, i) => { v[i - 1] = plano(celda.value); });
+    matriz.push(v);
+  });
+  return matriz;
 }

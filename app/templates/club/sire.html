@@ -3,7 +3,7 @@
 {% block titulo %}Conversor SIRE · Club de Contadores{% endblock %}
 {# Fuentes desde este mismo sitio: al cargar esta pagina no sale ninguna peticion a terceros. #}
 {% block fuentes %}<link rel="stylesheet" href="/static/fonts/plex/plex.css?v=1">{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=4">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=5">{% endblock %}
 {% block contenido %}
   <section class="fx" aria-label="Fórmula">
     <div class="ref">A1</div>
@@ -16,11 +16,19 @@
       <span>Gratis · sin cuenta · lee la propuesta del Registro de Compras y la vuelve un Excel legible</span></header>
     <div class="panel-cuerpo">
       <label class="sire-zona inicio" id="zona" for="archivo" tabindex="0">
-        <input type="file" id="archivo" accept=".zip,.txt" multiple hidden>
+        <input type="file" id="archivo" accept=".zip,.txt,.xlsx" multiple hidden>
         <b>Arrastra aquí la propuesta que descargaste del SIRE</b>
         <span>El ZIP tal cual, o el TXT. Si también tienes el TXT del <i>resumen</i>, súbelo junto: comprobamos que los totales cuadren.</span>
+        <span>¿Ya lo corregiste en el Excel del conversor? Súbelo aquí y te devolvemos el TXT de reemplazo.</span>
         <span class="btn-ver" aria-hidden="true">Elegir archivo</span>
       </label>
+      <details class="sire-desde-excel">
+        <summary>¿Tus compras están en otro Excel? Empieza desde una tabla</summary>
+        <p class="faint">Copia las filas <b>con su fila de títulos</b> (los del Excel del conversor, como «15. Base imponible…», o los de la propuesta) y pégalas aquí. O descarga la plantilla vacía, llénala y súbela.</p>
+        <textarea id="pegado" rows="5" spellcheck="false" aria-label="Filas pegadas desde Excel"></textarea>
+        <div class="sire-descargas"><button type="button" class="btn-sec" id="bPegado">Usar lo pegado</button>
+          <button type="button" class="btn-sec" id="bPlantilla">Descargar plantilla vacía</button></div>
+      </details>
       <div class="sire-privacidad">
         <span class="chip-sem verde"><s class="sem verde"></s>Modo local</span>
         <span>Tu archivo se procesa <b>en tu equipo</b>: ninguna cifra sale de él. Para mostrar la actividad solo consultamos el RUC del generador, sin montos ni fechas; no guardamos qué RUC consultas.</span>
@@ -73,11 +81,31 @@
     </section>
 
     <section class="panel sire-lee" aria-label="Descargar">
-      <header class="panel-cab"><b>Descargar en Excel</b><span>Se arma aquí mismo, en tu equipo</span></header>
+      <header class="panel-cab"><b>Descargar en Excel</b><span>Para revisar o corregir en tu Excel; luego súbelo aquí y te devolvemos el TXT</span></header>
       <div class="panel-cuerpo sire-descargas">
         <button type="button" class="btn-ver" id="bExcel">Descargar Excel</button>
         <button type="button" class="btn-sec" id="bImprimir">Versión para imprimir (clara)</button>
         <span class="faint" id="descMsg" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="panel sire-actua" id="pTxt" aria-label="TXT de reemplazo">
+      <header class="panel-cab"><b>TXT de reemplazo</b><span>Para subir al SIRE: reemplaza la propuesta con tus correcciones (Anexo 11)</span><em class="sire-tag">Paso final</em></header>
+      <div class="panel-cuerpo sire-txt">
+        <label class="sire-razon"><span>Razón social del generador, como figura en su ficha RUC</span>
+          <span class="puntos" id="razonMasc"></span><input type="text" id="razonGen" class="tapa" autocomplete="off" spellcheck="false"></label>
+        <p class="faint" id="razonNota"></p>
+        <label class="sire-razon"><span>Moneda en que llevas el registro</span>
+          <select id="monedaLibro"><option value="1">Soles</option><option value="2">Dólares</option></select></label>
+        <dl class="sire-datos" id="txtDatos"></dl>
+        <div id="txtEstado" aria-live="polite"></div>
+        <div class="sire-descargas">
+          <button type="button" class="btn-actua" id="bZip">Generar TXT de reemplazo (ZIP)</button>
+          <button type="button" class="btn-sec" id="bTxt">Solo el TXT</button>
+          <span class="faint" id="txtMsg" aria-live="polite"></span>
+        </div>
+        <p class="faint" id="txtNombre"></p>
+        <p class="faint">Se arma en tu equipo: el TXT no pasa por nuestro servidor. Súbelo en el SIRE, en el Registro de Compras, con «Reemplazar propuesta». Si quieres, valídalo antes con el PVSIRE.</p>
       </div>
     </section>
   </div>
@@ -88,4 +116,4 @@
   </dialog>
 {% endblock %}
 {% block estado %}<span>Procesado en tu equipo · ninguna cifra se envía</span><span id="estadoTxt">Listo</span>{% endblock %}
-{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=4" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=5" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}

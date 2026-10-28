@@ -146,8 +146,116 @@ test("campo 11 (rango): solo para consolidar operaciones sin crédito fiscal", (
 });
 
 // Siguen en sus fases (ver docs/sire/estructura-campos.md, "Casos del mercado").
-test.todo("fase 4 · caso 1: corregir un tipo 30 en el Excel y devolverlo en el TXT de reemplazo (Anexo 11)");
-test.todo("fase 4 · caso 3: reubicar 15-16 -> 17-18 / 19-20 por comprobante y generar el TXT (15+17+19 = propuesto ±1)");
+// --- Fase 4: TXT de reemplazo (Anexo 11) ----------------------------------------------------------------
+const lineas = t => t.split("\n").filter(Boolean).map(l => l.split("|"));
+
+test("fase 4 · nombre y estructura del Anexo 11: 37 campos, CAR vacío, sin 38-41 ni libres vacíos, palote final", () => {
+  const r = M.procesar(F.propuestaLimpia(), spec), t = M.reemplazo(r.filas, spec);
+  assert.deepEqual(t.bloqueos, []);
+  assert.equal(t.archivo, `LE${F.GENERADOR}20260700080400021112.TXT`);       // Tabla 13: 080400 · 02 reemplaza · O I M · 2
+  assert.equal(t.zip, `LE${F.GENERADOR}20260700080400021112.zip`);
+  const ls = lineas(t.texto);
+  assert.equal(ls.length, 6);                                                  // sin cabecera
+  for (const v of ls) { assert.equal(v.length, 38); assert.equal(v[37], ""); assert.equal(v[3], ""); assert.equal(v[36], ""); }
+  assert.ok(t.texto.endsWith("|\n") && !t.texto.includes("\r"));
+  assert.ok(ls.every(v => v[1] === "COMERCIAL EJEMPLO S.A.C."), "un solo nombre del generador (el más frecuente)");
+  assert.ok(ls.some(v => v[13] === "SERVICIOS & NEGOCIOS FICTICIOS E.I.R.L."), "«&amp;» del portal sale como «&»");
+});
+
+test("fase 4 · ida y vuelta sin pérdida: propuesta -> reemplazo -> se vuelve a leer igual (campos 1-37)", () => {
+  const r = M.procesar(F.propuestaLimpia(), spec), t = M.reemplazo(r.filas, spec);
+  const de_nuevo = M.parsear(t.texto, est).filas;                              // sin cabecera: por posicion
+  assert.equal(de_nuevo.length, r.filas.length);
+  de_nuevo.forEach((f, i) => { for (let n = 1; n <= 37; n++) {
+    const esperado = n === 4 || n === 37 ? "" : n === 2 ? "COMERCIAL EJEMPLO S.A.C." : r.filas[i].c[n];
+    assert.equal(f.c[n], esperado, `fila ${i + 1}, campo ${n}`);
+  } });
+  assert.deepEqual(M.totales(de_nuevo, spec).total, r.totales.total);
+});
+
+test("fase 4 · errores bloquean (no se entrega un TXT roto); advertencias no", () => {
+  const malo = M.reemplazo(M.procesar(F.propuestaConErrores(), spec).filas, spec);
+  assert.equal(malo.texto, null);
+  assert.ok(malo.bloqueos.length > 5);
+  const r = M.procesar(F.propuestaLimpia(), spec);
+  r.filas[1].c[10] = r.filas[0].c[10];                                          // duplicado: solo advertencia
+  const t = M.reemplazo(r.filas, spec);
+  assert.ok(t.texto && t.advertencias.some(h => h.regla === "duplicado"));
+  r.filas[2].c[1] = "20100055237";                                             // otro generador en el mismo TXT
+  assert.ok(M.reemplazo(r.filas, spec).bloqueos.some(h => h.regla === "reemplazo" && h.campo === 1));
+  assert.ok(M.reemplazo(r.filas, spec, { razon: "  " }).bloqueos.some(h => h.campo === 2));
+});
+
+test("fase 4 · libres: solo hasta el último usado y sin «|», «/» ni «\\»; montos vacíos -> 0.00", () => {
+  const r = M.procesar(F.propuestaLimpia(), spec);
+  r.filas[0].c[43] = "centro/costo 01"; r.filas[1].c[22] = "";
+  const t = M.reemplazo(r.filas, spec), ls = lineas(t.texto);
+  assert.equal(ls[0].length, 37 + 2 + 1);                                       // 42 vacio + 43 usado + palote final
+  assert.equal(ls[0][38], "centro costo 01");
+  assert.equal(ls[1].length, 38);
+  assert.equal(ls[1][21], "0.00");
+  assert.equal(t.ajustes.length, 1);
+});
+
+test("fase 4 · caso 1: tipo 30 (POS) corregido en la pantalla/Excel y devuelto en el TXT", () => {
+  const r = M.procesar(F.casoPOS(), spec);
+  assert.equal(M.reemplazo(r.filas, spec).texto, null);                         // serie y numero malos: bloquea
+  Object.assign(r.filas[3].c, { 8: "F701", 10: "20260700004" });                // el contador lo corrige
+  const t = M.reemplazo(r.filas, spec);
+  assert.deepEqual(t.bloqueos, []);
+  const v = lineas(t.texto)[3];
+  assert.deepEqual([v[6], v[7], v[9]], ["30", "F701", "20260700004"]);
+});
+
+test("fase 4 · caso 2: compra gravada usada solo para ventas exoneradas -> reubicada a 19-20 (DNG)", () => {
+  const r = M.procesar(F.casoLibros(), spec), f = r.filas[2];
+  assert.equal(M.destinoDe(f.c), "dg");
+  assert.ok(M.reubicar(f, "dng"));
+  assert.deepEqual([f.c[15], f.c[16], f.c[19], f.c[20]], ["0.00", "0.00", "50.00", "9.00"]);
+  assert.equal(casilla(M.casillas621(r.filas, spec), 113), 10000 + 5000);
+  const v = lineas(M.reemplazo(r.filas, spec).texto)[2];
+  assert.deepEqual([v[14], v[15], v[18], v[19]], ["0.00", "0.00", "50.00", "9.00"]);
+});
+
+test("fase 4 · caso 3: exportador 107 -> 110 por comprobante, con las sumas intactas (nota 5)", () => {
+  const r = M.procesar(F.casoExportador(), spec), antes = M.totales(r.filas, spec).total.montos;
+  assert.ok(M.reubicar(r.filas[0], "dgng"));
+  assert.equal(M.destinoDe(r.filas[0].c), "dgng");
+  const k = M.casillas621(r.filas, spec), despues = M.totales(r.filas, spec).total.montos;
+  assert.equal(casilla(k, 110), 100000);
+  assert.equal(antes[15] + antes[17] + antes[19], despues[15] + despues[17] + despues[19]);
+  assert.equal(antes[16] + antes[18] + antes[20], despues[16] + despues[18] + despues[20]);
+  assert.equal(M.reemplazo(r.filas, spec).texto.split("\n")[0].split("|").slice(14, 18).join("|"), "0.00|0.00|1000.00|180.00");
+  const neg = { c: { 15: "-100.00", 16: "-18.00", 17: "0.00", 18: "0.00", 19: "0.00", 20: "0.00" } };   // nota de credito
+  M.reubicar(neg, "dng"); assert.deepEqual([neg.c[19], neg.c[20]], ["-100.00", "-18.00"]);
+  assert.equal(M.reubicar({ c: { 15: "1,00" } }, "dng"), false);               // monto ilegible: no se mueve nada
+});
+
+test("fase 4 · tabla pegada / Excel: títulos del conversor o de la propuesta, números y fechas de Excel", () => {
+  const r = M.procesar(F.propuestaLimpia(), spec);
+  const tit = ["Fila", ...est.campos.filter(c => !c.libre).map(c => `${c.n}. ${c.nombre}`), "Observaciones"];
+  const matriz = [tit, ...r.filas.map(f => [f.n, ...est.campos.filter(c => !c.libre).map(c => f.c[c.n]), ""])];
+  const { filas } = M.filasDeTabla(matriz, spec);
+  assert.deepEqual(M.reemplazo(filas, spec).texto, M.reemplazo(r.filas, spec).texto);
+  const tsv = [F.CABECERA.slice(0, 27).join("\t"), [F.GENERADOR, "COMERCIAL EJEMPLO S.A.C.", "202607", "", "13/07/2026", "", "1", "F001", "", "7",
+    "", "6", F.PROV.a, "DISTRIBUIDORA FICTICIA S.A.C.", "100", "18", "", "", "", "", "", "", "", "", "118", "PEN", "1"].join("\t")].join("\n");
+  const p = M.filasDeTabla(M.tablaDePegado(tsv), spec);
+  assert.equal(p.filas[0].c[7], "01");                                         // Excel se comio el cero
+  assert.ok(p.avisos.length === 1);
+  const fecha = M.filasDeTabla([["5. Fecha de emisión", "1. RUC del generador", "7. Tipo", "25. Importe total", "15. Base"],
+    [new Date(Date.UTC(2026, 6, 13)), 20123456786, 1, 118, 100]], spec).filas[0].c;
+  assert.deepEqual([fecha[5], fecha[1], fecha[7], fecha[25], fecha[15]], ["13/07/2026", "20123456786", "01", "118.00", "100.00"]);
+  assert.throws(() => M.filasDeTabla([["A", "B"], ["1", "2"]], spec), /No reconocemos las columnas/);
+});
+
+test("fase 4 · ZIP para subir: un solo TXT con el mismo nombre, se vuelve a abrir igual", async () => {
+  const t = M.reemplazo(M.procesar(F.propuestaLimpia(), spec).filas, spec);
+  const z = M.zipear(t.archivo, new TextEncoder().encode(t.texto));
+  const de_nuevo = await M.descomprimir(z);
+  assert.equal(de_nuevo.length, 1);
+  assert.equal(de_nuevo[0].nombre, t.archivo);
+  assert.equal(new TextDecoder().decode(de_nuevo[0].data), t.texto);
+});
 test.todo("fase 5 · caso 2 en ventas: Exonerado (campo 19) e Inafecto (campo 20) del RVIE -> casilla 105 / 109");
 
 test("JSON Logic: operaciones del spec", () => {

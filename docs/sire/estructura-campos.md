@@ -179,3 +179,28 @@ propuesto (±1). No hace falta "papeles de trabajo": se corrige en la propuesta 
 Fase 1: casillas del 621 (referencial) + avisos según dos preguntas de perfil (no se adivina sin perfil).
 Fase 4: reubicar por comprobante y generar el TXT.
 Fuente de las casillas: Ayuda del Formulario 621 (SUNAT), casillas 107-122 y 173.
+
+## Fase 4 · Archivo de reemplazo (Excel → TXT): cómo se arma y por qué
+Fuentes leídas el 28/10/2026: Anexo 11, Tablas 12 y 13 de la RS 040-2022 (`anexo-040-2022.pdf`) y el
+*Manual de servicios Web API SIRE Compras v28*, punto 5.3 «importar reemplazo de la propuesta» (cpe.sunat.gob.pe).
+
+| Aspecto | Decisión | Base |
+|---|---|---|
+| Campos | 1–37 en orden; **38–41 no se envían**; 42–80 solo hasta el último usado | Anexo 11 (nota 6: SUNAT completa 38–41 desde la propuesta) |
+| Campo 4 (CAR) y 37 | Vacíos | Anexo 11: «Consignar vacío»; 37 solo para ajustes posteriores |
+| Montos sin dato | `0.00` (15–25 y 36) | Anexo 11, nota 2 |
+| Campo 2 | **Un solo** nombre del generador para todo el archivo (en la propuesta viene de varias formas); el contador lo confirma | Anexo 11 campo 2: «debe pertenecer al RUC del campo 1»; el SIRE responde «406 · Nombre no corresponde al RUC» |
+| Nombre | `LE` + RUC + AAAAMM + `00` + `080400` + `02` + O `1` + I `1` + M (`1` soles / `2` dólares) + `2` + `.TXT` | Tabla 13 (8.4, reemplaza la propuesta) |
+| Envío | ZIP con el TXT adentro, mismo nombre, `.zip` | Manual API 5.3: «.txt zipeado»; error 1348 si la extensión no es `.zip` |
+| Separador | `\|`; cada línea termina en palote (como la propuesta del portal) | Tabla 12 |
+| Cabecera | **No** lleva fila de títulos (el Anexo 11 no la describe) | Anexo 11 |
+| Texto libre (42–80) | `\|`, `/` y `\` se cambian por espacio y se avisa | Tabla 12, regla 2 |
+| `/` en razón social u otros campos | **No** se toca: queda como advertencia (el nombre debe coincidir con la ficha RUC) | criterio |
+| `&amp;` de la propuesta | Sale como `&` (el `&amp;` es un escape HTML del portal, no parte del nombre) | criterio |
+| Codificación y fin de línea | UTF-8 sin BOM, LF (como la propuesta que entrega el portal) | criterio |
+| Validación | Las mismas reglas de la Fase 1: un error **impide** generar; las advertencias solo se avisan | — |
+| Destino (15-16 / 17-18 / 19-20) | Solo si el contador lo elige, por comprobante; las sumas no cambian | Anexo 8, nota 5; Anexo 11, nota 2 |
+
+**Por confirmar con el PVSIRE** (en una muestra real, que corre en el equipo del contador): el palote final, el
+`&` sin escapar, la codificación UTF-8 y la extensión `.TXT` en mayúscula dentro del ZIP (la Tabla 13 dice `.TXT`;
+en foros se reporta un rechazo que se resolvió con `.txt`).
