@@ -154,6 +154,10 @@ test("fase 4 · nombre y estructura del Anexo 11: 37 campos, CAR vacío, sin 38-
   assert.deepEqual(t.bloqueos, []);
   assert.equal(t.archivo, `LE${F.GENERADOR}20260700080400021112.TXT`);       // Tabla 13: 080400 · 02 reemplaza · O I M · 2
   assert.equal(t.zip, `LE${F.GENERADOR}20260700080400021112.zip`);
+  // Pos. 22-27 = identificador del libro: RCE 080400 (Tabla 13 RS 040-2022 y el ejemplo RCE del Manual del
+  // PVSIRE 1.7.0). 140400 es del RVIE: si el PVSIRE objeta 22-27, se eligió «Ventas» como tipo de archivo.
+  assert.equal(t.zip.slice(21, 27), "080400");
+  assert.equal(spec.estructuras.rce_reemplazo.archivo.libro, "080400");               // una sola fuente: sire-spec.json
   const ls = lineas(t.texto);
   assert.equal(ls.length, 6);                                                  // sin cabecera
   for (const v of ls) { assert.equal(v.length, 38); assert.equal(v[37], ""); assert.equal(v[3], ""); assert.equal(v[36], ""); }

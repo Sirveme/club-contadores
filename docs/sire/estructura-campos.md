@@ -31,7 +31,7 @@ cada versión del producto.
 
 | Pos. | Valor |
 |---|---|
-| 22–27 libro | RVIE `140400` · RCE `080400` (no domiciliados `080500`) |
+| 22–27 libro | RVIE `140400` · RCE `080400` (no domiciliados `080500`). Confirmado en el Manual de Usuario del PVSIRE 1.7.0: su ejemplo RCE es `LE…202404` `00` `080400` `02` `1112.txt` y el RVIE `…00` `140400` `02` `1112`. El PVSIRE compara el nombre con el **tipo de archivo elegido**: si objeta «22 - 27 Identificador del libro», se eligió «Reemplazo del Registro de Ventas e Ingresos (RVIE)» para un archivo de compras |
 | 28–29 CC | `01` acepta propuesta · `02` **reemplaza propuesta** · `03` ajustes posteriores · `04`/`05` ajustes de periodos anteriores al SIRE (general / simplificado) · RCE `00`/`06` no domiciliados |
 | 30 O | `0` cierre/baja de RUC · `1` empresa operativa · `2` cierre del libro |
 | 31 I | `1` con información · `0` sin información |
