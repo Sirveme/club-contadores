@@ -186,3 +186,23 @@
 @media (prefers-reduced-motion: reduce) { .sire-toast { animation: none; } }
 /* Celular: la tabla se desplaza de lado; el detalle queda fijo al ancho visible para leerlo entero */
 @media (max-width: 720px) { .sire-editando { position: sticky; left: 0; max-width: calc(100vw - 66px); } }
+/* Codigo del SIRE junto a cada observacion: abre su entrada en el diccionario */
+.sire-cod { all: unset; cursor: pointer; display: inline-block; margin-right: 6px; padding: 0 6px; font: 600 .82em var(--mono, monospace);
+  color: var(--fg); background: var(--cell-2); border: 1px solid var(--grid); }
+.sire-cod:hover { border-color: var(--accent); }
+.sire-cod:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Diccionario de errores del SIRE */
+.sire-dicc > summary { cursor: pointer; list-style: none; }
+.sire-dicc > summary::-webkit-details-marker { display: none; }
+.sire-dicc > summary b::before { content: "▸ "; color: var(--muted); }
+.sire-dicc[open] > summary b::before { content: "▾ "; }
+.sire-dicc > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sire-dicc-buscar { display: grid; gap: 4px; max-width: 420px; color: var(--muted); font-size: .9em; }
+.sire-dicc-buscar input { padding: 6px 8px; color: var(--fg); background: var(--cell-2); border: 1px solid var(--grid); font: inherit; }
+.sire-dicc-lista { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--grid); }
+.sire-dicc-lista > li { padding: 8px 4px; border-bottom: 1px solid var(--grid); }
+.sire-dicc-lista > li[hidden] { display: none; }
+.sire-dicc-lista p { margin: 4px 0 0; }
+.sire-dicc-lista small { color: var(--muted); }
+.sire-dicc-cab { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.sire-dicc-cab .sire-tag { margin-left: 0; }

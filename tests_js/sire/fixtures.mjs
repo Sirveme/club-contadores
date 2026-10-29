@@ -60,7 +60,7 @@ export function propuestaConErrores() {
     base(4, { 5: "31/02/2026" }),                                              // fecha imposible
     base(5, { 7: "14", 8: "S001" }),                                           // servicio publico sin vencimiento
     base(6, { 7: "91" }),                                                      // no domiciliado en compras
-    base(7, { 15: "100.00", 16: "10.00", 25: "110.00" }),                      // IGV 10% (tasa reducida): advertencia
+    base(7, { 15: "1000.00", 16: "100.00", 25: "1100.00" }),                   // IGV 10% en 2026 (la reducida es 10.5%): advertencia
     base(8, { 15: "100.00", 16: "-18.00", 25: "82.00" }),                      // signos distintos
     base(9, { 21: "50.00", 25: "70.00" }),                                     // total no cuadra
     base(10, { 8: "X001" }),                                                   // serie invalida para factura

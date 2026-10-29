@@ -228,19 +228,25 @@ export function validar(filas, spec, estructuraId = "rce_propuesta") {
       add(f.n, 8, "error", "serie", `La serie «${c[8]}» no corresponde a un comprobante tipo ${tipo}.`);
     if (est.numeros[tipo] && c[10] && !new RegExp(est.numeros[tipo]).test(c[10]))
       add(f.n, 10, "error", "numero", `El número «${c[10]}» debe ser numérico, mayor a cero y de hasta ${Number((est.numeros[tipo].match(/\\d\{0,(\d+)\}/) || [, 7])[1]) + 1} dígitos.`);
-    // Reglas de la estructura (JSON Logic). {tipo} en el mensaje = "03 - Boleta de venta". marca "montos":
-    // se señalan los campos de la regla que traen monto (no solo el primero).
+    // Reglas de la estructura (JSON Logic). {tipo} en el mensaje = "03 - Boleta de venta"; {tipo_mod}, el del
+    // documento modificado (campo 29). marca "montos": se señalan los campos de la regla que traen monto.
+    // codigo: el de la validacion del SIRE que la regla replica (ver diccionario-errores.json).
+    const nombreTipo = t => `${t} - ${T.t11[t] || "tipo " + t}`;
     for (const r of est.reglas) {
       let aplica = false;
       try { aplica = ev(r.cuando, datos); } catch (_) { aplica = false; }
       if (!aplica || (r.debe === false ? false : ev(r.debe, datos))) continue;
       const marcas = r.marca === "montos" ? r.campos.filter(n => datos["m" + n] !== 0) : r.campos;
-      add(f.n, marcas[0] ?? r.campos[0], r.nivel, r.id, r.msg.replace("{tipo}", `${tipo} - ${T.t11[tipo] || "tipo " + tipo}`),
-        { marcas, ...(r.extra ? { extra: true } : {}) });
+      add(f.n, marcas[0] ?? r.campos[0], r.nivel, r.id, r.msg.replace("{tipo}", nombreTipo(tipo)).replace("{tipo_mod}", nombreTipo(c[29])),
+        { marcas, ...(r.extra ? { extra: true } : {}), ...(r.codigo ? { codigo: r.codigo } : {}) });
     }
     // Duplicados
-    const llave = [tipo, c[8], c[10], c[13]].join("|");
-    if (vistos.has(llave)) add(f.n, 10, "advertencia", "duplicado", `El comprobante ${tipo} ${c[8]}-${c[10]} del proveedor ${c[13]} se repite (ver fila ${vistos.get(llave)}).`);
+    // Duplicado en el archivo: error (435). Cliente SIRE v3.18.0: "Todos los comprobantes de pago duplicados
+    // incluidos en el archivo de reemplazo, serán considerados como un error paramétrico". El año de la DAM
+    // (campo 9) es parte de la llave: dos DAM de años distintos pueden tener el mismo número.
+    const llave = [tipo, c[8], c[9], c[10], c[13]].join("|");
+    if (vistos.has(llave)) add(f.n, 10, "error", "duplicado", `El comprobante ${tipo} ${c[8]}-${c[10]} del proveedor ${c[13]} se repite (ver fila ${vistos.get(llave)}): el SIRE no acepta comprobantes duplicados en el reemplazo. Deja uno solo.`,
+      { codigo: "435" });
     else vistos.set(llave, f.n);
   }
   return out;

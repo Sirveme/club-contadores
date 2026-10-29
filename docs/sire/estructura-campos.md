@@ -205,22 +205,42 @@ Fuentes leídas el 28/10/2026: Anexo 11, Tablas 12 y 13 de la RS 040-2022 (`anex
 `&` sin escapar, la codificación UTF-8 y la extensión `.TXT` en mayúscula dentro del ZIP (la Tabla 13 dice `.TXT`;
 en foros se reporta un rechazo que se resolvió con `.txt`).
 
-## Validaciones equivalentes al PVSIRE y las que el PVSIRE no hace (29/10/2026)
-Duilio pasó archivos por el PVSIRE y comparó. Cada regla vive en `sire-spec.json` (generado; la fuente de
-cada una está comentada en el generador) y tiene su prueba en `tests_js/sire/motor.test.mjs`.
+## Validaciones equivalentes al SIRE y la que el SIRE no hace (29/10/2026)
+Fuente autorizada de los códigos: **Control de Cambios en Aplicativo Cliente SIRE** (SUNAT),
+https://www2.sunat.gob.pe/orientacion/librosRegistros-Electronicos/descarga2/migeLibros/controlCambios/controlCambios-sire.pdf
+(bitácora de versiones del Cliente SIRE / PVSIRE; se cita por versión, p. ej. «v3.41.0»). Además, las RS 040-2022 y
+138-2023. Cada regla vive en `sire-spec.json` (generado; la fuente de cada una está comentada en el generador), lleva
+su `codigo` del SIRE y tiene su prueba en `tests_js/sire/motor.test.mjs`. Los textos oficiales de todos los códigos
+están en `app/static/sire/diccionario-errores.json` (se ve en el conversor: «Diccionario de errores del SIRE»; el
+campo `en_sencillo` se redacta con Duilio).
 
-| Regla (spec) | PVSIRE | Nivel | Qué revisa | Fuente |
+| Regla (spec) | Código | Nivel | Qué revisa | Fuente |
 |---|---|---|---|---|
-| `sin_credito` | 818 | Error | Tipo sin derecho a crédito fiscal (hoy: **03 boleta**) con importes en 15–25: van en los campos libres (42+) | Anexo 8, nota 1 («…que no otorguen derecho a crédito fiscal … se realizan en los campos libres»); RS 007-99/SUNAT art. 4 num. 3.2 (la boleta no da crédito fiscal) |
-| `negativo_15…25` | 425 | Error | En 07 y 87 (y 25 si el campo 34 empieza con «1») los montos 15, 17, 19, 21, 22, 24 y 25 van en negativo; el 23 solo en la 07 | Anexo 11, campos 15–25: «Valor negativo cuando campo 7 = '07', '87' o '25'…» |
-| `positivo_15…25` | 425 | Error (24: advertencia) | En los demás tipos, esos montos no van en negativo. El 24 lleva descuentos: solo se avisa | Anexo 11 (se lee «Acepta negativo» junto con la regla 3: el negativo es para esos tipos; el ISC, campo 22, lo dice sin «acepta negativo») |
+| `sin_credito` | 819 | Error | Tipo sin derecho a crédito fiscal (hoy: **03 boleta**) con importes en 15–25: van en los campos libres (42+) | Cliente SIRE v3.41.0 (819); Anexo 8, nota 1; RS 007-99/SUNAT art. 4 num. 3.2 |
+| `nota_sin_credito` | 818 | Error | Nota (07, 08, 87, 88) que modifica un tipo sin crédito (campo 29 = 03) con importes en 15–25 | Cliente SIRE v3.41.0 (818) |
+| `podria_sin_credito` | 390 | Advertencia (funcional) | Ticket 12 y boletos 05, 15, 16 con importes en 15–25: dan crédito solo si identifican al comprador con RUC y discriminan el IGV | Cliente SIRE v3.41.0 (390, «podría»); RCP art. 4 |
+| `nota_podria` | 391 | Advertencia (funcional) | Nota que modifica uno de esos tipos | Cliente SIRE v3.41.0 (391) |
+| `negativo_*` | 425 | Error | En 07 y 87 (y 25 si el campo 34 empieza con «1») los montos 15–23 y 25 van en negativo; el 23 solo en la 07 | Anexo 11, campos 15–25; Cliente SIRE v3.21.0 (campo 16 aun con base 0.00) y v3.27.0 (tipo 25: 15, 16, 18, 20) |
+| `positivo_*` | 425 | Error | En los demás tipos, esos montos no van en negativo | Anexo 11; Cliente SIRE v3.27.0 |
+| — campo 24 | — | Sin regla de signo | Acepta positivos y negativos en cualquier tipo | Cliente SIRE v3.30.0: «Se omite validación 425 … para el campo 24» |
+| `duplicado` | 435 | Error | El mismo tipo + serie + año DAM + número + proveedor dos veces en el archivo | Cliente SIRE v3.18.0: «Todos los comprobantes de pago duplicados incluidos en el archivo de reemplazo, serán considerados como un error paramétrico» |
+| `igv_15/17/19` | 346 | Advertencia | IGV ≈ 18% de su base, o la tasa reducida MYPE de restaurantes, hoteles y alojamientos (10% de 09/2022 a 2025; **10.5% en 2026**), por fecha de emisión o periodo (±S/ 1) | Cliente SIRE v3.27.0 (346) y v3.33.0–3.35.0 (10.5% en 2026, Ley 32387); Ley 31556 |
 | `signo_15/17/19` | — | Error | El IGV lleva el signo de su base | Anexo 11, campos 16, 18 y 20 |
 | `total` | **no lo valida** | Advertencia · revisión extra | 25 ≈ suma de 15–24 (±S/ 1) | Anexo 11, nota 2 |
-| `igv_15/17/19` | **no lo valida** | Advertencia · revisión extra | IGV ≈ 18% de su base (±S/ 1); puede ser tasa reducida | Ley del IGV; nunca error (hay tasas distintas) |
 
-Pendiente de decidir con más pruebas del PVSIRE:
-- **Otros tipos sin crédito fiscal.** El ticket (12) y los boletos (05, 15, 16) dan crédito fiscal solo si
-  identifican al comprador con su RUC y discriminan el IGV. Desde el archivo no se sabe, así que no se marcan.
-  Si el PVSIRE da 818 en alguno, se agrega a `SIN_CREDITO` en el generador (una línea).
-- **Factura con montos negativos.** Se trata como error, igual que el código 425. Si el SIRE acepta algún caso
-  (por ejemplo, anticipos), se baja a advertencia (`nivel` de `positivo_*`).
+Notas del Control de Cambios:
+- «Campo 25 acepta valores positivos y negativos para todo tipo de documento» (v3.38.0) es del **RVIE**
+  (campo 25 del RVIE = otros tributos), no del RCE: el total del RCE sigue con su signo por tipo.
+- 817 (SSCO) lo marca el SIRE por el **emisor** del comprobante; el conversor muestra aparte la condición del
+  proveedor: son complementarios.
+- 16/12 (v3.30.0): se incorporó el código de Aduanas **Chancay** para las DAM (útil para importaciones, fase futura).
+- 30/05 (v3.23.0): se retiró el entorno «Servidor SUNAT»; el Cliente SIRE solo opera en modo **Local**, como el conversor.
+- 437 y 814 se omiten en el reemplazo (solo complementación); 498 fue suprimida; 999 → 246 en el RVIE.
+
+Pendiente:
+- **818 o 819 en la boleta directa.** El catálogo de Duilio anota «818 | El tipo de comprobante no otorga derecho…»,
+  pero el Control de Cambios asigna ese texto al **819** (y al 818 el de la nota). Se sigue el PDF; confirmar con
+  el REPORTE_PARAMETRICA de una boleta directa.
+- **Tasa reducida 2027.** No hay fuente oficial a la mano; cuando SUNAT la publique, se agrega a `REDUCIDA`.
+- **Factura con montos negativos.** Error, igual que el 425. Si el SIRE acepta algún caso (anticipos), se baja a
+  advertencia (`nivel` de `positivo_*`).

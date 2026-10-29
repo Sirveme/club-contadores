@@ -65,7 +65,7 @@ test("cada regla de la norma, fila por fila", () => {
   assert.ok(f(11).includes("error:obligatorio:27"));
   assert.ok(["28", "29", "30", "32"].every(n => f(12).includes(`error:obligatorio:${n}`)));
   assert.ok(f(13).includes("error:tabla:26"));
-  assert.ok(f(14).includes("advertencia:duplicado:10"));
+  assert.ok(f(14).includes("error:duplicado:10"));                   // 435: el SIRE lo rechaza
   assert.ok(f(15).includes("error:emision_periodo:5"));
 });
 
@@ -145,15 +145,18 @@ test("campo 11 (rango): solo para consolidar operaciones sin crédito fiscal", (
   assert.ok(reglas(r, 1).includes("error:rango:11"));
 });
 
-// --- Validaciones del PVSIRE (818, 425) y las que el PVSIRE deja pasar (cuadre e IGV) ----------------------
+// --- Validaciones del SIRE (819/818, 390/391, 425, 346) y la que el SIRE deja pasar (cuadre) --------------
+// Fuente: Control de Cambios del Aplicativo Cliente SIRE (SUNAT) y Anexo 11 de la RS 040-2022.
 const una = (extra, proveedor = F.PROV.a) => M.procesar([F.CABECERA.join("|"), F.fila({ 1: F.GENERADOR, 2: "X", 3: "202607", 5: "01/07/2026",
   7: "01", 8: "F001", 10: "1", 12: "6", 13: proveedor, 14: "DISTRIBUIDORA FICTICIA S.A.C.", 15: "0.00", 16: "0.00", 17: "0.00", 18: "0.00",
   19: "0.00", 20: "0.00", 21: "0.00", 22: "0.00", 23: "0.00", 24: "0.00", 25: "0.00", 26: "PEN", 27: "1.000", ...extra })].join("\n"), spec);
+const nc = (mod = "01", serie = "F001") => ({ 28: "01/07/2026", 29: mod, 30: serie, 32: "9" });   // documento modificado
 
-test("818 · boleta (03) sin crédito fiscal: importes en 15-25 -> error, con los campos señalados", () => {
+test("819 · boleta (03) sin crédito fiscal: importes en 15-25 -> error, con los campos señalados", () => {
   const r = una({ 7: "03", 8: "B001", 21: "50.00", 25: "50.00" });
   const h = r.hallazgos.find(x => x.regla === "sin_credito");
   assert.equal(h.nivel, "error");
+  assert.equal(h.codigo, "819");
   assert.deepEqual(h.marcas, [21, 25]);
   assert.match(h.msg, /03 - Boleta de venta.*libre utilización/);
   assert.deepEqual(reglas(una({ 7: "03", 8: "B001", 42: "50.00" }), 1), []);        // en los libres: bien
@@ -161,15 +164,41 @@ test("818 · boleta (03) sin crédito fiscal: importes en 15-25 -> error, con lo
   assert.equal(M.reemplazo(r.filas, spec).texto, null);                             // y bloquea el TXT
 });
 
-test("425 · signo según el tipo: notas de crédito en negativo, el resto en positivo (Anexo 11)", () => {
-  const nc = { 28: "01/07/2026", 29: "01", 30: "F001", 32: "9" };                 // documento modificado
-  assert.deepEqual(reglas(una({ 7: "07", 15: "100.00", 16: "18.00", 25: "118.00", ...nc }), 1),
-    ["error:negativo_15:15", "error:negativo_25:25"]);
-  assert.deepEqual(reglas(una({ 7: "07", 15: "-100.00", 16: "-18.00", 25: "-118.00", ...nc }), 1), []);
+test("818 · la nota que modifica una boleta -> error con el tipo modificado; la de una factura, no", () => {
+  const r = una({ 7: "07", 8: "B001", 21: "-50.00", 25: "-50.00", ...nc("03", "B001") });
+  const h = r.hallazgos.find(x => x.regla === "nota_sin_credito");
+  assert.deepEqual([h.nivel, h.codigo, h.marcas], ["error", "818", [21, 25]]);
+  assert.match(h.msg, /07 - Nota de crédito.*\(03 - Boleta de venta\)/);
+  assert.deepEqual(reglas(una({ 7: "07", 8: "B001", 42: "-50.00", ...nc("03", "B001") }), 1), []);
+  assert.deepEqual(reglas(una({ 7: "07", 15: "-100.00", 16: "-18.00", 25: "-118.00", ...nc() }), 1), []);
+});
+
+test("390 / 391 · ticket y boletos podrían no dar crédito -> advertencia (validación funcional, no bloquea)", () => {
+  for (const t of ["12", "05", "15", "16"]) {
+    const h = una({ 7: t, 8: "0001", 15: "100.00", 16: "18.00", 25: "118.00" }).hallazgos.find(x => x.regla === "podria_sin_credito");
+    assert.deepEqual([h?.nivel, h?.codigo], ["advertencia", "390"], `tipo ${t}`);
+  }
+  const n = una({ 7: "07", 15: "-100.00", 16: "-18.00", 25: "-118.00", ...nc("12", "0001") });
+  assert.deepEqual(reglas(n, 1), ["advertencia:nota_podria:15"]);
+  assert.equal(n.hallazgos[0].codigo, "391");
+  assert.ok(M.reemplazo(n.filas, spec).texto);                                     // no bloquea
+  assert.deepEqual(reglas(una({ 7: "12", 8: "0001", 42: "118.00" }), 1), []);       // sin montos en 15-25: nada
+});
+
+test("425 · signo según el tipo (Anexo 11 y Cliente SIRE): notas de crédito en negativo, el resto en positivo", () => {
+  assert.deepEqual(reglas(una({ 7: "07", 15: "100.00", 16: "18.00", 25: "118.00", ...nc() }), 1),
+    ["error:negativo_15:15", "error:negativo_16:16", "error:negativo_25:25"]);
+  assert.deepEqual(reglas(una({ 7: "07", 15: "-100.00", 16: "-18.00", 25: "-118.00", ...nc() }), 1), []);
+  assert.ok(una({ 7: "07", 15: "100.00", ...nc() }).hallazgos.filter(h => /^(nega|posi)tivo_/.test(h.regla)).every(h => h.codigo === "425"));
   assert.ok(reglas(una({ 7: "87", 21: "5.00", 25: "5.00" }), 1).includes("error:negativo_21:21"));
-  assert.deepEqual(reglas(una({ 15: "-100.00", 16: "-18.00", 25: "-118.00" }), 1), ["error:positivo_15:15", "error:positivo_25:25"]);
+  assert.deepEqual(reglas(una({ 15: "-100.00", 16: "-18.00", 25: "-118.00" }), 1),
+    ["error:positivo_15:15", "error:positivo_16:16", "error:positivo_25:25"]);
   assert.deepEqual(reglas(una({ 21: "-5.00", 22: "-1.00" }), 1).filter(x => /positivo/.test(x)), ["error:positivo_21:21", "error:positivo_22:22"]);
-  assert.deepEqual(reglas(una({ 21: "10.00", 24: "-1.00", 25: "9.00" }), 1), ["advertencia:positivo_24:24"]);   // descuento: solo aviso
+  // IGV con base 0.00: también se revisa su signo (v3.21.0)
+  assert.ok(reglas(una({ 7: "07", 16: "18.00", 25: "-82.00", 21: "-100.00", ...nc() }), 1).includes("error:negativo_16:16"));
+  // Campo 24: el SIRE omite el 425 y acepta ambos signos en cualquier tipo (v3.30.0)
+  assert.deepEqual(reglas(una({ 21: "10.00", 24: "-1.00", 25: "9.00" }), 1), []);
+  assert.deepEqual(reglas(una({ 7: "07", 21: "-10.00", 24: "1.00", 25: "-9.00", ...nc() }), 1), []);
   // 25 (atribución) resta solo si el campo 34 empieza con «1»; el ICBPER (23) va en negativo solo en la 07
   const atrib = x => reglas(una({ 7: "25", 8: "0001", 21: "5.00", 25: "5.00", 34: x }), 1).filter(r => /negativo|positivo/.test(r));
   assert.deepEqual(atrib("1-ABC"), ["error:negativo_21:21", "error:negativo_25:25"]);
@@ -177,12 +206,36 @@ test("425 · signo según el tipo: notas de crédito en negativo, el resto en po
   assert.ok(!reglas(una({ 7: "87", 23: "0.50", 25: "-0.50", 21: "-1.00" }), 1).some(x => x.includes("_23")));
 });
 
-test("lo que el PVSIRE deja pasar: total que no cuadra e IGV fuera de tasa -> advertencia (no bloquea)", () => {
-  const r = una({ 15: "100.00", 16: "50.00", 25: "999.00" });
-  assert.deepEqual(reglas(r, 1), ["advertencia:igv_15:15", "advertencia:total:25"]);
-  assert.ok(r.hallazgos.every(h => h.extra));
+test("346 · IGV: 18% o la tasa reducida MYPE (10% hasta 2025, 10.5% en 2026) -> sin aviso; otra tasa -> advertencia", () => {
+  assert.deepEqual(reglas(una({ 15: "1000.00", 16: "105.00", 25: "1105.00" }), 1), []);                    // 2026 al 10.5%
+  assert.deepEqual(reglas(una({ 3: "202512", 5: "01/12/2025", 15: "1000.00", 16: "100.00", 25: "1100.00" }), 1), []);   // 2025 al 10%
+  assert.deepEqual(reglas(una({ 3: "202601", 5: "30/12/2025", 15: "1000.00", 16: "100.00", 25: "1100.00" }), 1), []);   // emitida en 2025
+  assert.deepEqual(reglas(una({ 3: "202512", 5: "01/12/2025", 15: "1000.00", 16: "105.00", 25: "1105.00" }), 1), ["advertencia:igv_15:15"]);
+  const r = una({ 15: "1000.00", 16: "100.00", 25: "1100.00" });                                          // 10% en 2026: ya no
+  assert.deepEqual(reglas(r, 1), ["advertencia:igv_15:15"]);
+  assert.equal(r.hallazgos[0].codigo, "346");
+  assert.ok(!r.hallazgos[0].extra && M.reemplazo(r.filas, spec).texto);
+});
+
+test("lo que el SIRE deja pasar: el total que no cuadra -> advertencia «revisión extra» (no bloquea)", () => {
+  const r = una({ 15: "100.00", 16: "18.00", 25: "999.00" });
+  assert.deepEqual(reglas(r, 1), ["advertencia:total:25"]);
+  assert.ok(r.hallazgos[0].extra);
   const t = M.reemplazo(r.filas, spec);
-  assert.ok(t.texto && !t.bloqueos.length && t.advertencias.length === 2);
+  assert.ok(t.texto && !t.bloqueos.length && t.advertencias.length === 1);
+});
+
+test("diccionario de errores: cada código del spec está en el diccionario, y lo que el diccionario cita existe", () => {
+  const d = JSON.parse(readFileSync(new URL("../../app/static/sire/diccionario-errores.json", import.meta.url), "utf8"));
+  const por = new Map(d.codigos.map(x => [x.codigo, x]));
+  assert.equal(por.size, d.codigos.length, "sin códigos repetidos");
+  for (const r of est.reglas.filter(r => r.codigo)) assert.ok(por.get(r.codigo)?.conversor.some(id => id === r.id || (id.endsWith("*") && r.id.startsWith(id.slice(0, -1)))), `${r.id} -> ${r.codigo}`);
+  const ids = new Set([...est.reglas.map(r => r.id), "duplicado", "serie"]);
+  for (const x of d.codigos) {
+    assert.match(x.codigo, /^\d{3}$/);
+    assert.ok(x.sunat && d.fuentes[x.fuente] && x.registros.length && "en_sencillo" in x, x.codigo);
+    for (const id of x.conversor) assert.ok(id.endsWith("*") ? [...ids].some(i => i.startsWith(id.slice(0, -1))) : ids.has(id), `${x.codigo}: ${id}`);
+  }
 });
 
 // Siguen en sus fases (ver docs/sire/estructura-campos.md, "Casos del mercado").
@@ -222,9 +275,12 @@ test("fase 4 · errores bloquean (no se entrega un TXT roto); advertencias no", 
   assert.equal(malo.texto, null);
   assert.ok(malo.bloqueos.length > 5);
   const r = M.procesar(F.propuestaLimpia(), spec);
-  r.filas[1].c[10] = r.filas[0].c[10];                                          // duplicado: solo advertencia
+  r.filas[0].c[25] = "999.00";                                                  // total que no cuadra: solo advertencia
   const t = M.reemplazo(r.filas, spec);
-  assert.ok(t.texto && t.advertencias.some(h => h.regla === "duplicado"));
+  assert.ok(t.texto && t.advertencias.some(h => h.regla === "total"));
+  const d = M.procesar(F.propuestaLimpia(), spec);
+  d.filas[1].c[10] = d.filas[0].c[10];                                          // duplicado: error 435 (Cliente SIRE v3.18.0)
+  assert.ok(M.reemplazo(d.filas, spec).bloqueos.some(h => h.regla === "duplicado" && h.codigo === "435"));
   r.filas[2].c[1] = "20100055237";                                             // otro generador en el mismo TXT
   assert.ok(M.reemplazo(r.filas, spec).bloqueos.some(h => h.regla === "reemplazo" && h.campo === 1));
   assert.ok(M.reemplazo(r.filas, spec, { razon: "  " }).bloqueos.some(h => h.campo === 2));

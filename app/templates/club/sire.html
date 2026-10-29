@@ -3,7 +3,7 @@
 {% block titulo %}Conversor SIRE · Club de Contadores{% endblock %}
 {# Fuentes desde este mismo sitio: al cargar esta pagina no sale ninguna peticion a terceros. #}
 {% block fuentes %}<link rel="stylesheet" href="/static/fonts/plex/plex.css?v=1">{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=6">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=7">{% endblock %}
 {% block contenido %}
   <section class="fx" aria-label="Fórmula">
     <div class="ref">A1</div>
@@ -112,10 +112,20 @@
     </section>
   </div>
 
+  <details class="panel sire-dicc" id="dicc">
+    <summary class="panel-cab"><b>Diccionario de errores del SIRE</b><span>Qué significa cada código que te devuelve el validador de SUNAT</span></summary>
+    <div class="panel-cuerpo">
+      <label class="sire-dicc-buscar"><span>Busca un código o una palabra</span>
+        <input type="search" id="diccBuscar" autocomplete="off" spellcheck="false" placeholder="Ej.: 425, crédito fiscal, duplicado"></label>
+      <span class="faint" id="diccCuenta" aria-live="polite"></span>
+      <ul class="sire-dicc-lista" id="diccLista"></ul>
+    </div>
+  </details>
+
   <dialog id="ficha" class="sire-ficha" aria-labelledby="fichaTit">
     <header><b id="fichaTit">Ficha del sector y del contribuyente</b><button type="button" class="btn-sec" id="fichaCerrar">Cerrar</button></header>
     <div id="fichaCuerpo"></div>
   </dialog>
 {% endblock %}
 {% block estado %}<span>Procesado en tu equipo · ninguna cifra se envía</span><span id="estadoTxt">Listo</span>{% endblock %}
-{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=6" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=7" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}

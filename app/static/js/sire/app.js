@@ -1,6 +1,6 @@
 // Conversor SIRE · pantalla (modo local). Lee el archivo EN EL NAVEGADOR: no se sube a ninguna parte.
 // Los textos del archivo se pintan siempre con textContent (nunca como HTML).
-import * as M from "./motor.js?v=5";
+import * as M from "./motor.js?v=6";
 
 const $ = id => document.getElementById(id);
 const CAP = JSON.parse(document.currentScript?.dataset.capacidades || document.querySelector("script[data-capacidades]")?.dataset.capacidades || "{}");
@@ -37,7 +37,7 @@ const nombreCampo = n => (spec.estructuras.rce_propuesta.campos.find(c => c.n ==
 const montoTxt = v => { const c = M.centimos(v || "0"); return c === null ? (v || "") : M.soles(c); };
 
 async function cargarSpec() {
-  if (!spec) spec = await (await fetch("/static/sire/sire-spec.json?v=4", { cache: "no-cache" })).json();
+  if (!spec) spec = await (await fetch("/static/sire/sire-spec.json?v=5", { cache: "no-cache" })).json();
   return spec;
 }
 
@@ -49,7 +49,7 @@ async function leer(archivos) {
     let propuesta = null, resumen = null;
     const excel = archivos.find(a => /\.xlsx$/i.test(a.name));
     if (excel) {                                      // el Excel del conversor (corregido) o la plantilla llena
-      const { leerExcel } = await import("./excel.js?v=5");
+      const { leerExcel } = await import("./excel.js?v=6");
       const t = M.filasDeTabla(await leerExcel(await excel.arrayBuffer()), spec);
       return cargarFilas(t.filas, t.avisos, { nombre: excel.name, origen: excel.name, codificacion: "Excel" });
     }
@@ -92,7 +92,7 @@ $("bPegado").addEventListener("click", async () => {
 $("bPlantilla").addEventListener("click", async () => {
   try {
     await cargarSpec();
-    const { generarExcel } = await import("./excel.js?v=5");
+    const { generarExcel } = await import("./excel.js?v=6");
     const vacio = { filas: [], hallazgos: [], avisos: [], totales: M.totales([], spec), propuesta: { nombre: "plantilla-compras-sire" }, perfil: {} };
     bajar(await generarExcel(vacio, spec, { plantilla: true }), "plantilla-compras-sire.xlsx");
   } catch (e) { msg("No pudimos armar la plantilla: " + (e.message || e), "err"); }
@@ -387,6 +387,50 @@ $("bSonido").addEventListener("click", () => {
 });
 pintarSonido();
 
+// --- Diccionario de errores del SIRE (diccionario-errores.json): se carga al abrirlo o al tocar un código --
+let dicc = null;
+async function cargarDicc() {
+  if (!dicc) dicc = await (await fetch("/static/sire/diccionario-errores.json?v=1", { cache: "no-cache" })).json();
+  return dicc;
+}
+const chipCodigo = codigo => el("button", { type: "button", class: "sire-cod", title: "Ver qué dice SUNAT de este código",
+  "aria-label": `Código ${codigo} del SIRE: ver en el diccionario`, texto: codigo, onclick: () => verCodigo(codigo) });
+function entradaDicc(x) {
+  return el("li", { id: "e-" + x.codigo, "data-texto": [x.codigo, x.sunat, x.en_sencillo, ...x.registros].join(" ").toLowerCase() },
+    el("div", { class: "sire-dicc-cab" }, el("b", { class: "mono", texto: x.codigo }),
+      el("span", { class: "faint", texto: `${x.registros.join(" y ")} · validación ${x.tipo}` }),
+      x.conversor.length ? el("span", { class: "sire-tag", texto: "El conversor lo revisa" }) : null),
+    el("p", {}, el("small", { texto: "SUNAT: " }), x.sunat),
+    x.en_sencillo ? el("p", { texto: x.en_sencillo }) : null,
+    x.vigencia ? el("p", { class: "faint", texto: x.vigencia }) : null,
+    x.nota ? el("p", { class: "faint", texto: x.nota }) : null);
+}
+async function pintarDicc() {
+  if ($("diccLista").childElementCount) return;
+  try {
+    const d = await cargarDicc();
+    $("diccLista").replaceChildren(...d.codigos.map(entradaDicc));
+  } catch (_) { $("diccLista").replaceChildren(el("li", { class: "faint", texto: "No pudimos cargar el diccionario. Vuelve a intentarlo." })); }
+}
+async function verCodigo(codigo) {
+  $("dicc").open = true;
+  await pintarDicc();
+  $("diccBuscar").value = ""; filtrarDicc();
+  const li = $("e-" + codigo);
+  if (!li) return;
+  li.classList.add("sire-guia");
+  li.addEventListener("animationend", () => li.classList.remove("sire-guia"), { once: true });
+  li.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+function filtrarDicc() {
+  const q = $("diccBuscar").value.trim().toLowerCase();
+  let n = 0;
+  for (const li of $("diccLista").children) { const ok = !q || (li.dataset.texto || "").includes(q); li.hidden = !ok; n += ok; }
+  $("diccCuenta").textContent = q ? `${n} código${n === 1 ? "" : "s"}` : "";
+}
+$("dicc").addEventListener("toggle", () => { if ($("dicc").open) pintarDicc(); });
+$("diccBuscar").addEventListener("input", filtrarDicc);
+
 // Campos que el contador corrige en linea. No: generador y periodo (uno solo para todo el TXT: la razon
 // social se fija en el panel del TXT), CAR (va vacio en el reemplazo) e informativos 38-41 (no se suben).
 const FIJOS = new Set([1, 2, 3, 4, 37]);
@@ -431,7 +475,8 @@ function detalleFila(f, hs) {
   const tipo = spec.tablas.t11[f.c[7]] || `Tipo ${f.c[7] || "—"}`, serie = [f.c[8], f.c[10]].filter(Boolean).join("-");
   const errores = hs.filter(h => h.nivel === "error"), avisos = hs.filter(h => h.nivel !== "error");
   const lista = (clase, titulo, xs) => xs.length ? el("div", { class: "sire-obs " + clase }, el("b", { texto: titulo }),
-    el("ul", {}, xs.map(h => el("li", {}, conRucs(h.msg), h.extra ? el("span", { class: "sire-extra", title: "Revisión adicional del conversor: el validador oficial no la hace.", texto: "revisión extra" }) : null)))) : null;
+    el("ul", {}, xs.map(h => el("li", {}, h.codigo ? chipCodigo(h.codigo) : null, conRucs(h.msg),
+      h.extra ? el("span", { class: "sire-extra", title: "Revisión adicional del conversor: el validador oficial no la hace.", texto: "revisión extra" }) : null)))) : null;
   return el("div", { class: "sire-editando", onkeydown: ev => { if (ev.key === "Escape") { ev.stopPropagation(); abrir(f.n); } } },
     el("div", { class: "sire-editando-cab" },
       el("span", {}, el("b", { texto: `Editando fila ${f.n}` }), ` · ${tipo} `, el("span", { class: "mono", texto: serie })),
@@ -451,7 +496,7 @@ async function descargar(imprimir) {
   const b1 = $("bExcel"), b2 = $("bImprimir");
   b1.disabled = b2.disabled = true; $("descMsg").textContent = "Armando el Excel en tu equipo…";
   try {
-    const { generarExcel } = await import("./excel.js?v=5");
+    const { generarExcel } = await import("./excel.js?v=6");
     const blob = await generarExcel({ ...estado, perfil }, spec, { imprimir });
     const base = estado.propuesta.nombre.replace(/(-imprimir)?\.(txt|zip|xlsx)$/i, "");
     bajar(blob, `${base}${imprimir ? "-imprimir" : ""}.xlsx`);

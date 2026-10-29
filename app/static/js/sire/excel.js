@@ -2,7 +2,7 @@
 // Se arma en el navegador: el archivo no sale del equipo. Dos versiones: oscura (pantalla, la de la
 // casa) y clara para imprimir (sin rellenos oscuros). Tambien se lee de vuelta (Fase 4): el contador lo
 // corrige y lo sube, y el conversor arma el TXT de reemplazo.
-import * as M from "./motor.js?v=5";
+import * as M from "./motor.js?v=6";
 
 const RUTA_EXCELJS = "/static/vendor/exceljs/4.4.0/exceljs.min.js";
 let cargando = null;
@@ -60,7 +60,7 @@ export async function generarExcel(estado, spec, { imprimir = false, plantilla =
       const v = f.c[c.n] ?? "";
       if ((c.tipo === "monto" || c.tipo === "tc") && v !== "") { const x = c.tipo === "tc" ? Number(v) : (M.centimos(v) ?? NaN) / 100; return Number.isFinite(x) ? x : v; }
       return v;                                                    // texto: RUC, series, numeros y fechas no pierden ceros
-    }), hs.map(h => `${h.nivel === "error" ? "ERROR" : "Advertencia"} (campo ${h.campo}): ${h.msg}`).join("\n")];
+    }), hs.map(h => `${h.nivel === "error" ? "ERROR" : "Advertencia"}${h.codigo ? " " + h.codigo : ""} (campo ${h.campo}): ${h.msg}`).join("\n")];
     const row = ws.addRow(valores);
     row.eachCell({ includeEmpty: true }, (celda, i) => {
       const campo = campos[i - 2];
@@ -127,7 +127,7 @@ export async function generarExcel(estado, spec, { imprimir = false, plantilla =
   const wo = wb.addWorksheet("Observaciones", { views: vista });
   wo.addRow(["Fila", "Campo", "Nivel", "Detalle"]).eachCell(c => estilar(c, P, { cab: true }));
   const avisos = estado.avisos.map(a => ["—", "—", "Lectura", a.msg]);
-  for (const v of [...avisos, ...estado.hallazgos.map(h => [h.fila, `${h.campo}. ${nombre(h.campo)}`, h.nivel === "error" ? "Error" : "Advertencia", h.msg])]) {
+  for (const v of [...avisos, ...estado.hallazgos.map(h => [h.fila, `${h.campo}. ${nombre(h.campo)}`, (h.nivel === "error" ? "Error" : "Advertencia") + (h.codigo ? " " + h.codigo : ""), h.msg])]) {
     const row = wo.addRow(v);
     row.eachCell({ includeEmpty: true }, c => estilar(c, P, { fill: v[2] === "Error" ? P.err : v[2] === "Advertencia" ? P.adv : null,
       color: v[2] === "Error" ? P.errTxt : v[2] === "Advertencia" ? P.advTxt : null }));

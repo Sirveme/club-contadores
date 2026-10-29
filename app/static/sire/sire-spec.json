@@ -1,5 +1,5 @@
 {
- "version": "2026-10-29",
+ "version": "2026-10-29b",
  "normas": [
   "RS 112-2021/SUNAT",
   "RS 040-2022/SUNAT",
@@ -1379,29 +1379,189 @@
       ]
      },
      "debe": {
-      "<=": [
+      "or": [
        {
-        "abs": {
-         "-": [
-          {
-           "var": "m16"
-          },
-          {
-           "*": [
+        "<=": [
+         {
+          "abs": {
+           "-": [
             {
-             "var": "m15"
+             "var": "m16"
             },
-            0.18
+            {
+             "*": [
+              {
+               "var": "m15"
+              },
+              0.18
+             ]
+            }
            ]
           }
-         ]
-        }
+         },
+         1
+        ]
        },
-       1
+       {
+        "and": [
+         {
+          "or": [
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202209
+              ]
+             },
+             {
+              "<=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202512
+              ]
+             }
+            ]
+           },
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202209
+              ]
+             },
+             {
+              "<=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202512
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "<=": [
+           {
+            "abs": {
+             "-": [
+              {
+               "var": "m16"
+              },
+              {
+               "*": [
+                {
+                 "var": "m15"
+                },
+                0.1
+               ]
+              }
+             ]
+            }
+           },
+           1
+          ]
+         }
+        ]
+       },
+       {
+        "and": [
+         {
+          "or": [
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202601
+              ]
+             },
+             {
+              "<=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202612
+              ]
+             }
+            ]
+           },
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202601
+              ]
+             },
+             {
+              "<=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202612
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "<=": [
+           {
+            "abs": {
+             "-": [
+              {
+               "var": "m16"
+              },
+              {
+               "*": [
+                {
+                 "var": "m15"
+                },
+                0.105
+               ]
+              }
+             ]
+            }
+           },
+           1
+          ]
+         }
+        ]
+       }
       ]
      },
-     "msg": "El IGV (campo 16) no es el 18% de la base (campo 15). Si aplica una tasa reducida, está bien.",
-     "extra": true
+     "codigo": "346",
+     "msg": "El IGV (campo 16) no es el 18% de la base (campo 15) ni la tasa reducida de restaurantes, hoteles y alojamientos MYPE (10% hasta 2025, 10.5% en 2026). Revisa la base y el impuesto."
     },
     {
      "id": "igv_17",
@@ -1419,29 +1579,189 @@
       ]
      },
      "debe": {
-      "<=": [
+      "or": [
        {
-        "abs": {
-         "-": [
-          {
-           "var": "m18"
-          },
-          {
-           "*": [
+        "<=": [
+         {
+          "abs": {
+           "-": [
             {
-             "var": "m17"
+             "var": "m18"
             },
-            0.18
+            {
+             "*": [
+              {
+               "var": "m17"
+              },
+              0.18
+             ]
+            }
            ]
           }
-         ]
-        }
+         },
+         1
+        ]
        },
-       1
+       {
+        "and": [
+         {
+          "or": [
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202209
+              ]
+             },
+             {
+              "<=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202512
+              ]
+             }
+            ]
+           },
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202209
+              ]
+             },
+             {
+              "<=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202512
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "<=": [
+           {
+            "abs": {
+             "-": [
+              {
+               "var": "m18"
+              },
+              {
+               "*": [
+                {
+                 "var": "m17"
+                },
+                0.1
+               ]
+              }
+             ]
+            }
+           },
+           1
+          ]
+         }
+        ]
+       },
+       {
+        "and": [
+         {
+          "or": [
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202601
+              ]
+             },
+             {
+              "<=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202612
+              ]
+             }
+            ]
+           },
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202601
+              ]
+             },
+             {
+              "<=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202612
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "<=": [
+           {
+            "abs": {
+             "-": [
+              {
+               "var": "m18"
+              },
+              {
+               "*": [
+                {
+                 "var": "m17"
+                },
+                0.105
+               ]
+              }
+             ]
+            }
+           },
+           1
+          ]
+         }
+        ]
+       }
       ]
      },
-     "msg": "El IGV (campo 18) no es el 18% de la base (campo 17). Si aplica una tasa reducida, está bien.",
-     "extra": true
+     "codigo": "346",
+     "msg": "El IGV (campo 18) no es el 18% de la base (campo 17) ni la tasa reducida de restaurantes, hoteles y alojamientos MYPE (10% hasta 2025, 10.5% en 2026). Revisa la base y el impuesto."
     },
     {
      "id": "igv_19",
@@ -1459,29 +1779,189 @@
       ]
      },
      "debe": {
-      "<=": [
+      "or": [
        {
-        "abs": {
-         "-": [
-          {
-           "var": "m20"
-          },
-          {
-           "*": [
+        "<=": [
+         {
+          "abs": {
+           "-": [
             {
-             "var": "m19"
+             "var": "m20"
             },
-            0.18
+            {
+             "*": [
+              {
+               "var": "m19"
+              },
+              0.18
+             ]
+            }
            ]
           }
-         ]
-        }
+         },
+         1
+        ]
        },
-       1
+       {
+        "and": [
+         {
+          "or": [
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202209
+              ]
+             },
+             {
+              "<=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202512
+              ]
+             }
+            ]
+           },
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202209
+              ]
+             },
+             {
+              "<=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202512
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "<=": [
+           {
+            "abs": {
+             "-": [
+              {
+               "var": "m20"
+              },
+              {
+               "*": [
+                {
+                 "var": "m19"
+                },
+                0.1
+               ]
+              }
+             ]
+            }
+           },
+           1
+          ]
+         }
+        ]
+       },
+       {
+        "and": [
+         {
+          "or": [
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202601
+              ]
+             },
+             {
+              "<=": [
+               {
+                "aaaamm": {
+                 "var": "c5"
+                }
+               },
+               202612
+              ]
+             }
+            ]
+           },
+           {
+            "and": [
+             {
+              ">=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202601
+              ]
+             },
+             {
+              "<=": [
+               {
+                "num": {
+                 "var": "c3"
+                }
+               },
+               202612
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "<=": [
+           {
+            "abs": {
+             "-": [
+              {
+               "var": "m20"
+              },
+              {
+               "*": [
+                {
+                 "var": "m19"
+                },
+                0.105
+               ]
+              }
+             ]
+            }
+           },
+           1
+          ]
+         }
+        ]
+       }
       ]
      },
-     "msg": "El IGV (campo 20) no es el 18% de la base (campo 19). Si aplica una tasa reducida, está bien.",
-     "extra": true
+     "codigo": "346",
+     "msg": "El IGV (campo 20) no es el 18% de la base (campo 19) ni la tasa reducida de restaurantes, hoteles y alojamientos MYPE (10% hasta 2025, 10.5% en 2026). Revisa la base y el impuesto."
     },
     {
      "id": "signo_15",
@@ -2048,7 +2528,420 @@
        }
       ]
      },
+     "codigo": "819",
      "msg": "Este comprobante ({tipo}) no da derecho a crédito fiscal: sus importes no van en los campos 15 al 25. Muévelos a los campos de libre utilización (42 en adelante) y deja esos montos en 0.00."
+    },
+    {
+     "id": "nota_sin_credito",
+     "nivel": "error",
+     "campos": [
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25
+     ],
+     "marca": "montos",
+     "cuando": {
+      "and": [
+       {
+        "in": [
+         {
+          "var": "c7"
+         },
+         [
+          "07",
+          "08",
+          "87",
+          "88"
+         ]
+        ]
+       },
+       {
+        "in": [
+         {
+          "var": "c29"
+         },
+         [
+          "03"
+         ]
+        ]
+       }
+      ]
+     },
+     "debe": {
+      "!": {
+       "or": [
+        {
+         "!=": [
+          {
+           "var": "m15"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m16"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m17"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m18"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m19"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m20"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m21"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m22"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m23"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m24"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m25"
+          },
+          0
+         ]
+        }
+       ]
+      }
+     },
+     "codigo": "818",
+     "msg": "Esta nota ({tipo}) modifica un comprobante que no da derecho a crédito fiscal ({tipo_mod}): sus importes no van en los campos 15 al 25. Muévelos a los campos de libre utilización (42 en adelante) y deja esos montos en 0.00."
+    },
+    {
+     "id": "podria_sin_credito",
+     "nivel": "advertencia",
+     "campos": [
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25
+     ],
+     "marca": "montos",
+     "cuando": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "05",
+        "12",
+        "15",
+        "16"
+       ]
+      ]
+     },
+     "debe": {
+      "!": {
+       "or": [
+        {
+         "!=": [
+          {
+           "var": "m15"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m16"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m17"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m18"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m19"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m20"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m21"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m22"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m23"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m24"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m25"
+          },
+          0
+         ]
+        }
+       ]
+      }
+     },
+     "codigo": "390",
+     "msg": "Este comprobante ({tipo}) podría no dar derecho a crédito fiscal: solo lo da si te identifica con tu RUC y discrimina el IGV. Si no cumple, mueve sus importes a los campos de libre utilización (42 en adelante)."
+    },
+    {
+     "id": "nota_podria",
+     "nivel": "advertencia",
+     "campos": [
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25
+     ],
+     "marca": "montos",
+     "cuando": {
+      "and": [
+       {
+        "in": [
+         {
+          "var": "c7"
+         },
+         [
+          "07",
+          "08",
+          "87",
+          "88"
+         ]
+        ]
+       },
+       {
+        "in": [
+         {
+          "var": "c29"
+         },
+         [
+          "05",
+          "12",
+          "15",
+          "16"
+         ]
+        ]
+       }
+      ]
+     },
+     "debe": {
+      "!": {
+       "or": [
+        {
+         "!=": [
+          {
+           "var": "m15"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m16"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m17"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m18"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m19"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m20"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m21"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m22"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m23"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m24"
+          },
+          0
+         ]
+        },
+        {
+         "!=": [
+          {
+           "var": "m25"
+          },
+          0
+         ]
+        }
+       ]
+      }
+     },
+     "codigo": "391",
+     "msg": "Esta nota ({tipo}) modifica un comprobante que podría no dar derecho a crédito fiscal ({tipo_mod}). Si ese comprobante no da crédito, mueve los importes de la nota a los campos de libre utilización (42 en adelante)."
     },
     {
      "id": "negativo_15",
@@ -2112,7 +3005,73 @@
       ]
      },
      "debe": false,
+     "codigo": "425",
      "msg": "«Base imponible (destino gravado)» (campo 15) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_16",
+     "nivel": "error",
+     "campos": [
+      16
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m16"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "codigo": "425",
+     "msg": "«IGV (destino gravado)» (campo 16) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
     },
     {
      "id": "negativo_17",
@@ -2176,7 +3135,73 @@
       ]
      },
      "debe": false,
+     "codigo": "425",
      "msg": "«Base imponible (gravado y no gravado)» (campo 17) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_18",
+     "nivel": "error",
+     "campos": [
+      18
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m18"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "codigo": "425",
+     "msg": "«IGV (gravado y no gravado)» (campo 18) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
     },
     {
      "id": "negativo_19",
@@ -2240,7 +3265,73 @@
       ]
      },
      "debe": false,
+     "codigo": "425",
      "msg": "«Base imponible (destino no gravado)» (campo 19) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_20",
+     "nivel": "error",
+     "campos": [
+      20
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m20"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "codigo": "425",
+     "msg": "«IGV (destino no gravado)» (campo 20) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
     },
     {
      "id": "negativo_21",
@@ -2304,6 +3395,7 @@
       ]
      },
      "debe": false,
+     "codigo": "425",
      "msg": "«Adquisiciones no gravadas» (campo 21) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
     },
     {
@@ -2368,6 +3460,7 @@
       ]
      },
      "debe": false,
+     "codigo": "425",
      "msg": "«ISC» (campo 22) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
     },
     {
@@ -2399,71 +3492,8 @@
       ]
      },
      "debe": false,
+     "codigo": "425",
      "msg": "«ICBPER» (campo 23) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
-    },
-    {
-     "id": "negativo_24",
-     "nivel": "error",
-     "campos": [
-      24
-     ],
-     "cuando": {
-      "and": [
-       {
-        ">": [
-         {
-          "var": "m24"
-         },
-         0
-        ]
-       },
-       {
-        "or": [
-         {
-          "in": [
-           {
-            "var": "c7"
-           },
-           [
-            "07",
-            "87"
-           ]
-          ]
-         },
-         {
-          "and": [
-           {
-            "in": [
-             {
-              "var": "c7"
-             },
-             [
-              "25"
-             ]
-            ]
-           },
-           {
-            "==": [
-             {
-              "substr": [
-               {
-                "var": "c34"
-               },
-               0,
-               1
-              ]
-             },
-             "1"
-            ]
-           }
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     "debe": false,
-     "msg": "«Otros tributos y cargos» (campo 24) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
     },
     {
      "id": "negativo_25",
@@ -2527,6 +3557,7 @@
       ]
      },
      "debe": false,
+     "codigo": "425",
      "msg": "«Importe total» (campo 25) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
     },
     {
@@ -2593,7 +3624,75 @@
       ]
      },
      "debe": false,
-     "msg": "«Base imponible (destino gravado)» (campo 15) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+     "codigo": "425",
+     "msg": "«Base imponible (destino gravado)» (campo 15) debe ser positivo: solo van en negativo las notas de crédito (07 y 87) y el documento de atribución (25) cuyo campo 34 empieza con «1»."
+    },
+    {
+     "id": "positivo_16",
+     "nivel": "error",
+     "campos": [
+      16
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m16"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "codigo": "425",
+     "msg": "«IGV (destino gravado)» (campo 16) debe ser positivo: solo van en negativo las notas de crédito (07 y 87) y el documento de atribución (25) cuyo campo 34 empieza con «1»."
     },
     {
      "id": "positivo_17",
@@ -2659,7 +3758,75 @@
       ]
      },
      "debe": false,
-     "msg": "«Base imponible (gravado y no gravado)» (campo 17) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+     "codigo": "425",
+     "msg": "«Base imponible (gravado y no gravado)» (campo 17) debe ser positivo: solo van en negativo las notas de crédito (07 y 87) y el documento de atribución (25) cuyo campo 34 empieza con «1»."
+    },
+    {
+     "id": "positivo_18",
+     "nivel": "error",
+     "campos": [
+      18
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m18"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "codigo": "425",
+     "msg": "«IGV (gravado y no gravado)» (campo 18) debe ser positivo: solo van en negativo las notas de crédito (07 y 87) y el documento de atribución (25) cuyo campo 34 empieza con «1»."
     },
     {
      "id": "positivo_19",
@@ -2725,7 +3892,75 @@
       ]
      },
      "debe": false,
-     "msg": "«Base imponible (destino no gravado)» (campo 19) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+     "codigo": "425",
+     "msg": "«Base imponible (destino no gravado)» (campo 19) debe ser positivo: solo van en negativo las notas de crédito (07 y 87) y el documento de atribución (25) cuyo campo 34 empieza con «1»."
+    },
+    {
+     "id": "positivo_20",
+     "nivel": "error",
+     "campos": [
+      20
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m20"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "codigo": "425",
+     "msg": "«IGV (destino no gravado)» (campo 20) debe ser positivo: solo van en negativo las notas de crédito (07 y 87) y el documento de atribución (25) cuyo campo 34 empieza con «1»."
     },
     {
      "id": "positivo_21",
@@ -2791,7 +4026,8 @@
       ]
      },
      "debe": false,
-     "msg": "«Adquisiciones no gravadas» (campo 21) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+     "codigo": "425",
+     "msg": "«Adquisiciones no gravadas» (campo 21) debe ser positivo: solo van en negativo las notas de crédito (07 y 87) y el documento de atribución (25) cuyo campo 34 empieza con «1»."
     },
     {
      "id": "positivo_22",
@@ -2857,7 +4093,8 @@
       ]
      },
      "debe": false,
-     "msg": "«ISC» (campo 22) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+     "codigo": "425",
+     "msg": "«ISC» (campo 22) debe ser positivo: solo van en negativo las notas de crédito (07 y 87) y el documento de atribución (25) cuyo campo 34 empieza con «1»."
     },
     {
      "id": "positivo_23",
@@ -2890,73 +4127,8 @@
       ]
      },
      "debe": false,
-     "msg": "«ICBPER» (campo 23) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
-    },
-    {
-     "id": "positivo_24",
-     "nivel": "advertencia",
-     "campos": [
-      24
-     ],
-     "cuando": {
-      "and": [
-       {
-        "<": [
-         {
-          "var": "m24"
-         },
-         0
-        ]
-       },
-       {
-        "!": {
-         "or": [
-          {
-           "in": [
-            {
-             "var": "c7"
-            },
-            [
-             "07",
-             "87"
-            ]
-           ]
-          },
-          {
-           "and": [
-            {
-             "in": [
-              {
-               "var": "c7"
-              },
-              [
-               "25"
-              ]
-             ]
-            },
-            {
-             "==": [
-              {
-               "substr": [
-                {
-                 "var": "c34"
-                },
-                0,
-                1
-               ]
-              },
-              "1"
-             ]
-            }
-           ]
-          }
-         ]
-        }
-       }
-      ]
-     },
-     "debe": false,
-     "msg": "«Otros tributos y cargos» (campo 24) es negativo: si es un descuento está bien; si no, revisa el signo."
+     "codigo": "425",
+     "msg": "«ICBPER» (campo 23) debe ser positivo: solo va en negativo en las notas de crédito (07)."
     },
     {
      "id": "positivo_25",
@@ -3022,7 +4194,8 @@
       ]
      },
      "debe": false,
-     "msg": "«Importe total» (campo 25) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+     "codigo": "425",
+     "msg": "«Importe total» (campo 25) debe ser positivo: solo van en negativo las notas de crédito (07 y 87) y el documento de atribución (25) cuyo campo 34 empieza con «1»."
     }
    ],
    "series": {
