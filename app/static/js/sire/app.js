@@ -1,6 +1,6 @@
 // Conversor SIRE · pantalla (modo local). Lee el archivo EN EL NAVEGADOR: no se sube a ninguna parte.
 // Los textos del archivo se pintan siempre con textContent (nunca como HTML).
-import * as M from "./motor.js?v=4";
+import * as M from "./motor.js?v=5";
 
 const $ = id => document.getElementById(id);
 const CAP = JSON.parse(document.currentScript?.dataset.capacidades || document.querySelector("script[data-capacidades]")?.dataset.capacidades || "{}");
@@ -37,7 +37,7 @@ const nombreCampo = n => (spec.estructuras.rce_propuesta.campos.find(c => c.n ==
 const montoTxt = v => { const c = M.centimos(v || "0"); return c === null ? (v || "") : M.soles(c); };
 
 async function cargarSpec() {
-  if (!spec) spec = await (await fetch("/static/sire/sire-spec.json?v=3", { cache: "no-cache" })).json();
+  if (!spec) spec = await (await fetch("/static/sire/sire-spec.json?v=4", { cache: "no-cache" })).json();
   return spec;
 }
 
@@ -49,7 +49,7 @@ async function leer(archivos) {
     let propuesta = null, resumen = null;
     const excel = archivos.find(a => /\.xlsx$/i.test(a.name));
     if (excel) {                                      // el Excel del conversor (corregido) o la plantilla llena
-      const { leerExcel } = await import("./excel.js?v=4");
+      const { leerExcel } = await import("./excel.js?v=5");
       const t = M.filasDeTabla(await leerExcel(await excel.arrayBuffer()), spec);
       return cargarFilas(t.filas, t.avisos, { nombre: excel.name, origen: excel.name, codificacion: "Excel" });
     }
@@ -92,7 +92,7 @@ $("bPegado").addEventListener("click", async () => {
 $("bPlantilla").addEventListener("click", async () => {
   try {
     await cargarSpec();
-    const { generarExcel } = await import("./excel.js?v=4");
+    const { generarExcel } = await import("./excel.js?v=5");
     const vacio = { filas: [], hallazgos: [], avisos: [], totales: M.totales([], spec), propuesta: { nombre: "plantilla-compras-sire" }, perfil: {} };
     bajar(await generarExcel(vacio, spec, { plantilla: true }), "plantilla-compras-sire.xlsx");
   } catch (e) { msg("No pudimos armar la plantilla: " + (e.message || e), "err"); }
@@ -304,25 +304,88 @@ function pintarDetalle() {
     const c = f.c, hs = pf.get(f.n) || [], nv = nivel(f.n);
     const bi = (M.centimos(c[15] || "0") ?? 0) + (M.centimos(c[17] || "0") ?? 0) + (M.centimos(c[19] || "0") ?? 0);
     const igv = (M.centimos(c[16] || "0") ?? 0) + (M.centimos(c[18] || "0") ?? 0) + (M.centimos(c[20] || "0") ?? 0);
-    const e = hs.filter(h => h.nivel === "error").length, a = hs.length - e;
-    cuerpo.push(el("tr", { class: "fila " + nv, tabindex: "0", title: "Ver todos los campos", onclick: () => { abierta = abierta === f.n ? null : f.n; pintarDetalle(); },
-        onkeydown: ev => { if (ev.key === "Enter") { abierta = abierta === f.n ? null : f.n; pintarDetalle(); } } },
+    const e = hs.filter(h => h.nivel === "error").length, a = hs.length - e, esta = abierta === f.n;
+    const marca = esta ? el("span", { class: "sire-estado edicion", texto: "en edición" })
+      : filaEditada(f.n) ? el("span", { class: "sire-estado editada", texto: "editada ✓" }) : null;
+    cuerpo.push(el("tr", { class: "fila " + nv + (esta ? " abierta" : ""), tabindex: "0", "data-fila": String(f.n), "aria-expanded": String(esta),
+        title: esta ? "Cerrar esta fila" : "Ver todos los campos", onclick: () => abrir(f.n),
+        onkeydown: ev => { if (ev.key === "Enter") abrir(f.n); } },
       el("td", { class: "n", texto: String(f.n) }), el("td", { class: "mono", texto: c[7] }), el("td", { class: "mono", texto: `${c[8]}-${c[10]}` }),
       el("td", { class: "mono", texto: c[5] }), el("td", {}, el("span", { class: "mono" }, R(c[13])), " ", N(c[14])),
       el("td", { class: "num", texto: M.soles(bi) }), el("td", { class: "num", texto: M.soles(igv) }), el("td", { class: "num", texto: montoTxt(c[21]) }),
       el("td", { class: "num", texto: montoTxt(c[25]) }), el("td", { class: "mono", texto: c[26] }),
       el("td", { class: "obs" }, e ? el("span", { class: "e", texto: `${e} error${e === 1 ? "" : "es"}` }) : null, e && a ? " · " : null,
-        a ? el("span", { class: "a", texto: `${a} advertencia${a === 1 ? "" : "s"}` }) : null, !hs.length ? "—" : null)));
-    if (abierta === f.n) cuerpo.push(el("tr", { class: "detalle" }, el("td", { colspan: "11" }, detalleFila(f, hs))));
+        a ? el("span", { class: "a", texto: `${a} advertencia${a === 1 ? "" : "s"}` }) : null, !hs.length && !marca ? "—" : null, marca)));
+    if (esta) cuerpo.push(el("tr", { class: "detalle" }, el("td", { colspan: "11" }, detalleFila(f, hs))));
   }
+  $("det").classList.toggle("editando", vista.some(f => f.n === abierta));
   if (!vista.length) cuerpo.push(el("tr", {}, el("td", { colspan: "11", class: "faint", texto: filtro === "todos" ? "El archivo no trae comprobantes." : "Ninguno. ✓" })));
   $("det").replaceChildren(el("thead", {}, cab), el("tbody", {}, cuerpo));
   $("detNota").textContent = "Toca una fila para ver todos sus campos y corregirlos";
   $("pag").replaceChildren(paginas > 1 ? [
-    el("button", { type: "button", class: "btn-sec", texto: "← Anteriores", onclick: () => { pagina--; pintarDetalle(); }, ...(pagina === 0 ? { disabled: "" } : {}) }),
+    el("button", { type: "button", class: "btn-sec", texto: "← Anteriores", onclick: () => { cerrar(); pagina--; pintarDetalle(); }, ...(pagina === 0 ? { disabled: "" } : {}) }),
     el("span", { texto: `Página ${pagina + 1} de ${paginas}` }),
-    el("button", { type: "button", class: "btn-sec", texto: "Siguientes →", onclick: () => { pagina++; pintarDetalle(); }, ...(pagina >= paginas - 1 ? { disabled: "" } : {}) })] : []);
+    el("button", { type: "button", class: "btn-sec", texto: "Siguientes →", onclick: () => { cerrar(); pagina++; pintarDetalle(); }, ...(pagina >= paginas - 1 ? { disabled: "" } : {}) })] : []);
 }
+
+// --- Fila en edicion: cual es, siempre a la vista, y como quedo al salir -------------------------------
+// "foto" = la fila tal como estaba al entrar: al salir se compara para decir "editada" o "sin cambios".
+let foto = null;
+const filaN = n => estado.filas.find(f => f.n === n);
+const filaEditada = n => [...estado.editados].some(k => k.startsWith(n + ":"));
+// Al pasar directo de una fila a otra, un solo aviso con las dos: como quedo la que sale y cual entra.
+function abrir(n) {
+  const otra = abierta !== n, salio = cerrar(false);
+  if (otra) { abierta = n; foto = JSON.stringify(filaN(n).c); }
+  avisoFila([salio, otra && [n, "edicion"]].filter(Boolean));
+  pintarDetalle();
+  if (abierta != null) $("det").querySelector(`tr[data-fila="${abierta}"]`)?.focus({ preventScroll: true });
+}
+function cerrar(avisar = true) {
+  if (abierta == null) return null;
+  const f = filaN(abierta), salio = [abierta, f && JSON.stringify(f.c) !== foto ? "editada" : "igual"];
+  abierta = null; foto = null;
+  if (avisar) avisoFila([salio]);
+  return salio;
+}
+const AVISOS = { edicion: "en edición", editada: "editada ✓", igual: "sin cambios" };
+let toastReloj = 0;
+function avisoFila(estados) {
+  if (!estados.length) return;
+  const t = $("toastFila"), ultimo = estados[estados.length - 1][1];
+  t.className = "sire-toast " + ultimo;
+  t.replaceChildren(...estados.map(([n, cual]) => el("div", { class: cual }, el("b", { texto: `Fila ${n}` }), ` — ${AVISOS[cual]}`)));
+  t.hidden = false;
+  clearTimeout(toastReloj); toastReloj = setTimeout(() => { t.hidden = true; }, 2600);
+  sonar(estados.some(([, c]) => c === "editada") ? "editada" : ultimo);
+}
+// Sonido: apagado de entrada (oficinas compartidas, grabaciones). Se recuerda solo en este navegador.
+let sonido = false, audio = null;
+try { sonido = localStorage.getItem("sire.sonido") === "1"; } catch (_) { /* sin almacenamiento */ }
+const TONOS = { edicion: [660], editada: [660, 880], igual: [440] };
+function sonar(cual) {
+  if (!sonido) return;
+  try {
+    audio ||= new AudioContext();
+    TONOS[cual].forEach((hz, i) => {
+      const o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + i * 0.09;
+      o.frequency.value = hz; o.type = "sine";
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.05, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.08);
+      o.connect(g).connect(audio.destination); o.start(t0); o.stop(t0 + 0.09);
+    });
+  } catch (_) { /* sin audio: el aviso visual basta */ }
+}
+function pintarSonido() {
+  $("bSonido").setAttribute("aria-pressed", String(sonido));
+  $("bSonido").textContent = sonido ? "Sonido: encendido" : "Sonido: apagado";
+}
+$("bSonido").addEventListener("click", () => {
+  sonido = !sonido;
+  try { if (sonido) localStorage.setItem("sire.sonido", "1"); else localStorage.removeItem("sire.sonido"); } catch (_) { /* nada */ }
+  pintarSonido();
+  if (sonido) sonar("edicion");
+});
+pintarSonido();
 
 // Campos que el contador corrige en linea. No: generador y periodo (uno solo para todo el TXT: la razon
 // social se fija en el panel del TXT), CAR (va vacio en el reemplazo) e informativos 38-41 (no se suben).
@@ -350,9 +413,12 @@ function destinoFila(f) {
     el("small", { class: "faint", texto: actual === "mixto" ? "Hoy está repartido entre destinos: al elegir uno, todo pasa ahí." : "Las sumas de base e IGV no cambian (nota 5 del Anexo 8). Solo se mueve si tú lo eliges." }));
 }
 function detalleFila(f, hs) {
-  const malos = new Map(hs.map(h => [h.campo, h.nivel]));
+  const malos = new Map();
+  for (const h of hs) for (const n of h.marcas || [h.campo]) if (malos.get(n) !== "error") malos.set(n, h.nivel);
   const est = spec.estructuras.rce_propuesta;
-  const visibles = est.campos.filter(c => !c.libre || f.c[c.n]);
+  // Libres: los usados y uno vacio mas (ahi van, p. ej., los importes de una boleta: no dan credito fiscal)
+  const libres = est.campos.filter(c => c.libre), usado = libres.reduce((u, c) => f.c[c.n] ? c.n : u, libres[0].n - 1);
+  const visibles = est.campos.filter(c => !c.libre || c.n <= usado + 1);
   const sensible = n => CAMPOS_RUC.has(n) || CAMPOS_NOMBRE.has(n);
   const valor = c => {
     if (!editable(c)) return valorCampo(c.n, f.c[c.n]);
@@ -362,21 +428,30 @@ function detalleFila(f, hs) {
     return sensible(c.n) ? [el("span", { class: "puntos" }, valorCampo(c.n, f.c[c.n])), input] : input;   // modo video: se tapa
   };
   const corregido = n => estado.editados.has(`${f.n}:${n}`);
-  return el("div", {}, hs.length ? el("ul", {}, hs.map(h => el("li", { class: h.nivel === "error" ? "e" : "a" }, `${h.nivel === "error" ? "Error" : "Advertencia"} · `, conRucs(h.msg)))) : null,
+  const tipo = spec.tablas.t11[f.c[7]] || `Tipo ${f.c[7] || "—"}`, serie = [f.c[8], f.c[10]].filter(Boolean).join("-");
+  const errores = hs.filter(h => h.nivel === "error"), avisos = hs.filter(h => h.nivel !== "error");
+  const lista = (clase, titulo, xs) => xs.length ? el("div", { class: "sire-obs " + clase }, el("b", { texto: titulo }),
+    el("ul", {}, xs.map(h => el("li", {}, conRucs(h.msg), h.extra ? el("span", { class: "sire-extra", title: "Revisión adicional del conversor: el validador oficial no la hace.", texto: "revisión extra" }) : null)))) : null;
+  return el("div", { class: "sire-editando", onkeydown: ev => { if (ev.key === "Escape") { ev.stopPropagation(); abrir(f.n); } } },
+    el("div", { class: "sire-editando-cab" },
+      el("span", {}, el("b", { texto: `Editando fila ${f.n}` }), ` · ${tipo} `, el("span", { class: "mono", texto: serie })),
+      el("button", { type: "button", class: "btn-sec", texto: "Cerrar fila ✕", title: "También con Esc", onclick: () => abrir(f.n) })),
+    lista("e", `${errores.length} error${errores.length === 1 ? "" : "es"} · impide${errores.length === 1 ? "" : "n"} generar el TXT`, errores),
+    lista("a", `${avisos.length} advertencia${avisos.length === 1 ? "" : "s"} · no impide${avisos.length === 1 ? "" : "n"} generar el TXT: revísala${avisos.length === 1 ? "" : "s"}`, avisos),
     destinoFila(f),
     el("div", { class: "sire-campos" }, visibles.map(c => el("div", { class: [malos.get(c.n) === "error" ? "mal" : malos.get(c.n) ? "ojo" : "", corregido(c.n) ? "editado" : ""].join(" ").trim() },
       el("small", { texto: `${c.n} · ${c.nombre}${corregido(c.n) ? " · corregido" : ""}` }), valor(c)))),
     el("p", { class: "faint", texto: "Corrige aquí mismo: cada cambio se vuelve a validar con las reglas de la norma y pasa al Excel y al TXT de reemplazo." }));
 }
 
-document.querySelectorAll(".ver-filtros button[data-f]").forEach(b => b.addEventListener("click", () => { filtro = b.dataset.f; pagina = 0; abierta = null; pintarDetalle(); }));
+document.querySelectorAll(".ver-filtros button[data-f]").forEach(b => b.addEventListener("click", () => { cerrar(); filtro = b.dataset.f; pagina = 0; pintarDetalle(); }));
 
 // --- Excel (ExcelJS se carga recien al descargar) ----------------------------------------------------
 async function descargar(imprimir) {
   const b1 = $("bExcel"), b2 = $("bImprimir");
   b1.disabled = b2.disabled = true; $("descMsg").textContent = "Armando el Excel en tu equipo…";
   try {
-    const { generarExcel } = await import("./excel.js?v=4");
+    const { generarExcel } = await import("./excel.js?v=5");
     const blob = await generarExcel({ ...estado, perfil }, spec, { imprimir });
     const base = estado.propuesta.nombre.replace(/(-imprimir)?\.(txt|zip|xlsx)$/i, "");
     bajar(blob, `${base}${imprimir ? "-imprimir" : ""}.xlsx`);
@@ -419,7 +494,7 @@ function pintarReemplazo() {
   $("txtNombre").replaceChildren("Nombre del archivo: ", el("span", { class: "mono" }, t.archivo.slice(0, 2), R(t.archivo.slice(2, 13)), t.archivo.slice(13)), " (dentro del ZIP del mismo nombre).");
 }
 function verErrores() {
-  filtro = "error"; pagina = 0; abierta = null; pintarDetalle();
+  cerrar(); filtro = "error"; pagina = 0; pintarDetalle();
   $("pDet").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 // La razon social elegida pasa a todas las filas: una sola en pantalla, en el Excel y en el TXT.

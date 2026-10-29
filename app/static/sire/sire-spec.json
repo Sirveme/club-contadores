@@ -1,5 +1,5 @@
 {
- "version": "2026-10-27",
+ "version": "2026-10-29",
  "normas": [
   "RS 112-2021/SUNAT",
   "RS 040-2022/SUNAT",
@@ -1400,7 +1400,8 @@
        1
       ]
      },
-     "msg": "El IGV (campo 16) no es el 18% de la base (campo 15). Si aplica una tasa reducida, está bien."
+     "msg": "El IGV (campo 16) no es el 18% de la base (campo 15). Si aplica una tasa reducida, está bien.",
+     "extra": true
     },
     {
      "id": "igv_17",
@@ -1439,7 +1440,8 @@
        1
       ]
      },
-     "msg": "El IGV (campo 18) no es el 18% de la base (campo 17). Si aplica una tasa reducida, está bien."
+     "msg": "El IGV (campo 18) no es el 18% de la base (campo 17). Si aplica una tasa reducida, está bien.",
+     "extra": true
     },
     {
      "id": "igv_19",
@@ -1478,7 +1480,8 @@
        1
       ]
      },
-     "msg": "El IGV (campo 20) no es el 18% de la base (campo 19). Si aplica una tasa reducida, está bien."
+     "msg": "El IGV (campo 20) no es el 18% de la base (campo 19). Si aplica una tasa reducida, está bien.",
+     "extra": true
     },
     {
      "id": "signo_15",
@@ -1674,7 +1677,8 @@
        1
       ]
      },
-     "msg": "El importe total (campo 25) no es la suma de bases, IGV, no gravadas, ISC, ICBPER y otros (diferencia mayor a S/ 1)."
+     "msg": "El importe total (campo 25) no es la suma de bases, IGV, no gravadas, ISC, ICBPER y otros (diferencia mayor a S/ 1).",
+     "extra": true
     },
     {
      "id": "rce_tipo",
@@ -1924,6 +1928,1101 @@
       ]
      },
      "msg": "El número final (rango) solo se usa para anotar en forma consolidada operaciones que no dan derecho a crédito fiscal: bases e IGV deben ir en 0.00 y el tipo de comprobante debe admitirlo."
+    },
+    {
+     "id": "sin_credito",
+     "nivel": "error",
+     "campos": [
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25
+     ],
+     "marca": "montos",
+     "cuando": {
+      "in": [
+       {
+        "var": "c7"
+       },
+       [
+        "03"
+       ]
+      ]
+     },
+     "debe": {
+      "and": [
+       {
+        "==": [
+         {
+          "var": "m15"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m16"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m17"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m18"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m19"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m20"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m21"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m22"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m23"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m24"
+         },
+         0
+        ]
+       },
+       {
+        "==": [
+         {
+          "var": "m25"
+         },
+         0
+        ]
+       }
+      ]
+     },
+     "msg": "Este comprobante ({tipo}) no da derecho a crédito fiscal: sus importes no van en los campos 15 al 25. Muévelos a los campos de libre utilización (42 en adelante) y deja esos montos en 0.00."
+    },
+    {
+     "id": "negativo_15",
+     "nivel": "error",
+     "campos": [
+      15
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m15"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Base imponible (destino gravado)» (campo 15) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_17",
+     "nivel": "error",
+     "campos": [
+      17
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m17"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Base imponible (gravado y no gravado)» (campo 17) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_19",
+     "nivel": "error",
+     "campos": [
+      19
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m19"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Base imponible (destino no gravado)» (campo 19) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_21",
+     "nivel": "error",
+     "campos": [
+      21
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m21"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Adquisiciones no gravadas» (campo 21) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_22",
+     "nivel": "error",
+     "campos": [
+      22
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m22"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«ISC» (campo 22) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_23",
+     "nivel": "error",
+     "campos": [
+      23
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m23"
+         },
+         0
+        ]
+       },
+       {
+        "in": [
+         {
+          "var": "c7"
+         },
+         [
+          "07"
+         ]
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«ICBPER» (campo 23) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_24",
+     "nivel": "error",
+     "campos": [
+      24
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m24"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Otros tributos y cargos» (campo 24) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "negativo_25",
+     "nivel": "error",
+     "campos": [
+      25
+     ],
+     "cuando": {
+      "and": [
+       {
+        ">": [
+         {
+          "var": "m25"
+         },
+         0
+        ]
+       },
+       {
+        "or": [
+         {
+          "in": [
+           {
+            "var": "c7"
+           },
+           [
+            "07",
+            "87"
+           ]
+          ]
+         },
+         {
+          "and": [
+           {
+            "in": [
+             {
+              "var": "c7"
+             },
+             [
+              "25"
+             ]
+            ]
+           },
+           {
+            "==": [
+             {
+              "substr": [
+               {
+                "var": "c34"
+               },
+               0,
+               1
+              ]
+             },
+             "1"
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Importe total» (campo 25) debe ir en negativo, con formato -#.##: este comprobante ({tipo}) resta."
+    },
+    {
+     "id": "positivo_15",
+     "nivel": "error",
+     "campos": [
+      15
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m15"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Base imponible (destino gravado)» (campo 15) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+    },
+    {
+     "id": "positivo_17",
+     "nivel": "error",
+     "campos": [
+      17
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m17"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Base imponible (gravado y no gravado)» (campo 17) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+    },
+    {
+     "id": "positivo_19",
+     "nivel": "error",
+     "campos": [
+      19
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m19"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Base imponible (destino no gravado)» (campo 19) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+    },
+    {
+     "id": "positivo_21",
+     "nivel": "error",
+     "campos": [
+      21
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m21"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Adquisiciones no gravadas» (campo 21) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+    },
+    {
+     "id": "positivo_22",
+     "nivel": "error",
+     "campos": [
+      22
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m22"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«ISC» (campo 22) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+    },
+    {
+     "id": "positivo_23",
+     "nivel": "error",
+     "campos": [
+      23
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m23"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "in": [
+          {
+           "var": "c7"
+          },
+          [
+           "07"
+          ]
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«ICBPER» (campo 23) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
+    },
+    {
+     "id": "positivo_24",
+     "nivel": "advertencia",
+     "campos": [
+      24
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m24"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Otros tributos y cargos» (campo 24) es negativo: si es un descuento está bien; si no, revisa el signo."
+    },
+    {
+     "id": "positivo_25",
+     "nivel": "error",
+     "campos": [
+      25
+     ],
+     "cuando": {
+      "and": [
+       {
+        "<": [
+         {
+          "var": "m25"
+         },
+         0
+        ]
+       },
+       {
+        "!": {
+         "or": [
+          {
+           "in": [
+            {
+             "var": "c7"
+            },
+            [
+             "07",
+             "87"
+            ]
+           ]
+          },
+          {
+           "and": [
+            {
+             "in": [
+              {
+               "var": "c7"
+              },
+              [
+               "25"
+              ]
+             ]
+            },
+            {
+             "==": [
+              {
+               "substr": [
+                {
+                 "var": "c34"
+                },
+                0,
+                1
+               ]
+              },
+              "1"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "debe": false,
+     "msg": "«Importe total» (campo 25) debe ser positivo: solo las notas de crédito (07 y 87) van en negativo."
     }
    ],
    "series": {

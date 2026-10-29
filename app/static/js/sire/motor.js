@@ -181,7 +181,7 @@ function cuadreTotal(c, estructura) {
 // --- Validacion -----------------------------------------------------------------------------------
 export function validar(filas, spec, estructuraId = "rce_propuesta") {
   const est = spec.estructuras[estructuraId], T = spec.tablas, out = [];
-  const add = (fila, campo, nivel, regla, msg) => out.push({ fila, campo, nivel, regla, msg });
+  const add = (fila, campo, nivel, regla, msg, extra) => out.push({ fila, campo, nivel, regla, msg, ...extra });
   const vistos = new Map();
   for (const f of filas) {
     const c = f.c;
@@ -228,11 +228,15 @@ export function validar(filas, spec, estructuraId = "rce_propuesta") {
       add(f.n, 8, "error", "serie", `La serie «${c[8]}» no corresponde a un comprobante tipo ${tipo}.`);
     if (est.numeros[tipo] && c[10] && !new RegExp(est.numeros[tipo]).test(c[10]))
       add(f.n, 10, "error", "numero", `El número «${c[10]}» debe ser numérico, mayor a cero y de hasta ${Number((est.numeros[tipo].match(/\\d\{0,(\d+)\}/) || [, 7])[1]) + 1} dígitos.`);
-    // Reglas de la estructura (JSON Logic)
+    // Reglas de la estructura (JSON Logic). {tipo} en el mensaje = "03 - Boleta de venta". marca "montos":
+    // se señalan los campos de la regla que traen monto (no solo el primero).
     for (const r of est.reglas) {
       let aplica = false;
       try { aplica = ev(r.cuando, datos); } catch (_) { aplica = false; }
-      if (aplica && !(r.debe === false ? false : ev(r.debe, datos))) add(f.n, r.campos[0], r.nivel, r.id, r.msg);
+      if (!aplica || (r.debe === false ? false : ev(r.debe, datos))) continue;
+      const marcas = r.marca === "montos" ? r.campos.filter(n => datos["m" + n] !== 0) : r.campos;
+      add(f.n, marcas[0] ?? r.campos[0], r.nivel, r.id, r.msg.replace("{tipo}", `${tipo} - ${T.t11[tipo] || "tipo " + tipo}`),
+        { marcas, ...(r.extra ? { extra: true } : {}) });
     }
     // Duplicados
     const llave = [tipo, c[8], c[10], c[13]].join("|");

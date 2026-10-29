@@ -204,3 +204,23 @@ Fuentes leídas el 28/10/2026: Anexo 11, Tablas 12 y 13 de la RS 040-2022 (`anex
 **Por confirmar con el PVSIRE** (en una muestra real, que corre en el equipo del contador): el palote final, el
 `&` sin escapar, la codificación UTF-8 y la extensión `.TXT` en mayúscula dentro del ZIP (la Tabla 13 dice `.TXT`;
 en foros se reporta un rechazo que se resolvió con `.txt`).
+
+## Validaciones equivalentes al PVSIRE y las que el PVSIRE no hace (29/10/2026)
+Duilio pasó archivos por el PVSIRE y comparó. Cada regla vive en `sire-spec.json` (generado; la fuente de
+cada una está comentada en el generador) y tiene su prueba en `tests_js/sire/motor.test.mjs`.
+
+| Regla (spec) | PVSIRE | Nivel | Qué revisa | Fuente |
+|---|---|---|---|---|
+| `sin_credito` | 818 | Error | Tipo sin derecho a crédito fiscal (hoy: **03 boleta**) con importes en 15–25: van en los campos libres (42+) | Anexo 8, nota 1 («…que no otorguen derecho a crédito fiscal … se realizan en los campos libres»); RS 007-99/SUNAT art. 4 num. 3.2 (la boleta no da crédito fiscal) |
+| `negativo_15…25` | 425 | Error | En 07 y 87 (y 25 si el campo 34 empieza con «1») los montos 15, 17, 19, 21, 22, 24 y 25 van en negativo; el 23 solo en la 07 | Anexo 11, campos 15–25: «Valor negativo cuando campo 7 = '07', '87' o '25'…» |
+| `positivo_15…25` | 425 | Error (24: advertencia) | En los demás tipos, esos montos no van en negativo. El 24 lleva descuentos: solo se avisa | Anexo 11 (se lee «Acepta negativo» junto con la regla 3: el negativo es para esos tipos; el ISC, campo 22, lo dice sin «acepta negativo») |
+| `signo_15/17/19` | — | Error | El IGV lleva el signo de su base | Anexo 11, campos 16, 18 y 20 |
+| `total` | **no lo valida** | Advertencia · revisión extra | 25 ≈ suma de 15–24 (±S/ 1) | Anexo 11, nota 2 |
+| `igv_15/17/19` | **no lo valida** | Advertencia · revisión extra | IGV ≈ 18% de su base (±S/ 1); puede ser tasa reducida | Ley del IGV; nunca error (hay tasas distintas) |
+
+Pendiente de decidir con más pruebas del PVSIRE:
+- **Otros tipos sin crédito fiscal.** El ticket (12) y los boletos (05, 15, 16) dan crédito fiscal solo si
+  identifican al comprador con su RUC y discriminan el IGV. Desde el archivo no se sabe, así que no se marcan.
+  Si el PVSIRE da 818 en alguno, se agrega a `SIN_CREDITO` en el generador (una línea).
+- **Factura con montos negativos.** Se trata como error, igual que el código 425. Si el SIRE acepta algún caso
+  (por ejemplo, anticipos), se baja a advertencia (`nivel` de `positivo_*`).

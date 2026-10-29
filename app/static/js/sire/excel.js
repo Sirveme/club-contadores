@@ -2,7 +2,7 @@
 // Se arma en el navegador: el archivo no sale del equipo. Dos versiones: oscura (pantalla, la de la
 // casa) y clara para imprimir (sin rellenos oscuros). Tambien se lee de vuelta (Fase 4): el contador lo
 // corrige y lo sube, y el conversor arma el TXT de reemplazo.
-import * as M from "./motor.js?v=4";
+import * as M from "./motor.js?v=5";
 
 const RUTA_EXCELJS = "/static/vendor/exceljs/4.4.0/exceljs.min.js";
 let cargando = null;
@@ -64,7 +64,7 @@ export async function generarExcel(estado, spec, { imprimir = false, plantilla =
     const row = ws.addRow(valores);
     row.eachCell({ includeEmpty: true }, (celda, i) => {
       const campo = campos[i - 2];
-      const h = campo && hs.find(x => x.campo === campo.n);
+      const h = campo && hs.find(x => (x.marcas || [x.campo]).includes(campo.n));
       const num = campo && (campo.tipo === "monto" ? "#,##0.00" : campo.tipo === "tc" ? "0.000" : null);
       if (campo && !num) celda.numFmt = "@";
       estilar(celda, P, { num, fill: h ? (h.nivel === "error" ? P.err : P.adv) : null, color: h ? (h.nivel === "error" ? P.errTxt : P.advTxt) : null });

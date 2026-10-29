@@ -3,7 +3,7 @@
 {% block titulo %}Conversor SIRE · Club de Contadores{% endblock %}
 {# Fuentes desde este mismo sitio: al cargar esta pagina no sale ninguna peticion a terceros. #}
 {% block fuentes %}<link rel="stylesheet" href="/static/fonts/plex/plex.css?v=1">{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=5">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/css/sire.css?v=6">{% endblock %}
 {% block contenido %}
   <section class="fx" aria-label="Fórmula">
     <div class="ref">A1</div>
@@ -74,9 +74,11 @@
           <button type="button" data-f="todos" aria-pressed="true">Todos <span id="nTodos"></span></button>
           <button type="button" data-f="error" aria-pressed="false"><s class="sem rojo"></s>Con errores <span id="nErr"></span></button>
           <button type="button" data-f="advertencia" aria-pressed="false"><s class="sem amarillo"></s>Con advertencias <span id="nAdv"></span></button>
+          <button type="button" class="sire-sonido" id="bSonido" aria-pressed="false" title="Un sonido corto al entrar y salir de una fila. Viene apagado.">Sonido: apagado</button>
         </div>
         <div class="tabla-wrap"><table class="tabla sire-det" id="det"></table></div>
         <div class="sire-pag" id="pag"></div>
+        <div class="sire-toast" id="toastFila" role="status" aria-live="polite" hidden></div>
       </div>
     </section>
 
@@ -116,4 +118,4 @@
   </dialog>
 {% endblock %}
 {% block estado %}<span>Procesado en tu equipo · ninguna cifra se envía</span><span id="estadoTxt">Listo</span>{% endblock %}
-{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=5" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}
+{% block scripts %}<script type="module" src="/static/js/sire/app.js?v=6" data-capacidades='{{ capacidades|tojson }}'></script>{% endblock %}

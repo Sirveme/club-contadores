@@ -145,6 +145,46 @@ test("campo 11 (rango): solo para consolidar operaciones sin crédito fiscal", (
   assert.ok(reglas(r, 1).includes("error:rango:11"));
 });
 
+// --- Validaciones del PVSIRE (818, 425) y las que el PVSIRE deja pasar (cuadre e IGV) ----------------------
+const una = (extra, proveedor = F.PROV.a) => M.procesar([F.CABECERA.join("|"), F.fila({ 1: F.GENERADOR, 2: "X", 3: "202607", 5: "01/07/2026",
+  7: "01", 8: "F001", 10: "1", 12: "6", 13: proveedor, 14: "DISTRIBUIDORA FICTICIA S.A.C.", 15: "0.00", 16: "0.00", 17: "0.00", 18: "0.00",
+  19: "0.00", 20: "0.00", 21: "0.00", 22: "0.00", 23: "0.00", 24: "0.00", 25: "0.00", 26: "PEN", 27: "1.000", ...extra })].join("\n"), spec);
+
+test("818 · boleta (03) sin crédito fiscal: importes en 15-25 -> error, con los campos señalados", () => {
+  const r = una({ 7: "03", 8: "B001", 21: "50.00", 25: "50.00" });
+  const h = r.hallazgos.find(x => x.regla === "sin_credito");
+  assert.equal(h.nivel, "error");
+  assert.deepEqual(h.marcas, [21, 25]);
+  assert.match(h.msg, /03 - Boleta de venta.*libre utilización/);
+  assert.deepEqual(reglas(una({ 7: "03", 8: "B001", 42: "50.00" }), 1), []);        // en los libres: bien
+  assert.ok(!reglas(una({ 15: "100.00", 16: "18.00", 25: "118.00" }), 1).length);   // factura: sí da crédito
+  assert.equal(M.reemplazo(r.filas, spec).texto, null);                             // y bloquea el TXT
+});
+
+test("425 · signo según el tipo: notas de crédito en negativo, el resto en positivo (Anexo 11)", () => {
+  const nc = { 28: "01/07/2026", 29: "01", 30: "F001", 32: "9" };                 // documento modificado
+  assert.deepEqual(reglas(una({ 7: "07", 15: "100.00", 16: "18.00", 25: "118.00", ...nc }), 1),
+    ["error:negativo_15:15", "error:negativo_25:25"]);
+  assert.deepEqual(reglas(una({ 7: "07", 15: "-100.00", 16: "-18.00", 25: "-118.00", ...nc }), 1), []);
+  assert.ok(reglas(una({ 7: "87", 21: "5.00", 25: "5.00" }), 1).includes("error:negativo_21:21"));
+  assert.deepEqual(reglas(una({ 15: "-100.00", 16: "-18.00", 25: "-118.00" }), 1), ["error:positivo_15:15", "error:positivo_25:25"]);
+  assert.deepEqual(reglas(una({ 21: "-5.00", 22: "-1.00" }), 1).filter(x => /positivo/.test(x)), ["error:positivo_21:21", "error:positivo_22:22"]);
+  assert.deepEqual(reglas(una({ 21: "10.00", 24: "-1.00", 25: "9.00" }), 1), ["advertencia:positivo_24:24"]);   // descuento: solo aviso
+  // 25 (atribución) resta solo si el campo 34 empieza con «1»; el ICBPER (23) va en negativo solo en la 07
+  const atrib = x => reglas(una({ 7: "25", 8: "0001", 21: "5.00", 25: "5.00", 34: x }), 1).filter(r => /negativo|positivo/.test(r));
+  assert.deepEqual(atrib("1-ABC"), ["error:negativo_21:21", "error:negativo_25:25"]);
+  assert.deepEqual(atrib("2-ABC"), []);
+  assert.ok(!reglas(una({ 7: "87", 23: "0.50", 25: "-0.50", 21: "-1.00" }), 1).some(x => x.includes("_23")));
+});
+
+test("lo que el PVSIRE deja pasar: total que no cuadra e IGV fuera de tasa -> advertencia (no bloquea)", () => {
+  const r = una({ 15: "100.00", 16: "50.00", 25: "999.00" });
+  assert.deepEqual(reglas(r, 1), ["advertencia:igv_15:15", "advertencia:total:25"]);
+  assert.ok(r.hallazgos.every(h => h.extra));
+  const t = M.reemplazo(r.filas, spec);
+  assert.ok(t.texto && !t.bloqueos.length && t.advertencias.length === 2);
+});
+
 // Siguen en sus fases (ver docs/sire/estructura-campos.md, "Casos del mercado").
 // --- Fase 4: TXT de reemplazo (Anexo 11) ----------------------------------------------------------------
 const lineas = t => t.split("\n").filter(Boolean).map(l => l.split("|"));
