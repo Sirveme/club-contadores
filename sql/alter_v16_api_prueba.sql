@@ -7,10 +7,19 @@
 ALTER TABLE api_llaves ADD COLUMN IF NOT EXISTS instalacion       uuid;         -- UUID que genera la extension la 1a vez
 ALTER TABLE api_llaves ADD COLUMN IF NOT EXISTS codigo            text;         -- 'K7QM-4XPA': el que la persona dicta por WhatsApp
 ALTER TABLE api_llaves ADD COLUMN IF NOT EXISTS vence_en          timestamptz;  -- NULL = acceso permanente
-ALTER TABLE api_llaves ADD COLUMN IF NOT EXISTS ip_alta           text;         -- sha256 de la IP que la pidio (tope por IP/dia)
+ALTER TABLE api_llaves ADD COLUMN IF NOT EXISTS ip_alta           text;         -- huella HMAC (con secreto) de la IP que la pidio (tope por IP/dia)
 ALTER TABLE api_llaves ADD COLUMN IF NOT EXISTS solicitud_persona uuid;         -- socio que se registro desde la extension
 ALTER TABLE api_llaves ADD COLUMN IF NOT EXISTS solicitud_en      timestamptz;
 ALTER TABLE api_llaves ADD COLUMN IF NOT EXISTS activada_en       timestamptz;  -- paso de prueba a permanente
 CREATE UNIQUE INDEX IF NOT EXISTS ux_api_llaves_instalacion ON api_llaves (instalacion) WHERE instalacion IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_api_llaves_codigo ON api_llaves (codigo) WHERE codigo IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix_api_llaves_ip_alta ON api_llaves (ip_alta, creada_en) WHERE ip_alta IS NOT NULL;
+
+-- Contador del DIA (hora de Lima): solo las pruebas tienen tope diario (PRUEBA_CUOTA_DIA).
+CREATE TABLE IF NOT EXISTS api_uso_dia (
+    llave_id  uuid NOT NULL REFERENCES api_llaves (id),
+    recurso   text NOT NULL,
+    dia       date NOT NULL,
+    unidades  int  NOT NULL DEFAULT 0,
+    PRIMARY KEY (llave_id, recurso, dia)
+);

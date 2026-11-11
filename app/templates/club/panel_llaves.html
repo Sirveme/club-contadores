@@ -23,12 +23,27 @@
   {% if aviso %}<div class="msg info">{{ aviso }}</div>{% endif %}
   {% if pruebas %}
   <section class="panel" aria-label="Pruebas de la extensión" style="margin-bottom:12px">
-    <header class="panel-cab"><b>Pruebas de la extensión Ficha RUC</b><span>15 días por instalación · la bitácora solo guarda cuántas</span></header>
+    <header class="panel-cab"><b>Pruebas de la extensión Ficha RUC</b><span>{{ prueba_cuota.dias }} días por instalación · {{ prueba_cuota.mes }} consultas/mes y {{ prueba_cuota.dia }}/día · solo conteos</span></header>
     <div class="panel-cuerpo">
       <p style="margin:0">En prueba <b class="mono">{{ pruebas.en_prueba }}</b> · vencidas <b class="mono">{{ pruebas.vencidas }}</b>
         · se registraron y esperan activación <b class="mono">{{ pruebas.por_activar }}</b> · activadas <b class="mono">{{ pruebas.activadas }}</b></p>
-      <p class="nota" style="margin:6px 0 0">Emitidas por día (30 días):
-        {% for d in pruebas.dias %}<span class="mono">{{ d.dia.strftime("%d/%m") }}: {{ d.pruebas }}</span>{% if not loop.last %} · {% endif %}{% else %}<span class="faint">ninguna todavía</span>{% endfor %}</p>
+    </div>
+    <div class="tabla-wrap"><table class="tabla">
+      <thead><tr><th>Día</th>{% for k, t in metricas_cols %}<th>{{ t }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for d in pruebas.dias %}
+        <tr><td class="mono">{{ d.dia.strftime("%d/%m/%Y") }}</td>{% for k, t in metricas_cols %}<td class="mono">{{ d[k] }}</td>{% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="panel-cuerpo">
+      <form class="ver-acciones" method="get" action="/panel/llaves/metricas.csv">
+        <div class="campo"><label for="mDesde">Desde</label><input id="mDesde" name="desde" type="date" required
+          value="{{ (pruebas.dias[-1].dia if pruebas.dias else '') }}"></div>
+        <div class="campo"><label for="mHasta">Hasta</label><input id="mHasta" name="hasta" type="date" required value="{{ pruebas.hoy }}"></div>
+        <div><button class="btn-sec" type="submit">Exportar CSV</button></div>
+      </form>
+      <p class="nota" style="margin:6px 0 0">Solo conteos por día (hora de Lima): sin RUC, sin IP y sin identificadores. «Vencidas sin activar» cuenta el día en que venció cada prueba.</p>
       <p class="nota" style="margin:6px 0 0">Para activar a alguien: busca su código (te lo escribe por WhatsApp) en la lista de abajo, ábrelo y toca «Activar acceso permanente».</p>
     </div>
   </section>

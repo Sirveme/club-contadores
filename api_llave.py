@@ -87,8 +87,9 @@ async def main(a):
             r = await A.pruebas_resumen(conn, a.esquema)
             print(f"En prueba {r['en_prueba']} · vencidas {r['vencidas']} · registradas esperando activación {r['por_activar']}"
                   f" · activadas {r['activadas']}")
+            print("  " + " | ".join(["día"] + [t for _, t in A.METRICAS]))
             for d in r["dias"]:
-                print(f"  {d['dia']:%d/%m/%Y}  {d['pruebas']} prueba(s) emitida(s)")
+                print(f"  {d['dia']:%d/%m/%Y} | " + " | ".join(str(d[k]) for k, _ in A.METRICAS))
             for f in await conn.fetch(f"SELECT codigo, solicitud_en FROM {t} WHERE plan_codigo = 'prueba' AND solicitud_persona IS NOT NULL "
                                       f"AND estado = 'activa' ORDER BY solicitud_en"):
                 print(f"  por activar: {f['codigo']}  (se registró el {f['solicitud_en']:%d/%m/%Y %H:%M})")

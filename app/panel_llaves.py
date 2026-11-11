@@ -16,7 +16,7 @@ import re
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from . import api_v1 as A, club, db, identidad
 from . import padron as P
@@ -76,6 +76,8 @@ async def _pruebas() -> dict | None:
 async def _pagina(request: Request, **extra):
     llaves = await _listar()
     extra.setdefault("pruebas", await _pruebas())
+    extra.setdefault("metricas_cols", A.METRICAS)
+    extra.setdefault("prueba_cuota", {"mes": A.PRUEBA_CUOTA_MES, "dia": A.PRUEBA_CUOTA_DIA, "dias": A.PRUEBA_DIAS})
     return club.templates.TemplateResponse(request, "club/panel_llaves.html", {
         "s": await club.socio_actual(request), "inicio": club.inicio(request), "llaves": llaves,
         "esquema": V.ESQUEMA, "api_abierta": A.ABIERTA, "cuota_gratis": A.CUOTA_GRATIS_MES, "rpm_defecto": A.RPM_DEFECTO,
@@ -167,6 +169,32 @@ async def accion(prefijo: str, accion: str, request: Request):
     else:
         return HTMLResponse("Acción desconocida.", status_code=404, headers=NO_CACHE)
     return RedirectResponse(f"/panel/llaves/{prefijo}?ok={aviso}", 303)
+
+
+@router.get("/panel/llaves/metricas.csv")
+async def metricas_csv(desde: str = "", hasta: str = ""):
+    """Metricas diarias de la extension en CSV (solo conteos). Rango maximo: 366 dias."""
+    import csv, io
+    from datetime import date, timedelta
+    try:
+        d, h = date.fromisoformat(desde), date.fromisoformat(hasta)
+    except ValueError:
+        return HTMLResponse("Elige las fechas «desde» y «hasta».", status_code=400, headers=NO_CACHE)
+    if d > h:
+        d, h = h, d
+    if (h - d).days > 366:
+        d = h - timedelta(days=366)
+    if not await _pruebas():
+        return HTMLResponse("Todavía no hay pruebas de la extensión.", status_code=404, headers=NO_CACHE)
+    async with db._pool.acquire() as conn:
+        filas = await A.metricas(conn, V.ESQUEMA, d, h)
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["dia"] + [k for k, _ in A.METRICAS])
+    for f in sorted(filas, key=lambda x: x["dia"]):
+        w.writerow([f["dia"].isoformat()] + [f[k] for k, _ in A.METRICAS])
+    return Response("\ufeff" + out.getvalue(), media_type="text/csv; charset=utf-8", headers={
+        **NO_CACHE, "Content-Disposition": f'attachment; filename="metricas-extension-{d}-{h}.csv"'})
 
 
 @router.get("/panel/llaves/{prefijo}", response_class=HTMLResponse)

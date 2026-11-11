@@ -18,6 +18,8 @@ Configuracion:
   API_MAX_LOTE=100             RUC distintos y validos por lote
   API_PRUEBA_DIAS=15           dias de la prueba gratis de la extension (por instalacion)
   PRUEBAS_POR_IP_DIA=20        pruebas nuevas por IP en 24 h (se lee al arrancar: Railway reinicia al cambiarla)
+  PRUEBA_CUOTA_MES=1000        consultas por mes durante la prueba (aparte del plan gratis)
+  PRUEBA_CUOTA_DIA=200         tope diario, solo para pruebas
 Usa el esquema del Verificador (VERIFICADOR_ESQUEMA).
 
 Cada llamada autenticada: ritmo -> validar -> descontar cuota -> consultar -> bitacora.
@@ -62,6 +64,10 @@ SQL_V14 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SQL_V16 = os.path.join(os.path.dirname(SQL_V14), "alter_v16_api_prueba.sql")
 PRUEBA_DIAS = int(os.getenv("API_PRUEBA_DIAS", "15") or 15)
 PRUEBA_MAX_IP_DIA = int(os.getenv("PRUEBAS_POR_IP_DIA", "20") or 20)
+# La prueba tiene su propia cuota (generosa, para que el contador se acostumbre): se aplica al
+# vuelo, asi cambiar la variable alcanza tambien a las pruebas ya emitidas.
+PRUEBA_CUOTA_MES = int(os.getenv("PRUEBA_CUOTA_MES", "1000") or 1000)
+PRUEBA_CUOTA_DIA = int(os.getenv("PRUEBA_CUOTA_DIA", "200") or 200)
 _INSTALACION_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")   # crypto.randomUUID()
 _CODIGO_ABC = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"           # sin 0/O ni 1/I/L: se dicta por WhatsApp
 _CODIGO_RE = re.compile(rf"^[{_CODIGO_ABC}]{{8}}$")
@@ -324,7 +330,10 @@ async def autenticar(request: Request) -> dict:
         raise ErrorApi(403, "llave_revocada", "Esta llave está revocada o suspendida.")
     if row.get("vence_en") and row["vence_en"] <= datetime.now(timezone.utc):
         raise ErrorApi(403, "prueba_vencida", "Tu prueba gratis terminó.", registro_abierto=registro_abierto())
-    return dict(row)
+    llave = dict(row)
+    if llave["plan_codigo"] == "prueba":
+        llave["cuota_mes"] = PRUEBA_CUOTA_MES
+    return llave
 
 
 def registro_abierto() -> bool:
@@ -376,9 +385,57 @@ def _cab_cuota(c: dict) -> dict:
             "X-Cuota-Restante": str(c["restante"]), "X-Cuota-Reinicio": c["reinicio"]}
 
 
+_DIA = "(now() AT TIME ZONE 'America/Lima')::date"
+
+
+class _Tope(Exception):
+    pass
+
+
+async def estado_cuota_dia(llave: dict, recurso: str = "ruc") -> dict:
+    usada = await db._pool.fetchval(
+        f"SELECT coalesce((SELECT unidades FROM {V.ESQUEMA}.api_uso_dia WHERE llave_id = $1 AND recurso = $2 AND dia = {_DIA}), 0)",
+        llave["id"], recurso)
+    return {"limite": PRUEBA_CUOTA_DIA, "usada": usada, "restante": max(0, PRUEBA_CUOTA_DIA - usada)}
+
+
+async def _consumir_prueba(llave: dict, unidades: int, recurso: str) -> dict:
+    """Prueba: tope del dia Y cuota del mes, los dos o ninguno (una transaccion). Al toparse, deja
+    en la bitacora un 'tope_dia' / 'tope_mes' (solo el hecho, para las metricas)."""
+    tope = None
+    try:
+        async with db._pool.acquire() as conn, conn.transaction():
+            if unidades > PRUEBA_CUOTA_DIA or await conn.fetchval(
+                    f"""INSERT INTO {V.ESQUEMA}.api_uso_dia AS u (llave_id, recurso, dia, unidades) VALUES ($1, $2, {_DIA}, $3)
+                        ON CONFLICT (llave_id, recurso, dia) DO UPDATE SET unidades = u.unidades + $3
+                        WHERE u.unidades + $3 <= $4 RETURNING unidades""", llave["id"], recurso, unidades, PRUEBA_CUOTA_DIA) is None:
+                raise _Tope("dia")
+            if unidades > llave["cuota_mes"] or await conn.fetchval(
+                    f"""INSERT INTO {V.ESQUEMA}.api_uso_mes AS u (llave_id, recurso, mes, unidades) VALUES ($1, $2, {_MES}, $3)
+                        ON CONFLICT (llave_id, recurso, mes) DO UPDATE SET unidades = u.unidades + $3
+                        WHERE u.unidades + $3 <= $4 RETURNING unidades""", llave["id"], recurso, unidades, llave["cuota_mes"]) is None:
+                raise _Tope("mes")                    # deshace tambien lo sumado al dia
+    except _Tope as t:
+        tope = str(t)
+    c = await estado_cuota(llave, recurso)
+    if tope:
+        await db._pool.execute(f"INSERT INTO {V.ESQUEMA}.api_uso (llave_id, recurso, unidades, http) VALUES ($1, $2, 0, 429)",
+                               llave["id"], "tope_" + tope)
+        if tope == "dia":
+            d = await estado_cuota_dia(llave, recurso)
+            manana = await db._pool.fetchval(f"SELECT ({_DIA} + 1)::text")
+            raise ErrorApi(429, "cuota_agotada", f"Llegaste al tope de hoy ({PRUEBA_CUOTA_DIA} consultas). Mañana puedes seguir.",
+                           _cab_cuota(c), reinicio=manana, restante=d["restante"], solicitadas=unidades, periodo="dia")
+        raise ErrorApi(429, "cuota_agotada", f"Llegaste a tu cuota del mes ({c['limite']} consultas). Se reinicia el {c['reinicio']}.",
+                       _cab_cuota(c), reinicio=c["reinicio"], restante=c["restante"], solicitadas=unidades, periodo="mes")
+    return c
+
+
 async def consumir(llave: dict, unidades: int, recurso: str = "ruc") -> dict:
     """Descuenta `unidades` de la cuota del mes en UNA sentencia (atomica). Si no caben, no
-    descuenta nada y lanza 429. -> estado de la cuota tras descontar."""
+    descuenta nada y lanza 429. -> estado de la cuota tras descontar. Pruebas: ademas, tope diario."""
+    if llave["plan_codigo"] == "prueba":
+        return await _consumir_prueba(llave, unidades, recurso)
     usada = None
     if unidades <= llave["cuota_mes"]:
         usada = await db._pool.fetchval(
@@ -643,7 +700,8 @@ async def yo(request: Request):
     cuota = await estado_cuota(llave)
     return JSONResponse({"llave": llave["prefijo"], "nombre": llave["nombre"], "plan": llave["plan_codigo"],
                          "alcances": list(llave["alcances"]), "consultas_por_minuto": llave["rpm"], "cuota": cuota,
-                         "acceso": acceso(llave), "registro_abierto": registro_abierto()},
+                         "acceso": acceso(llave), "registro_abierto": registro_abierto(),
+                         **({"cuota_dia": await estado_cuota_dia(llave)} if llave["plan_codigo"] == "prueba" else {})},
                         headers={**SIN_CACHE, **_cab_cuota(cuota)})
 
 
@@ -709,7 +767,7 @@ async def prueba(cuerpo: Prueba, request: Request):
                                      instalacion, codigo, vence_en, ip_alta)
                     VALUES ($1, $2, $3, 'prueba', $4, $5, '{{ruc}}', 'prueba', $6, $7, now() + make_interval(days => $8), $9)
                     RETURNING *""",
-                prefijo, huella, f"Ficha RUC · prueba {codigo}", CUOTA_GRATIS_MES, RPM_DEFECTO, inst, codigo, PRUEBA_DIAS, ip_huella)
+                prefijo, huella, f"Ficha RUC · prueba {codigo}", PRUEBA_CUOTA_MES, RPM_DEFECTO, inst, codigo, PRUEBA_DIAS, ip_huella)
             # Bitacora: solo el conteo de pruebas emitidas (sin IP y, por supuesto, sin RUC)
             await conn.execute(f"INSERT INTO {V.ESQUEMA}.api_uso (llave_id, recurso, unidades, http, ms) VALUES ($1, 'prueba', 1, 201, $2)",
                                fila["id"], int((time.monotonic() - t0) * 1000))
@@ -727,26 +785,66 @@ async def activar_instalacion(conn, esquema: str, codigo: str, *, nombre: str | 
     if not c:
         return None
     row = await conn.fetchrow(
-        f"""UPDATE {esquema}.api_llaves SET plan_codigo = 'gratis', vence_en = NULL, activada_en = now(),
+        f"""UPDATE {esquema}.api_llaves SET plan_codigo = 'gratis', vence_en = NULL, activada_en = now(), cuota_mes = $4,
                    nombre = coalesce($2, nombre), persona_id = coalesce($3, persona_id, solicitud_persona)
             WHERE codigo = $1 AND instalacion IS NOT NULL AND estado = 'activa' AND plan_codigo = 'prueba'
-            RETURNING *""", c, nombre, persona_id)
+            RETURNING *""", c, nombre, persona_id, CUOTA_GRATIS_MES)
     return dict(row) if row else None
 
 
-async def pruebas_resumen(conn, esquema: str) -> dict:
-    """Para el panel y el comando: pruebas emitidas por dia (de la bitacora: solo conteos) y estado."""
-    dias = [dict(r) for r in await conn.fetch(
-        f"""SELECT (creado_en AT TIME ZONE 'America/Lima')::date AS dia, sum(unidades) AS pruebas
-            FROM {esquema}.api_uso WHERE recurso = 'prueba' AND creado_en > now() - interval '30 days'
-            GROUP BY 1 ORDER BY 1 DESC""")]
+# Metricas diarias de la extension (para estimar): SOLO conteos por dia (hora de Lima). Ninguna
+# columna lleva RUC, IP ni identificadores. Se calculan al vuelo de la bitacora y de api_llaves.
+METRICAS = [
+    ("pruebas_emitidas", "Pruebas emitidas"),
+    ("instalaciones_activas", "Instalaciones que consultaron"),
+    ("consultas", "Consultas del día"),
+    ("tope_dia", "Pruebas que llegaron al tope diario"),
+    ("tope_mes", "Pruebas que llegaron al tope mensual"),
+    ("activadas", "Pruebas activadas como permanentes"),
+    ("vencidas_sin_activar", "Pruebas vencidas sin activar"),
+]
+
+
+async def metricas(conn, esquema: str, desde, hasta) -> list[dict]:
+    """Una fila por dia entre `desde` y `hasta` (fechas, inclusive), del mas reciente al mas viejo."""
+    rows = await conn.fetch(f"""
+        WITH d AS (SELECT generate_series($1::date, $2::date, interval '1 day')::date AS dia),
+        ext AS (SELECT id, activada_en, vence_en, plan_codigo FROM {esquema}.api_llaves WHERE instalacion IS NOT NULL),
+        u AS (SELECT (u.creado_en AT TIME ZONE 'America/Lima')::date AS dia, u.recurso, u.llave_id, u.unidades
+              FROM {esquema}.api_uso u JOIN ext ON ext.id = u.llave_id
+              WHERE u.creado_en >= $1::date::timestamp AT TIME ZONE 'America/Lima'
+                AND u.creado_en < ($2::date + 1)::timestamp AT TIME ZONE 'America/Lima'),
+        ud AS (SELECT dia,
+                      coalesce(sum(unidades) FILTER (WHERE recurso = 'prueba'), 0) AS pruebas_emitidas,
+                      count(DISTINCT llave_id) FILTER (WHERE recurso = 'ruc' AND unidades > 0) AS instalaciones_activas,
+                      coalesce(sum(unidades) FILTER (WHERE recurso = 'ruc'), 0) AS consultas,
+                      count(DISTINCT llave_id) FILTER (WHERE recurso = 'tope_dia') AS tope_dia,
+                      count(DISTINCT llave_id) FILTER (WHERE recurso = 'tope_mes') AS tope_mes
+               FROM u GROUP BY dia),
+        act AS (SELECT (activada_en AT TIME ZONE 'America/Lima')::date AS dia, count(*) AS n FROM ext
+                WHERE activada_en IS NOT NULL GROUP BY 1),
+        ven AS (SELECT (vence_en AT TIME ZONE 'America/Lima')::date AS dia, count(*) AS n FROM ext
+                WHERE plan_codigo = 'prueba' AND vence_en <= now() GROUP BY 1)
+        SELECT d.dia, coalesce(ud.pruebas_emitidas, 0) AS pruebas_emitidas, coalesce(ud.instalaciones_activas, 0) AS instalaciones_activas,
+               coalesce(ud.consultas, 0) AS consultas, coalesce(ud.tope_dia, 0) AS tope_dia, coalesce(ud.tope_mes, 0) AS tope_mes,
+               coalesce(act.n, 0) AS activadas, coalesce(ven.n, 0) AS vencidas_sin_activar
+        FROM d LEFT JOIN ud USING (dia) LEFT JOIN act USING (dia) LEFT JOIN ven USING (dia)
+        ORDER BY d.dia DESC""", desde, hasta)
+    return [{k: int(v) if k != "dia" else v for k, v in dict(r).items()} for r in rows]
+
+
+async def pruebas_resumen(conn, esquema: str, dias: int = 14) -> dict:
+    """Para el panel y el comando: metricas de los ultimos `dias` y el estado de las pruebas."""
+    hoy = await conn.fetchval(f"SELECT {_DIA}")
+    from datetime import timedelta
+    filas = await metricas(conn, esquema, hoy - timedelta(days=dias - 1), hoy)
     est = await conn.fetchrow(
         f"""SELECT count(*) FILTER (WHERE plan_codigo = 'prueba' AND vence_en > now()) AS en_prueba,
                    count(*) FILTER (WHERE plan_codigo = 'prueba' AND vence_en <= now()) AS vencidas,
                    count(*) FILTER (WHERE plan_codigo = 'prueba' AND solicitud_persona IS NOT NULL) AS por_activar,
                    count(*) FILTER (WHERE activada_en IS NOT NULL) AS activadas
             FROM {esquema}.api_llaves WHERE instalacion IS NOT NULL""")
-    return {"dias": dias, **dict(est)}
+    return {"dias": filas, "hoy": hoy, **dict(est)}
 
 
 async def asegurar_esquema():
