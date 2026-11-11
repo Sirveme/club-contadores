@@ -323,8 +323,15 @@ async def autenticar(request: Request) -> dict:
     if row["estado"] != "activa":
         raise ErrorApi(403, "llave_revocada", "Esta llave está revocada o suspendida.")
     if row.get("vence_en") and row["vence_en"] <= datetime.now(timezone.utc):
-        raise ErrorApi(403, "prueba_vencida", "Tu prueba gratis terminó.")
+        raise ErrorApi(403, "prueba_vencida", "Tu prueba gratis terminó.", registro_abierto=registro_abierto())
     return dict(row)
+
+
+def registro_abierto() -> bool:
+    """El registro del Club con DNI esta abierto al publico (IDENTIDAD_REGISTRO_ABIERTO). La extension
+    muestra «Regístrate aquí» solo si es asi: al abrirlo, el boton aparece sin publicar otra version."""
+    from . import identidad
+    return bool(identidad.REGISTRO_ABIERTO)
 
 
 def acceso(llave: dict) -> dict:
@@ -636,7 +643,7 @@ async def yo(request: Request):
     cuota = await estado_cuota(llave)
     return JSONResponse({"llave": llave["prefijo"], "nombre": llave["nombre"], "plan": llave["plan_codigo"],
                          "alcances": list(llave["alcances"]), "consultas_por_minuto": llave["rpm"], "cuota": cuota,
-                         "acceso": acceso(llave)},
+                         "acceso": acceso(llave), "registro_abierto": registro_abierto()},
                         headers={**SIN_CACHE, **_cab_cuota(cuota)})
 
 
@@ -697,7 +704,8 @@ async def prueba(cuerpo: Prueba, request: Request):
             await conn.execute(f"INSERT INTO {V.ESQUEMA}.api_uso (llave_id, recurso, unidades, http, ms) VALUES ($1, 'prueba', 1, 201, $2)",
                                fila["id"], int((time.monotonic() - t0) * 1000))
             http = 201
-    return JSONResponse({"credencial": llave, "codigo": fila["codigo"], "acceso": acceso(dict(fila))}, status_code=http, headers=SIN_CACHE)
+    return JSONResponse({"credencial": llave, "codigo": fila["codigo"], "acceso": acceso(dict(fila)),
+                         "registro_abierto": registro_abierto()}, status_code=http, headers=SIN_CACHE)
 
 
 async def activar_instalacion(conn, esquema: str, codigo: str, *, nombre: str | None = None,
