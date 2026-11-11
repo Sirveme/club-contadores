@@ -316,7 +316,7 @@ def _con_cookie(resp, request: Request, token: str):
 # URLs viejas (/club/tablero, /club/igv, /club/directorio, ...) -> 301 a las nuevas.
 RUTAS_CLUB = ("/entrar", "/igv", "/directorio", "/c", "/perfil", "/empresario", "/salir",
               "/registro", "/ingresar", "/cambiar-clave", "/activar", "/privacidad", "/verificador",
-              "/a-donde", "/lado")
+              "/a-donde", "/lado", "/extension")
 
 
 def ruta_nueva(path: str, home: str) -> str | None:

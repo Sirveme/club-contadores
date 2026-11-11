@@ -16,6 +16,8 @@ Configuracion:
   API_CUOTA_GRATIS_MES=100     cuota por defecto del plan gratis (provisional)
   API_RPM_DEFECTO=60           consultas por minuto por llave
   API_MAX_LOTE=100             RUC distintos y validos por lote
+  API_PRUEBA_DIAS=15           dias de la prueba gratis de la extension (por instalacion)
+  API_PRUEBA_MAX_IP_DIA=3      pruebas nuevas por IP en 24 h
 Usa el esquema del Verificador (VERIFICADOR_ESQUEMA).
 
 Cada llamada autenticada: ritmo -> validar -> descontar cuota -> consultar -> bitacora.
@@ -35,6 +37,7 @@ import re
 import secrets
 import time
 from collections import deque
+from datetime import datetime, timezone
 
 from typing import Any
 
@@ -56,6 +59,12 @@ MAX_LOTE = int(os.getenv("API_MAX_LOTE", "100") or 100)
 ANEXOS_MAX = 100
 ALCANCES = ("ruc", "ssco_representantes", "dni")
 SQL_V14 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sql", "alter_v14_api.sql")
+SQL_V16 = os.path.join(os.path.dirname(SQL_V14), "alter_v16_api_prueba.sql")
+PRUEBA_DIAS = int(os.getenv("API_PRUEBA_DIAS", "15") or 15)
+PRUEBA_MAX_IP_DIA = int(os.getenv("API_PRUEBA_MAX_IP_DIA", "3") or 3)
+_INSTALACION_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")   # crypto.randomUUID()
+_CODIGO_ABC = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"           # sin 0/O ni 1/I/L: se dicta por WhatsApp
+_CODIGO_RE = re.compile(rf"^[{_CODIGO_ABC}]{{8}}$")
 _LLAVE_RE = re.compile(r"^(psp_live_[a-z0-9]{8})_[A-Za-z0-9_-]{20,}$")
 _SUFIJO_ENTIDAD = re.compile(r"\s*/\s*SUNAT\s*$", re.I)
 SIN_CACHE = {"Cache-Control": "private, no-store", "X-Robots-Tag": "noindex"}
@@ -313,7 +322,18 @@ async def autenticar(request: Request) -> dict:
                                               "Authorization: Bearer <tu llave>.")
     if row["estado"] != "activa":
         raise ErrorApi(403, "llave_revocada", "Esta llave está revocada o suspendida.")
+    if row.get("vence_en") and row["vence_en"] <= datetime.now(timezone.utc):
+        raise ErrorApi(403, "prueba_vencida", "Tu prueba gratis terminó.")
     return dict(row)
+
+
+def acceso(llave: dict) -> dict:
+    """Prueba (con dias restantes) o permanente: lo que la extension muestra, sin hablar de llaves."""
+    vence = llave.get("vence_en")
+    if not vence:
+        return {"tipo": "permanente"}
+    seg = (vence - datetime.now(timezone.utc)).total_seconds()
+    return {"tipo": "prueba", "vence": vence.isoformat(), "dias_restantes": max(0, -int(-seg // 86400))}
 
 
 # --- Ritmo, cuota y bitacora -------------------------------------------------------------
@@ -615,8 +635,100 @@ async def yo(request: Request):
     llave = await autenticar(request)
     cuota = await estado_cuota(llave)
     return JSONResponse({"llave": llave["prefijo"], "nombre": llave["nombre"], "plan": llave["plan_codigo"],
-                         "alcances": list(llave["alcances"]), "consultas_por_minuto": llave["rpm"], "cuota": cuota},
+                         "alcances": list(llave["alcances"]), "consultas_por_minuto": llave["rpm"], "cuota": cuota,
+                         "acceso": acceso(llave)},
                         headers={**SIN_CACHE, **_cab_cuota(cuota)})
+
+
+# --- Prueba gratis de la extension (15 dias por instalacion) ---------------------------------
+class Prueba(BaseModel):
+    instalacion: str = Field(max_length=36)
+
+
+_NO_DISPONIBLE = "No pudimos iniciar la prueba en este momento. Intenta más tarde."
+
+
+def _codigo_nuevo() -> str:
+    c = "".join(secrets.choice(_CODIGO_ABC) for _ in range(8))
+    return f"{c[:4]}-{c[4:]}"
+
+
+def codigo_normal(texto: str) -> str | None:
+    """'k7qm 4xpa' -> 'K7QM-4XPA' (o None si no tiene la forma de un codigo)."""
+    t = re.sub(r"[\s-]", "", str(texto or "")).upper()
+    return f"{t[:4]}-{t[4:]}" if _CODIGO_RE.match(t) else None
+
+
+@app.post("/prueba", include_in_schema=False)
+async def prueba(cuerpo: Prueba, request: Request):
+    """La extension la pide sola la primera vez (sin credencial). Una prueba por instalacion: si la
+    misma instalacion vuelve a pedir, recibe una credencial nueva con el MISMO vencimiento (no se
+    reinician los 15 dias). Tope de pruebas nuevas por IP y dia; al pasarlo, un error generico."""
+    inst = cuerpo.instalacion.strip().lower()
+    if not _INSTALACION_RE.match(inst):
+        raise ErrorApi(422, "solicitud_invalida", "La solicitud no tiene el formato esperado.")
+    t0, ip = time.monotonic(), club._client_ip(request)
+    ip_huella = hashlib.sha256(("ip:" + ip).encode()).hexdigest() if ip else None
+    t = f"{V.ESQUEMA}.api_llaves"
+    llave, prefijo, huella = nueva_llave()
+    async with db._pool.acquire() as conn, conn.transaction():
+        await conn.execute("SELECT pg_advisory_xact_lock(hashtext('api_prueba'))")     # el conteo por IP, sin carreras
+        fila = await conn.fetchrow(f"SELECT * FROM {t} WHERE instalacion = $1", inst)
+        if fila:
+            if fila["plan_codigo"] != "prueba" or fila["estado"] != "activa":
+                raise ErrorApi(409, "no_disponible", _NO_DISPONIBLE)
+            fila = await conn.fetchrow(f"UPDATE {t} SET prefijo = $2, huella = $3 WHERE id = $1 RETURNING *", fila["id"], prefijo, huella)
+            http = 200
+        else:
+            if ip_huella and await conn.fetchval(f"SELECT count(*) FROM {t} WHERE ip_alta = $1 AND creada_en > now() - interval '1 day'",
+                                                 ip_huella) >= PRUEBA_MAX_IP_DIA:
+                raise ErrorApi(503, "no_disponible", _NO_DISPONIBLE)
+            for _ in range(5):                                    # el codigo es corto: se reintenta si choca
+                codigo = _codigo_nuevo()
+                if not await conn.fetchval(f"SELECT 1 FROM {t} WHERE codigo = $1", codigo):
+                    break
+            fila = await conn.fetchrow(
+                f"""INSERT INTO {t} (prefijo, huella, nombre, plan_codigo, cuota_mes, rpm, alcances, creada_por,
+                                     instalacion, codigo, vence_en, ip_alta)
+                    VALUES ($1, $2, $3, 'prueba', $4, $5, '{{ruc}}', 'prueba', $6, $7, now() + make_interval(days => $8), $9)
+                    RETURNING *""",
+                prefijo, huella, f"Ficha RUC · prueba {codigo}", CUOTA_GRATIS_MES, RPM_DEFECTO, inst, codigo, PRUEBA_DIAS, ip_huella)
+            # Bitacora: solo el conteo de pruebas emitidas (sin IP y, por supuesto, sin RUC)
+            await conn.execute(f"INSERT INTO {V.ESQUEMA}.api_uso (llave_id, recurso, unidades, http, ms) VALUES ($1, 'prueba', 1, 201, $2)",
+                               fila["id"], int((time.monotonic() - t0) * 1000))
+            http = 201
+    return JSONResponse({"credencial": llave, "codigo": fila["codigo"], "acceso": acceso(dict(fila))}, status_code=http, headers=SIN_CACHE)
+
+
+async def activar_instalacion(conn, esquema: str, codigo: str, *, nombre: str | None = None,
+                              persona_id=None) -> dict | None:
+    """Prueba -> acceso permanente (plan gratis, sin vencimiento). La usan el panel y el comando
+    (hoy, a mano); el bot de registro la llamara igual cuando exista. La extension lo detecta sola
+    en su siguiente consulta a /yo. -> la fila activada, o None si no hay una prueba con ese codigo."""
+    c = codigo_normal(codigo)
+    if not c:
+        return None
+    row = await conn.fetchrow(
+        f"""UPDATE {esquema}.api_llaves SET plan_codigo = 'gratis', vence_en = NULL, activada_en = now(),
+                   nombre = coalesce($2, nombre), persona_id = coalesce($3, persona_id, solicitud_persona)
+            WHERE codigo = $1 AND instalacion IS NOT NULL AND estado = 'activa' AND plan_codigo = 'prueba'
+            RETURNING *""", c, nombre, persona_id)
+    return dict(row) if row else None
+
+
+async def pruebas_resumen(conn, esquema: str) -> dict:
+    """Para el panel y el comando: pruebas emitidas por dia (de la bitacora: solo conteos) y estado."""
+    dias = [dict(r) for r in await conn.fetch(
+        f"""SELECT (creado_en AT TIME ZONE 'America/Lima')::date AS dia, sum(unidades) AS pruebas
+            FROM {esquema}.api_uso WHERE recurso = 'prueba' AND creado_en > now() - interval '30 days'
+            GROUP BY 1 ORDER BY 1 DESC""")]
+    est = await conn.fetchrow(
+        f"""SELECT count(*) FILTER (WHERE plan_codigo = 'prueba' AND vence_en > now()) AS en_prueba,
+                   count(*) FILTER (WHERE plan_codigo = 'prueba' AND vence_en <= now()) AS vencidas,
+                   count(*) FILTER (WHERE plan_codigo = 'prueba' AND solicitud_persona IS NOT NULL) AS por_activar,
+                   count(*) FILTER (WHERE activada_en IS NOT NULL) AS activadas
+            FROM {esquema}.api_llaves WHERE instalacion IS NOT NULL""")
+    return {"dias": dias, **dict(est)}
 
 
 async def asegurar_esquema():
@@ -631,7 +743,7 @@ async def asegurar_esquema():
 
 
 async def crear_tablas(pool_o_conn, esquema: str):
-    sql = open(SQL_V14, encoding="utf-8").read()
+    sql = open(SQL_V14, encoding="utf-8").read() + "\n" + open(SQL_V16, encoding="utf-8").read()
     if hasattr(pool_o_conn, "acquire"):
         async with pool_o_conn.acquire() as conn, conn.transaction():
             await conn.execute(f"SET LOCAL search_path TO {esquema}, public")

@@ -21,6 +21,18 @@
   {% endif %}
 
   {% if aviso %}<div class="msg info">{{ aviso }}</div>{% endif %}
+  {% if pruebas %}
+  <section class="panel" aria-label="Pruebas de la extensión" style="margin-bottom:12px">
+    <header class="panel-cab"><b>Pruebas de la extensión Ficha RUC</b><span>15 días por instalación · la bitácora solo guarda cuántas</span></header>
+    <div class="panel-cuerpo">
+      <p style="margin:0">En prueba <b class="mono">{{ pruebas.en_prueba }}</b> · vencidas <b class="mono">{{ pruebas.vencidas }}</b>
+        · se registraron y esperan activación <b class="mono">{{ pruebas.por_activar }}</b> · activadas <b class="mono">{{ pruebas.activadas }}</b></p>
+      <p class="nota" style="margin:6px 0 0">Emitidas por día (30 días):
+        {% for d in pruebas.dias %}<span class="mono">{{ d.dia.strftime("%d/%m") }}: {{ d.pruebas }}</span>{% if not loop.last %} · {% endif %}{% else %}<span class="faint">ninguna todavía</span>{% endfor %}</p>
+      <p class="nota" style="margin:6px 0 0">Para activar a alguien: busca su código (te lo escribe por WhatsApp) en la lista de abajo, ábrelo y toca «Activar acceso permanente».</p>
+    </div>
+  </section>
+  {% endif %}
   {% if errores %}<div class="msg err">{% for e in errores %}{{ e }}<br>{% endfor %}</div>{% endif %}
   {% if not api_abierta %}<div class="msg info">La API está <b>cerrada</b> al público (API_ABIERTA): puedes preparar llaves; empezarán a responder cuando se abra.</div>{% endif %}
 

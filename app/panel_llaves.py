@@ -7,6 +7,8 @@ host): otra pagina no puede disparar acciones con la sesion del admin.
 - La llave completa se muestra UNA vez, al crearla; en la base solo queda su huella.
 - Revocar es definitivo; suspender se puede revertir (reactivar).
 - Listar no crea nada: las tablas de la API se crean recien al emitir la primera llave.
+- Pruebas de la extension Ficha RUC (plan 'prueba', 15 dias): se activan a mano con "Activar acceso
+  permanente" (o `api_llave.py activar CODIGO`). La extension lo detecta sola en su siguiente consulta.
 """
 from __future__ import annotations
 
@@ -61,8 +63,19 @@ async def _listar() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def _pruebas() -> dict | None:
+    if not await _hay_tablas():
+        return None
+    async with db._pool.acquire() as conn:
+        if not await conn.fetchval("SELECT 1 FROM information_schema.columns WHERE table_schema = $1 AND table_name = 'api_llaves' "
+                                   "AND column_name = 'codigo'", V.ESQUEMA):
+            return None
+        return await A.pruebas_resumen(conn, V.ESQUEMA)
+
+
 async def _pagina(request: Request, **extra):
     llaves = await _listar()
+    extra.setdefault("pruebas", await _pruebas())
     return club.templates.TemplateResponse(request, "club/panel_llaves.html", {
         "s": await club.socio_actual(request), "inicio": club.inicio(request), "llaves": llaves,
         "esquema": V.ESQUEMA, "api_abierta": A.ABIERTA, "cuota_gratis": A.CUOTA_GRATIS_MES, "rpm_defecto": A.RPM_DEFECTO,
@@ -141,10 +154,16 @@ async def accion(prefijo: str, accion: str, request: Request):
         if cuota is None or rpm is None:
             return RedirectResponse(f"/panel/llaves/{prefijo}?ok=" + "Cuota (0 a 10 000 000) y consultas por minuto (1 a 6000) deben ser números.", 303)
         plan = await db._pool.fetchval(f"SELECT plan_codigo FROM {_t('api_llaves')} WHERE prefijo = $1", prefijo)
-        alcances = ["ruc"] + [a for a, _ in ALCANCES_PANEL if a in (f.get("alcances") or []) and plan != "gratis"]
+        alcances = ["ruc"] + [a for a, _ in ALCANCES_PANEL if a in (f.get("alcances") or []) and plan == "pago"]
         await db._pool.execute(f"UPDATE {_t('api_llaves')} SET cuota_mes = $2, rpm = $3, alcances = $4 WHERE prefijo = $1 AND estado <> 'revocada'",
                                prefijo, cuota, rpm, alcances)
         return RedirectResponse(f"/panel/llaves/{prefijo}?ok=Cambios guardados.", 303)
+    elif accion == "activar":                         # prueba de la extension -> acceso permanente
+        codigo = await db._pool.fetchval(f"SELECT codigo FROM {_t('api_llaves')} WHERE prefijo = $1", prefijo)
+        async with db._pool.acquire() as conn:
+            fila = await A.activar_instalacion(conn, V.ESQUEMA, codigo or "")
+        aviso = ("Acceso permanente activado: la extensión lo detecta sola en su próxima consulta." if fila
+                 else "No se activó: no es una prueba vigente de la extensión.")
     else:
         return HTMLResponse("Acción desconocida.", status_code=404, headers=NO_CACHE)
     return RedirectResponse(f"/panel/llaves/{prefijo}?ok={aviso}", 303)

@@ -5,6 +5,11 @@
   python api_llave.py listar   [--esquema ...]
   python api_llave.py revocar psp_live_a1b2c3d4   [--esquema ...]
   python api_llave.py alcances psp_live_a1b2c3d4 ruc ssco_representantes   [--esquema ...]
+  python api_llave.py activar K7QM-4XPA [--nombre "Juan Pérez García"]   [--esquema ...]
+  python api_llave.py pruebas   [--esquema ...]
+
+activar: la prueba de la extension Ficha RUC con ese codigo (el que la persona escribe por WhatsApp)
+pasa a acceso permanente; la extension lo detecta sola. pruebas: emitidas por dia y en que estado van.
 
 --esquema: public (produccion, por defecto) o prueba_padron (ensayo). El plan 'pago' incluye el
 alcance 'ssco_representantes'; el gratis no. La cuota por defecto del plan gratis sale de
@@ -74,6 +79,19 @@ async def main(a):
                 raise SystemExit(f"alcances no permitidos: {malos}")
             r = await conn.execute(f"UPDATE {t} SET alcances = $2 WHERE prefijo = $1", a.prefijo, a.lista)
             print("alcances actualizados" if r.endswith("1") else "no hay una llave con ese prefijo")
+        elif a.cmd == "activar":
+            fila = await A.activar_instalacion(conn, a.esquema, a.codigo, nombre=a.nombre)
+            print(f"Acceso permanente activado: {fila['codigo']} · {fila['nombre']!r} · {fila['cuota_mes']} consultas/mes"
+                  if fila else "No hay una prueba vigente con ese código (revisa que esté bien escrito, o ya fue activada).")
+        elif a.cmd == "pruebas":
+            r = await A.pruebas_resumen(conn, a.esquema)
+            print(f"En prueba {r['en_prueba']} · vencidas {r['vencidas']} · registradas esperando activación {r['por_activar']}"
+                  f" · activadas {r['activadas']}")
+            for d in r["dias"]:
+                print(f"  {d['dia']:%d/%m/%Y}  {d['pruebas']} prueba(s) emitida(s)")
+            for f in await conn.fetch(f"SELECT codigo, solicitud_en FROM {t} WHERE plan_codigo = 'prueba' AND solicitud_persona IS NOT NULL "
+                                      f"AND estado = 'activa' ORDER BY solicitud_en"):
+                print(f"  por activar: {f['codigo']}  (se registró el {f['solicitud_en']:%d/%m/%Y %H:%M})")
     finally:
         await conn.close()
 
@@ -87,6 +105,8 @@ if __name__ == "__main__":
     sub.add_parser("listar")
     r = sub.add_parser("revocar"); r.add_argument("prefijo")
     al = sub.add_parser("alcances"); al.add_argument("prefijo"); al.add_argument("lista", nargs="+")
+    ac = sub.add_parser("activar"); ac.add_argument("codigo"); ac.add_argument("--nombre")
+    sub.add_parser("pruebas")
     for p in sub.choices.values():
         p.add_argument("--esquema", default="public")
     asyncio.run(main(ap.parse_args()))

@@ -16,6 +16,11 @@
     <div class="panel-cuerpo">
       <dl class="llave-datos">
         <div><dt>Plan</dt><dd>{{ k.plan_codigo }}</dd></div>
+        {% if k.codigo %}
+        <div><dt>Extensión · código</dt><dd class="mono">{{ k.codigo }}</dd></div>
+        <div><dt>{{ "Prueba vence" if k.vence_en else "Activada" }}</dt><dd class="mono">{{ (k.vence_en or k.activada_en).strftime("%d/%m/%Y %H:%M") if (k.vence_en or k.activada_en) else "—" }}</dd></div>
+        <div><dt>Se registró en el Club</dt><dd class="mono">{{ k.solicitud_en.strftime("%d/%m/%Y %H:%M") if k.solicitud_en else "— (aún no)" }}</dd></div>
+        {% endif %}
         <div><dt>Alcances</dt><dd class="mono">{{ k.alcances|join(", ") }}</dd></div>
         <div><dt>Cliente</dt><dd class="mono">{{ k.cliente_ruc or "—" }}</dd></div>
         <div><dt>Este mes</dt><dd class="mono">{{ cuota.usada }} de {{ cuota.limite }} · quedan {{ cuota.restante }} · reinicia {{ cuota.reinicio }}</dd></div>
@@ -26,6 +31,11 @@
       </dl>
       {% if k.estado != "revocada" %}
       <div class="ver-acciones">
+        {% if k.estado == "activa" and k.plan_codigo == "prueba" and k.codigo %}
+        <form method="post" action="/panel/llaves/{{ k.prefijo }}/activar"
+              onsubmit="return confirm('¿Activar el acceso permanente de la extensión {{ k.codigo }}?')">
+          <button class="btn-ver" type="submit">Activar acceso permanente</button></form>
+        {% endif %}
         {% if k.estado == "activa" %}
         <form method="post" action="/panel/llaves/{{ k.prefijo }}/suspender"><button class="btn-sec" type="submit">Suspender</button></form>
         {% else %}
@@ -49,7 +59,7 @@
       </div>
       {% for a, texto in alcances_panel %}
       <label class="check-simple"><input type="checkbox" name="alcances" value="{{ a }}" {% if a in k.alcances %}checked{% endif %}
-        {% if k.plan_codigo == "gratis" %}disabled{% endif %}> {{ texto }}{% if k.plan_codigo == "gratis" %} <span class="faint">(no disponible en el plan gratis)</span>{% endif %}</label>
+        {% if k.plan_codigo != "pago" %}disabled{% endif %}> {{ texto }}{% if k.plan_codigo != "pago" %} <span class="faint">(solo en planes pagados)</span>{% endif %}</label>
       {% endfor %}
       <div><button class="btn-ver" type="submit">Guardar</button></div>
     </form>

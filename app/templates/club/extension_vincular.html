@@ -1,0 +1,24 @@
+{% extends "club/base.html" %}
+{% set hoja = "puerta" %}
+{% block titulo %}Ficha RUC · Club de Contadores{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Fórmula">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">=</span>FICHA_RUC({% if codigo %}"{{ codigo }}"{% endif %})</div>
+  </section>
+  <div class="estrecho">
+    {% if caso == "recibida" %}
+    <div class="msg info"><b>¡Listo! Recibimos tu solicitud.</b>
+      Activamos el acceso permanente de tu extensión Ficha RUC (código <b class="mono">{{ codigo }}</b>) en breve.
+      No tienes que hacer nada más: la extensión lo detecta sola la próxima vez que la abras.</div>
+    {% elif caso == "empresario" %}
+    <div class="msg info"><b>El Club de Empresarios está por lanzarse.</b>
+      Ya tenemos tu dato y te avisaremos apenas esté listo. La extensión Ficha RUC, por ahora, es para los socios del Club de Contadores.</div>
+    {% else %}
+    <div class="msg info"><b>Ya estás en el Club.</b>
+      Para activar tu extensión Ficha RUC, ábrela y toca «Regístrate aquí» o «Únete por WhatsApp» en el aviso de tu prueba.</div>
+    {% endif %}
+    <div class="acciones"><a class="btn" href="{{ inicio }}">Ir al Club</a></div>
+  </div>
+{% endblock %}
