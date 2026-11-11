@@ -666,6 +666,16 @@ def codigo_normal(texto: str) -> str | None:
     return f"{t[:4]}-{t[4:]}" if _CODIGO_RE.match(t) else None
 
 
+def _huella_ip(ip: str | None) -> str | None:
+    """Huella IRREVERSIBLE de la IP (lo promete /privacidad, art. 10): HMAC con el secreto del servidor.
+    Un sha256 simple de una IPv4 se revierte probando las 4 300 millones de direcciones; sin el
+    secreto, no. Sin secreto configurado no se guarda nada (y no se aplica el tope por IP)."""
+    secreto = os.getenv("SESION_SECRET", "").strip()
+    if not ip or not secreto:
+        return None
+    return hmac.new(secreto.encode(), ("prueba-ip:" + ip).encode(), hashlib.sha256).hexdigest()
+
+
 @app.post("/prueba", include_in_schema=False)
 async def prueba(cuerpo: Prueba, request: Request):
     """La extension la pide sola la primera vez (sin credencial). Una prueba por instalacion: si la
@@ -675,7 +685,7 @@ async def prueba(cuerpo: Prueba, request: Request):
     if not _INSTALACION_RE.match(inst):
         raise ErrorApi(422, "solicitud_invalida", "La solicitud no tiene el formato esperado.")
     t0, ip = time.monotonic(), club._client_ip(request)
-    ip_huella = hashlib.sha256(("ip:" + ip).encode()).hexdigest() if ip else None
+    ip_huella = _huella_ip(ip)
     t = f"{V.ESQUEMA}.api_llaves"
     llave, prefijo, huella = nueva_llave()
     async with db._pool.acquire() as conn, conn.transaction():
