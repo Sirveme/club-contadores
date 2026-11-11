@@ -17,7 +17,7 @@ Configuracion:
   API_RPM_DEFECTO=60           consultas por minuto por llave
   API_MAX_LOTE=100             RUC distintos y validos por lote
   API_PRUEBA_DIAS=15           dias de la prueba gratis de la extension (por instalacion)
-  API_PRUEBA_MAX_IP_DIA=3      pruebas nuevas por IP en 24 h
+  PRUEBAS_POR_IP_DIA=20        pruebas nuevas por IP en 24 h (se lee al arrancar: Railway reinicia al cambiarla)
 Usa el esquema del Verificador (VERIFICADOR_ESQUEMA).
 
 Cada llamada autenticada: ritmo -> validar -> descontar cuota -> consultar -> bitacora.
@@ -61,7 +61,7 @@ ALCANCES = ("ruc", "ssco_representantes", "dni")
 SQL_V14 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sql", "alter_v14_api.sql")
 SQL_V16 = os.path.join(os.path.dirname(SQL_V14), "alter_v16_api_prueba.sql")
 PRUEBA_DIAS = int(os.getenv("API_PRUEBA_DIAS", "15") or 15)
-PRUEBA_MAX_IP_DIA = int(os.getenv("API_PRUEBA_MAX_IP_DIA", "3") or 3)
+PRUEBA_MAX_IP_DIA = int(os.getenv("PRUEBAS_POR_IP_DIA", "20") or 20)
 _INSTALACION_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")   # crypto.randomUUID()
 _CODIGO_ABC = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"           # sin 0/O ni 1/I/L: se dicta por WhatsApp
 _CODIGO_RE = re.compile(rf"^[{_CODIGO_ABC}]{{8}}$")
