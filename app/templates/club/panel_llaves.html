@@ -48,6 +48,21 @@
     </div>
   </section>
   {% endif %}
+  {% if vitrina %}
+  <section class="panel" aria-label="Vitrina de la extensión" style="margin-bottom:12px">
+    <header class="panel-cab"><b>Vitrina de la extensión: clics por tarjeta</b><span>últimos {{ vitrina.dias|length }} días · {{ vitrina.total }} clics · solo conteos · <a href="/panel/vitrina">Editar tarjetas →</a></span></header>
+    <div class="tabla-wrap"><table class="tabla">
+      <thead><tr><th>Día</th>{% for t in vitrina.tarjetas %}<th>{{ t.titulo }}{% if not t.activo %} (apagada){% endif %}</th>{% endfor %}<th>Total</th></tr></thead>
+      <tbody>
+      {% for d in vitrina.dias %}
+        <tr><td class="mono">{{ d.dia.strftime("%d/%m/%Y") }}</td>{% for n in d.por %}<td class="mono">{{ n }}</td>{% endfor %}<td class="mono"><b>{{ d.total }}</b></td></tr>
+      {% endfor %}
+        <tr><td><b>Total</b></td>{% for n in vitrina.totales %}<td class="mono"><b>{{ n }}</b></td>{% endfor %}<td class="mono"><b>{{ vitrina.total }}</b></td></tr>
+      </tbody>
+    </table></div>
+    <div class="panel-cuerpo"><p class="nota" style="margin:0">Un clic es una vez que alguien tocó el botón de la tarjeta (hora de Lima). Sin RUC, sin IP y sin identificadores.</p></div>
+  </section>
+  {% endif %}
   {% if errores %}<div class="msg err">{% for e in errores %}{{ e }}<br>{% endfor %}</div>{% endif %}
   {% if not api_abierta %}<div class="msg info">La API está <b>cerrada</b> al público (API_ABIERTA): puedes preparar llaves; empezarán a responder cuando se abra.</div>{% endif %}
 

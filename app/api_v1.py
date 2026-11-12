@@ -46,12 +46,13 @@ from typing import Any
 from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import club, db
 from . import padron as P
 from . import verificador as V
+from . import vitrina_ext as VT
 
 log = logging.getLogger("uvicorn.error")
 ABIERTA = os.getenv("API_ABIERTA", "0").strip() == "1"
@@ -62,6 +63,7 @@ ANEXOS_MAX = 100
 ALCANCES = ("ruc", "ssco_representantes", "dni")
 SQL_V14 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sql", "alter_v14_api.sql")
 SQL_V16 = os.path.join(os.path.dirname(SQL_V14), "alter_v16_api_prueba.sql")
+SQL_V17 = os.path.join(os.path.dirname(SQL_V14), "alter_v17_vitrina.sql")
 PRUEBA_DIAS = int(os.getenv("API_PRUEBA_DIAS", "15") or 15)
 PRUEBA_MAX_IP_DIA = int(os.getenv("PRUEBAS_POR_IP_DIA", "20") or 20)
 # La prueba tiene su propia cuota (generosa, para que el contador se acostumbre): se aplica al
@@ -734,6 +736,28 @@ def _huella_ip(ip: str | None) -> str | None:
     return hmac.new(secreto.encode(), ("prueba-ip:" + ip).encode(), hashlib.sha256).hexdigest()
 
 
+# --- Vitrina de la extension (sin credencial, no consume cuota) ----------------------------------
+@app.get("/vitrina", include_in_schema=False)
+async def vitrina():
+    """Tarjetas activas de la vitrina: SOLO datos (la extension los pinta como texto)."""
+    try:
+        ts = await VT.tarjetas(db._pool, V.ESQUEMA)
+    except Exception:
+        log.exception("vitrina: no se pudieron leer las tarjetas")
+        return _error(503, "no_disponible", "La vitrina no está disponible en este momento.")
+    return JSONResponse({"tarjetas": ts}, headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/vitrina/ir/{tarjeta_id}", include_in_schema=False)
+async def vitrina_ir(tarjeta_id: int):
+    """Clic en una tarjeta: suma 1 a su dia (solo el conteo: sin IP ni identificadores) y redirige a su
+    enlace con ?ref=ficha-ruc. Solo redirige a enlaces guardados en el panel (no es un redirector abierto)."""
+    destino = await VT.contar_clic(db._pool, V.ESQUEMA, tarjeta_id) if 0 < tarjeta_id < 2**31 else None
+    if not destino:
+        return _error(404, "no_encontrado", "Esa tarjeta ya no está disponible.")
+    return RedirectResponse(destino, status_code=302, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
 @app.post("/prueba", include_in_schema=False)
 async def prueba(cuerpo: Prueba, request: Request):
     """La extension la pide sola la primera vez (sin credencial). Una prueba por instalacion: si la
@@ -859,7 +883,7 @@ async def asegurar_esquema():
 
 
 async def crear_tablas(pool_o_conn, esquema: str):
-    sql = open(SQL_V14, encoding="utf-8").read() + "\n" + open(SQL_V16, encoding="utf-8").read()
+    sql = "\n".join(open(f, encoding="utf-8").read() for f in (SQL_V14, SQL_V16, SQL_V17))
     if hasattr(pool_o_conn, "acquire"):
         async with pool_o_conn.acquire() as conn, conn.transaction():
             await conn.execute(f"SET LOCAL search_path TO {esquema}, public")

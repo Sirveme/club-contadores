@@ -21,6 +21,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from . import api_v1 as A, club, db, identidad
 from . import padron as P
 from . import verificador as V
+from . import vitrina_ext as VT
 
 router = APIRouter()
 _PREFIJO = re.compile(r"^psp_live_[a-z0-9]{8}$")
@@ -73,8 +74,15 @@ async def _pruebas() -> dict | None:
         return await A.pruebas_resumen(conn, V.ESQUEMA)
 
 
+async def _vitrina() -> dict | None:
+    if not await db._pool.fetchval("SELECT to_regclass($1) IS NOT NULL", _t("vitrina_clics")):
+        return None
+    return await VT.clics_resumen(db._pool, V.ESQUEMA)
+
+
 async def _pagina(request: Request, **extra):
     llaves = await _listar()
+    extra.setdefault("vitrina", await _vitrina())
     extra.setdefault("pruebas", await _pruebas())
     extra.setdefault("metricas_cols", A.METRICAS)
     extra.setdefault("prueba_cuota", {"mes": A.PRUEBA_CUOTA_MES, "dia": A.PRUEBA_CUOTA_DIA, "dias": A.PRUEBA_DIAS})
@@ -82,6 +90,39 @@ async def _pagina(request: Request, **extra):
         "s": await club.socio_actual(request), "inicio": club.inicio(request), "llaves": llaves,
         "esquema": V.ESQUEMA, "api_abierta": A.ABIERTA, "cuota_gratis": A.CUOTA_GRATIS_MES, "rpm_defecto": A.RPM_DEFECTO,
         "alcances_panel": ALCANCES_PANEL, **extra}, headers=NO_CACHE)
+
+
+# --- Vitrina de la extension: editar tarjetas (solo datos) -------------------------------------
+async def _pagina_vitrina(request: Request, **extra):
+    await A.crear_tablas(db._pool, V.ESQUEMA)
+    return club.templates.TemplateResponse(request, "club/panel_vitrina.html", {
+        "s": await club.socio_actual(request), "inicio": club.inicio(request),
+        "tarjetas": await VT.tarjetas(db._pool, V.ESQUEMA, todas=True), "ref": VT.REF, **extra}, headers=NO_CACHE)
+
+
+@router.get("/panel/vitrina", response_class=HTMLResponse)
+async def panel_vitrina(request: Request, ok: str = ""):
+    return await _pagina_vitrina(request, aviso=ok[:120])
+
+
+@router.post("/panel/vitrina/guardar", response_class=HTMLResponse)
+async def vitrina_guardar(request: Request):
+    if not _mismo_sitio(request):
+        return HTMLResponse("Acción no permitida.", status_code=403, headers=NO_CACHE)
+    f = await _form(request)
+    t, errores = VT.validar(f)
+    tid = _entero(f.get("id", ""), 1, 2**31 - 1) if f.get("id") else None
+    clave = None
+    if not tid:
+        clave = f.get("clave", "").lower()
+        if not VT.CLAVE_RE.match(clave):
+            errores.append("La clave nueva va en minúsculas, sin espacios (2 a 30 letras, números, - o _).")
+        elif await db._pool.fetchval(f"SELECT 1 FROM {_t('vitrina_tarjetas')} WHERE clave = $1", clave):
+            errores.append("Ya hay una tarjeta con esa clave.")
+    if errores:
+        return await _pagina_vitrina(request, errores=errores, previo={**f, "id": tid})
+    await VT.guardar(db._pool, V.ESQUEMA, tid, t, clave)
+    return RedirectResponse("/panel/vitrina?ok=" + ("Tarjeta guardada." if tid else "Tarjeta creada."), 303)
 
 
 @router.get("/panel/llaves", response_class=HTMLResponse)

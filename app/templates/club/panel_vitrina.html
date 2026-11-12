@@ -1,0 +1,50 @@
+{% extends "club/base.html" %}
+{% set hoja = "panel_vitrina" %}
+{% block titulo %}Vitrina de la extensión · Panel{% endblock %}
+{% block contenido %}
+  <section class="fx" aria-label="Fórmula">
+    <div class="ref">A1</div>
+    <div class="f">fx</div>
+    <div class="val"><span class="q">=</span>VITRINA(tarjetas; orden; activo)</div>
+  </section>
+
+  {% if aviso %}<div class="msg info">{{ aviso }}</div>{% endif %}
+  {% if errores %}<div class="msg err">{% for e in errores %}{{ e }}<br>{% endfor %}</div>{% endif %}
+  <p class="nota">Estas tarjetas rotan al pie de la ficha y de la tabla en la extensión Ficha RUC. Los cambios se ven en
+    unos minutos, sin publicar otra versión. Son solo datos: texto, un emoji, dos colores (degradado) y un enlace
+    <span class="mono">https://</span>, al que se le agrega <span class="mono">?ref={{ ref }}</span>. Para quitar una
+    tarjeta, apágala. Los clics se ven en <a href="/panel/llaves">Llaves de la API</a>.</p>
+
+  {% macro formulario(t, nueva=False) %}
+  <form class="panel" method="post" action="/panel/vitrina/guardar" style="margin-bottom:12px">
+    <header class="panel-cab" style="background:linear-gradient(90deg, {{ t.color1 or '#ff7a18' }}, {{ t.color2 or '#d6246e' }})">
+      <b style="color:#1a110a">{{ t.emoji }} {{ t.titulo or "Tarjeta nueva" }}</b>
+      <span style="color:#1a110a">{% if not nueva %}{{ "activa" if t.activo else "apagada" }} · orden {{ t.orden }}{% endif %}</span></header>
+    <div class="panel-cuerpo">
+      {% if not nueva %}<input type="hidden" name="id" value="{{ t.id }}">{% endif %}
+      <div class="ver-acciones">
+        {% if nueva %}<div class="campo"><label>Clave (única)</label><input name="clave" maxlength="30" required placeholder="nueva-tarjeta" value="{{ t.clave or '' }}"></div>{% endif %}
+        <div class="campo"><label>Título</label><input name="titulo" maxlength="40" required value="{{ t.titulo or '' }}"></div>
+        <div class="campo"><label>Emoji</label><input name="emoji" maxlength="8" value="{{ t.emoji or '' }}" style="width:5em"></div>
+        <div class="campo"><label>Orden</label><input name="orden" inputmode="numeric" value="{{ t.orden or 0 }}" style="width:5em"></div>
+      </div>
+      <div class="ver-acciones">
+        <div class="campo" style="flex:1"><label>Beneficio (una línea)</label><input name="texto" maxlength="70" required value="{{ t.texto or '' }}"></div>
+        <div class="campo"><label>Botón</label><input name="boton" maxlength="20" required value="{{ t.boton or '' }}"></div>
+      </div>
+      <div class="ver-acciones">
+        <div class="campo" style="flex:1"><label>Enlace (https://)</label><input name="enlace" maxlength="300" required value="{{ t.enlace or '' }}"></div>
+        <div class="campo"><label>Color 1</label><input name="color1" type="color" value="{{ t.color1 or '#ff7a18' }}"></div>
+        <div class="campo"><label>Color 2</label><input name="color2" type="color" value="{{ t.color2 or '#d6246e' }}"></div>
+      </div>
+      <label class="check-simple"><input type="checkbox" name="activo" value="1" {% if nueva or t.activo %}checked{% endif %}> Activa (se muestra en la extensión)</label>
+      <div><button class="btn-ver" type="submit">{{ "Crear tarjeta →" if nueva else "Guardar" }}</button></div>
+    </div>
+  </form>
+  {% endmacro %}
+
+  {% for t in tarjetas %}
+    {% if previo and previo.id == t.id %}{{ formulario(previo) }}{% else %}{{ formulario(t) }}{% endif %}
+  {% endfor %}
+  {{ formulario(previo if (previo and not previo.id) else {}, nueva=True) }}
+{% endblock %}
